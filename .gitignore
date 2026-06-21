@@ -216,3 +216,26 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# ============================================================
+# myStock 项目专用规则
+# ============================================================
+
+# 配置（含敏感信息，如交易密码）——绝不提交
+config.yaml
+config.local.yaml
+config.*.local.yaml
+
+# 数据库与运行时数据（含真实持仓 / 交易数据）——绝不提交
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+
+# 个人交易数据导出
+**/datasets/
+
+# macOS
+.DS_Store
+**/.DS_Store

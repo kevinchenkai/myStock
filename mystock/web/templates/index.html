@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>myStock · 我的港美股</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>myStock</h1>
+    <span class="sub">个人港美股持仓 / 交易 / 行情（本地）· <span class="up">红涨</span> <span class="down">绿跌</span></span>
+  </header>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="positions">我的持仓</div>
+    <div class="tab" data-tab="trades">我的交易</div>
+  </div>
+
+  <div class="container">
+    <!-- 持仓 -->
+    <div class="panel" id="panel-positions">
+      <div class="toolbar">
+        <div class="filter" data-filter="positions">
+          <span class="filter-label">市场</span>
+          <span class="chip active" data-market="">全部</span>
+          <span class="chip" data-market="US">美股</span>
+          <span class="chip" data-market="HK">港股</span>
+        </div>
+        <div class="muted" id="positions-meta"></div>
+      </div>
+      <div id="positions-table"></div>
+    </div>
+
+    <!-- 交易 -->
+    <div class="panel" id="panel-trades" style="display:none;">
+      <div class="toolbar">
+        <div class="subtabs">
+          <div class="subtab active" data-sub="orders">按订单</div>
+          <div class="subtab" data-sub="deals">按成交</div>
+        </div>
+        <div class="filter" data-filter="trades">
+          <span class="filter-label">市场</span>
+          <span class="chip active" data-market="">全部</span>
+          <span class="chip" data-market="US">美股</span>
+          <span class="chip" data-market="HK">港股</span>
+        </div>
+      </div>
+      <div id="orders-table"></div>
+      <div id="deals-table" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- 个股详情下钻 -->
+  <div class="overlay" id="overlay">
+    <div class="detail">
+      <div class="detail-head">
+        <h2 id="detail-title">—</h2>
+        <button class="close-btn" id="detail-close">关闭 ✕</button>
+      </div>
+      <div id="detail-body"></div>
+    </div>
+  </div>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

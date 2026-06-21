@@ -1,0 +1,141 @@
+:root {
+  --up: #d33a3a;     /* 涨：红 */
+  --down: #1aab5a;   /* 跌：绿 */
+  --flat: #888;      /* 平：中性灰 */
+  --bg: #f5f6f8;
+  --panel: #ffffff;
+  --border: #e3e6ea;
+  --text: #222;
+  --muted: #777;
+  --accent: #2f6fed;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+}
+
+header {
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 20px;
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+}
+header h1 { font-size: 18px; margin: 0; }
+header .sub { color: var(--muted); font-size: 12px; }
+
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 20px 0;
+}
+.tab {
+  padding: 8px 18px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  background: #eef0f3;
+  cursor: pointer;
+  border-radius: 6px 6px 0 0;
+  color: var(--muted);
+}
+.tab.active {
+  background: var(--panel);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.container { padding: 0 20px 40px; }
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 0 6px 6px 6px;
+  padding: 16px;
+}
+
+.subtabs { display: flex; gap: 8px; }
+.subtab {
+  padding: 5px 14px; border: 1px solid var(--border);
+  border-radius: 14px; cursor: pointer; background: #f0f2f5; color: var(--muted);
+}
+.subtab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+/* 工具栏：市场筛选 + 元信息 */
+.toolbar {
+  display: flex; align-items: center; gap: 16px;
+  flex-wrap: wrap; margin-bottom: 12px;
+}
+.filter { display: flex; align-items: center; gap: 6px; }
+.filter-label { color: var(--muted); font-size: 12px; }
+.chip {
+  padding: 4px 12px; border: 1px solid var(--border);
+  border-radius: 14px; cursor: pointer; background: #f0f2f5; color: var(--muted);
+  user-select: none;
+}
+.chip:hover { border-color: var(--accent); }
+.chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.toolbar .muted { margin-left: auto; }
+
+/* 可排序表头 */
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--text); }
+th.sortable .arrow { font-size: 10px; color: var(--accent); margin-left: 2px; }
+
+table { width: 100%; border-collapse: collapse; }
+th, td {
+  padding: 8px 10px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+th:first-child, td:first-child,
+th.text, td.text { text-align: left; }
+th {
+  background: #fafbfc; color: var(--muted); font-weight: 600;
+  position: sticky; top: 0;
+}
+tbody tr:hover { background: #f7f9fc; }
+
+.clickable { color: var(--accent); cursor: pointer; }
+.clickable:hover { text-decoration: underline; }
+
+.up { color: var(--up); }
+.down { color: var(--down); }
+.flat { color: var(--flat); }
+
+.badge {
+  display: inline-block; padding: 1px 8px; border-radius: 10px; font-size: 12px;
+}
+.badge.buy { background: rgba(211,58,58,.12); color: var(--up); }
+.badge.sell { background: rgba(26,171,90,.12); color: var(--down); }
+
+.muted { color: var(--muted); }
+.empty { padding: 30px; text-align: center; color: var(--muted); }
+
+/* 详情面板 */
+.overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.35);
+  display: none; justify-content: center; align-items: flex-start;
+  padding: 40px 20px; overflow: auto; z-index: 20;
+}
+.overlay.open { display: flex; }
+.detail {
+  background: var(--panel); border-radius: 8px; width: 100%; max-width: 1000px;
+  padding: 20px; box-shadow: 0 10px 40px rgba(0,0,0,.2);
+}
+.detail-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.detail-head h2 { margin: 0; font-size: 18px; }
+.close-btn { cursor: pointer; border: none; background: #eee; border-radius: 6px; padding: 6px 12px; }
+
+.detail h3 { font-size: 14px; margin: 18px 0 8px; border-left: 3px solid var(--accent); padding-left: 8px; }
+
+.chart-wrap { width: 100%; overflow-x: auto; border: 1px solid var(--border); border-radius: 6px; }
+svg.chart { display: block; }
+.scroll-table { max-height: 260px; overflow: auto; border: 1px solid var(--border); border-radius: 6px; }

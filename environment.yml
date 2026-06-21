@@ -1,0 +1,13 @@
+name: mk
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - pip
+  - pip:
+      - futu-api>=7.0.0
+      - yfinance>=0.2.40
+      - Flask>=3.0.0
+      - PyYAML>=6.0
+      - pandas>=2.0.0
