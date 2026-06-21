@@ -5,11 +5,28 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>myStock · 我的港美股</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <script>
+    // 首屏即应用主题，避免深/浅切换闪烁（FOUC）。
+    // localStorage 存 'light' / 'dark' / 'system'（或未设置=跟随系统）。
+    (function () {
+      try {
+        var t = localStorage.getItem("mystock-theme");
+        if (t === "light" || t === "dark") {
+          document.documentElement.setAttribute("data-theme", t);
+        }
+      } catch (e) {}
+    })();
+  </script>
 </head>
 <body>
   <header>
+    <span class="brand">M</span>
     <h1>myStock</h1>
     <span class="sub">个人港美股持仓 / 交易 / 行情（本地）· <span class="up">红涨</span> <span class="down">绿跌</span></span>
+    <button class="theme-toggle" id="theme-toggle" type="button" title="切换主题：跟随系统 / 浅色 / 深色">
+      <span class="tt-icon" id="tt-icon">🖥️</span>
+      <span id="tt-label">跟随系统</span>
+    </button>
   </header>
 
   <div class="tabs">
