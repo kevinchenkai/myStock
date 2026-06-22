@@ -70,6 +70,30 @@ CREATE TABLE IF NOT EXISTS daily_quotes (
     PRIMARY KEY (yf_symbol, date)
 );
 
+-- 股票通用信息（公司 / 估值），来自 yfinance Ticker.info。
+-- 随每日 update 刷新；按 futu_code 覆盖（UPSERT）。
+CREATE TABLE IF NOT EXISTS stock_profiles (
+    futu_code           TEXT PRIMARY KEY,     -- 富途代码，如 HK.00700 / US.AAPL
+    yf_symbol           TEXT,                 -- yfinance 代码
+    long_name           TEXT,                 -- 公司名
+    sector              TEXT,                 -- 板块
+    industry            TEXT,                 -- 行业
+    exchange            TEXT,                 -- 交易所
+    market_cap_mm       REAL,                 -- 市值(百万，本币计价，单位见 currency)
+    shares_mm           REAL,                 -- 流通股本(百万)
+    trailing_pe         REAL,                 -- 市盈率(TTM)
+    forward_pe          REAL,                 -- 预期市盈率
+    price_to_book       REAL,                 -- 市净率
+    trailing_eps        REAL,                 -- 每股收益(TTM)
+    dividend_yield      REAL,                 -- 股息率%
+    beta                REAL,                 -- Beta
+    target_mean_price   REAL,                 -- 目标均价
+    recommendation      TEXT,                 -- 分析师评级
+    currency            TEXT,                 -- 货币
+    website             TEXT,                 -- 官网
+    synced_at           TEXT                  -- 入库时间
+);
+
 -- 行情跳过名单：连续多次抓取为空（如退市 / yfinance 无数据）的代码，
 -- 后续直接跳过，避免重复无效请求与库的退市警告噪音。
 CREATE TABLE IF NOT EXISTS quote_skiplist (

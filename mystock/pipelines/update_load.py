@@ -57,6 +57,9 @@ def run() -> int:
 
         quote_start = _incremental_start(conn, "yfinance", "date")
         init_load.collect_quotes(conn, quote_start, end_date)
+
+        # 通用信息：每日全量刷新（UPSERT 覆盖）
+        init_load.collect_profiles(conn)
     finally:
         conn.close()
 

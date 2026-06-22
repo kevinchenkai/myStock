@@ -101,6 +101,19 @@ def upsert_quotes(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
     return _upsert(conn, "daily_quotes", rows, ["yf_symbol", "date"])
 
 
+def upsert_profiles(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
+    return _upsert(conn, "stock_profiles", rows, ["futu_code"])
+
+
+def get_profile(conn: sqlite3.Connection, futu_code: str) -> Optional[dict]:
+    """读取某代码的通用信息（无则返回 None）。"""
+    cur = conn.execute(
+        "SELECT * FROM stock_profiles WHERE futu_code = ?", (futu_code,)
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
 def replace_position_snapshot(
     conn: sqlite3.Connection, snapshot_date: str, rows: Sequence[dict]
 ) -> int:

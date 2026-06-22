@@ -124,6 +124,45 @@ def collect_quotes(conn, start: str, end: str) -> None:
     print(f"[quotes] 完成：{msg}，共 {grand_total} 条")
 
 
+def collect_profiles(conn) -> None:
+    """抓取全部持仓/交易代码的通用信息（公司/估值），UPSERT 入库。
+
+    随每日 update 刷新。复用行情跳过名单（退市/无数据代码不再请求）。
+    单标的失败不中断整体。
+    """
+    now = _now()
+    all_codes = db.all_traded_codes(conn)
+    if not all_codes:
+        db.write_sync_log(conn, "yf_profile", None, None, 0, "ok", "no codes")
+        print("[profiles] 无可抓取的代码，跳过")
+        return
+
+    skip = db.get_quote_skiplist(conn)
+    codes = [c for c in all_codes if c not in skip]
+
+    ok_codes = 0
+    empty_codes = 0
+    err_codes = 0
+    print(f"[profiles] 准备抓取 {len(codes)} 个标的的通用信息…")
+    for code in codes:
+        try:
+            row = yc.fetch_profile(code, now=now)
+            if not row:
+                empty_codes += 1
+                print(f"  · {code}: 无资料")
+                continue
+            db.upsert_profiles(conn, [row])
+            ok_codes += 1
+            print(f"  ✓ {code}: {row.get('long_name') or ''}")
+        except Exception as e:  # noqa: BLE001
+            err_codes += 1
+            print(f"  ✗ {code}: {e}", file=sys.stderr)
+
+    msg = f"{ok_codes} ok / {empty_codes} empty / {err_codes} err / {len(skip)} skipped"
+    db.write_sync_log(conn, "yf_profile", None, None, ok_codes, "ok", msg)
+    print(f"[profiles] 完成：{msg}")
+
+
 def run() -> int:
     start = CONFIG.start_date
     end = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -142,6 +181,8 @@ def run() -> int:
         collect_deals(conn, start, end)
         # yfinance 用日期粒度
         collect_quotes(conn, start, end_date)
+        # 通用信息（依赖 quotes 已更新的跳过名单，故放在最后）
+        collect_profiles(conn)
     finally:
         conn.close()
 

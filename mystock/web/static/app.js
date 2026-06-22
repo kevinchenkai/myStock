@@ -351,6 +351,8 @@ async function openStock(code) {
     document.getElementById("detail-title").textContent =
       d.name ? `${code} · ${d.name}` : code;
     body.innerHTML = `
+      <h3>通用信息</h3>
+      <div id="detail-profile"><div class="empty">加载通用信息中…</div></div>
       <h3>价格走势（收盘价）</h3>
       ${renderChart(d.quotes)}
       <h3>历史日线（${d.quotes.length} 条）</h3>
@@ -360,9 +362,69 @@ async function openStock(code) {
       <h3>我的成交（${d.deals.length} 条）</h3>
       ${renderDetailDeals(d.deals)}
     `;
+    loadProfile(code);   // 通用信息走 yfinance 实时接口，异步填充
   } catch (e) {
     body.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
   }
+}
+
+// 通用信息：字段顺序与渲染方式（与后端 _PROFILE_LABELS 字段名一致）。
+// cur:true 表示该值以标的本币计价（yfinance 按交易货币返回），
+// 展示时把币种（货币字段）拼到标签后，避免误标成美元。
+const PROFILE_FIELDS = [
+  { key: "公司名" }, { key: "板块" }, { key: "行业" }, { key: "交易所" },
+  { key: "市值(百万)", num: true, cur: true }, { key: "流通股本(百万)", num: true },
+  { key: "市盈率(TTM)", num: true }, { key: "预期市盈率", num: true },
+  { key: "市净率", num: true }, { key: "每股收益(TTM)", num: true, cur: true },
+  { key: "股息率%", num: true }, { key: "Beta", num: true },
+  { key: "目标均价", num: true, cur: true }, { key: "分析师评级" },
+  { key: "货币" }, { key: "官网", link: true },
+];
+
+async function loadProfile(code) {
+  const wrap = document.getElementById("detail-profile");
+  if (!wrap) return;
+  try {
+    const r = await getJSON(`/api/stock/${encodeURIComponent(code)}/profile`);
+    if (!r.profile) {
+      wrap.innerHTML = `<div class="empty">暂无通用信息（可能未上市 / yfinance 无资料）</div>`;
+      return;
+    }
+    wrap.innerHTML = renderProfile(r.profile);
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty">通用信息加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+function renderProfile(p) {
+  const cur = p["货币"] ? String(p["货币"]) : "";   // 标的本币，如 USD / HKD
+  const items = PROFILE_FIELDS.map((f) => {
+    let v = p[f.key];
+    if (v === null || v === undefined || v === "") return "";
+    // 本币计价字段：标签后拼币种，避免误标成美元。无币种则保持原样。
+    //  「市值(百万)」→「市值(百万HKD)」；「目标均价」→「目标均价(HKD)」
+    let label = f.key;
+    if (f.cur && cur) {
+      label = f.key.includes("(百万)")
+        ? f.key.replace("(百万)", `(百万${cur})`)
+        : `${f.key}(${cur})`;
+    }
+    let val;
+    if (f.link) {
+      const url = esc(String(v));
+      val = `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+    } else if (f.num) {
+      val = fmtNum(v);
+    } else {
+      val = esc(String(v));
+    }
+    return `<div class="profile-item">
+      <span class="profile-key">${esc(label)}</span>
+      <span class="profile-val">${val}</span>
+    </div>`;
+  }).filter(Boolean).join("");
+  if (!items) return `<div class="empty">暂无通用信息</div>`;
+  return `<div class="profile-grid">${items}</div>`;
 }
 
 // 简单的收盘价折线 SVG。涨段红、跌段绿（相对前一日收盘）。

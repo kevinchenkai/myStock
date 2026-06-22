@@ -109,3 +109,60 @@ def fetch_daily(
                 row[db_col] = float(r[yf_col])
         rows.append(row)
     return rows
+
+
+def _profile_from_info(info: dict) -> dict:
+    """从 yfinance Ticker.info 提取常用公司/估值信息，键为 stock_profiles 列名。"""
+    market_cap = info.get("marketCap")
+    shares = info.get("sharesOutstanding")
+    # yfinance 新版 dividendYield 已是百分比数值（如 0.36 表示 0.36%）
+    dividend_yield = info.get("dividendYield")
+    return {
+        "long_name": info.get("longName") or info.get("shortName"),
+        "sector": info.get("sector"),
+        "industry": info.get("industry"),
+        "exchange": info.get("exchange"),
+        "market_cap_mm": market_cap / 1_000_000 if market_cap else None,
+        "shares_mm": shares / 1_000_000 if shares else None,
+        "trailing_pe": info.get("trailingPE"),
+        "forward_pe": info.get("forwardPE"),
+        "price_to_book": info.get("priceToBook"),
+        "trailing_eps": info.get("trailingEps"),
+        "dividend_yield": dividend_yield,
+        "beta": info.get("beta"),
+        "target_mean_price": info.get("targetMeanPrice"),
+        "recommendation": info.get("recommendationKey"),
+        "currency": info.get("currency"),
+        "website": info.get("website"),
+    }
+
+# 这些列才是“真正的资料”——全为空视为无有效资料（如退市），不入库。
+_PROFILE_VALUE_COLS = (
+    "long_name", "sector", "industry", "exchange", "market_cap_mm",
+    "shares_mm", "trailing_pe", "forward_pe", "price_to_book",
+    "trailing_eps", "dividend_yield", "beta", "target_mean_price",
+    "recommendation", "currency", "website",
+)
+
+
+def fetch_profile(futu_code: str, now: str = "") -> Optional[dict]:
+    """抓取单个标的的通用信息（公司/估值），返回 stock_profiles 入库 dict。
+
+    实时调用 yfinance Ticker.info。失败或无有效资料返回 None。
+    """
+    _require_yf()
+    yf_symbol = futu_to_yf(futu_code)
+    try:
+        info = yf.Ticker(yf_symbol).info or {}
+    except Exception:  # noqa: BLE001 — 资料缺失不应中断整体流程
+        return None
+    if not info:
+        return None
+    profile = _profile_from_info(info)
+    # 全为空说明无有效资料（如退市），返回 None
+    if all(profile.get(c) is None for c in _PROFILE_VALUE_COLS):
+        return None
+    profile["futu_code"] = futu_code
+    profile["yf_symbol"] = yf_symbol
+    profile["synced_at"] = now
+    return profile

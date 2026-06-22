@@ -333,6 +333,27 @@ th.sortable .arrow { font-size: 9px; color: var(--accent); margin-left: 3px; }
   font-weight: 700;
 }
 
+/* 通用信息：自适应网格的键值卡片 */
+.profile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+.profile-item {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 8px 12px;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--panel-2);
+}
+.profile-key { font-size: 11px; color: var(--muted); }
+.profile-val {
+  font-size: 14px; font-weight: 600; color: var(--text);
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+.profile-val a { color: var(--accent); text-decoration: none; }
+.profile-val a:hover { text-decoration: underline; }
+
 .chart-wrap {
   width: 100%; overflow-x: auto;
   border: 1px solid var(--border); border-radius: var(--radius-sm);

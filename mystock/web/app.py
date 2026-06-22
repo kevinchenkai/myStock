@@ -19,8 +19,29 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 
 from ..config import CONFIG
+from .. import db as dbmod
 
 app = Flask(__name__)
+
+# stock_profiles 列名 -> 前端展示用中文标签（顺序即展示顺序）
+_PROFILE_LABELS = [
+    ("long_name", "公司名"),
+    ("sector", "板块"),
+    ("industry", "行业"),
+    ("exchange", "交易所"),
+    ("market_cap_mm", "市值(百万)"),
+    ("shares_mm", "流通股本(百万)"),
+    ("trailing_pe", "市盈率(TTM)"),
+    ("forward_pe", "预期市盈率"),
+    ("price_to_book", "市净率"),
+    ("trailing_eps", "每股收益(TTM)"),
+    ("dividend_yield", "股息率%"),
+    ("beta", "Beta"),
+    ("target_mean_price", "目标均价"),
+    ("recommendation", "分析师评级"),
+    ("currency", "货币"),
+    ("website", "官网"),
+]
 
 
 def get_db() -> sqlite3.Connection:
@@ -125,7 +146,7 @@ def api_quotes():
         conn.close()
 
 
-@app.route("/api/stock/<path:code>")
+@app.route("/api/stock/<code>")
 def api_stock(code: str):
     """聚合某只股票：行情 + 订单 + 成交。"""
     conn = get_db()
@@ -168,6 +189,23 @@ def api_stock(code: str):
         )
     finally:
         conn.close()
+
+
+@app.route("/api/stock/<code>/profile")
+def api_stock_profile(code: str):
+    """单只股票的通用信息（公司 / 估值），读取自 db.stock_profiles。
+
+    数据由 init.sh / update.sh 抓取入库；此处仅读库，不触发网络。
+    """
+    conn = get_db()
+    try:
+        row = dbmod.get_profile(conn, code)
+    finally:
+        conn.close()
+    if not row:
+        return jsonify({"code": code, "profile": None})
+    profile = {label: row.get(col) for col, label in _PROFILE_LABELS}
+    return jsonify({"code": code, "profile": profile})
 
 
 def main() -> None:
