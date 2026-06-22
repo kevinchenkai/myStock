@@ -333,6 +333,22 @@ th.sortable .arrow { font-size: 9px; color: var(--accent); margin-left: 3px; }
   font-weight: 700;
 }
 
+/* 可折叠板块：标题点击切换显示/隐藏 */
+.section-title {
+  display: flex; align-items: center; gap: 6px;
+  cursor: pointer; user-select: none;
+  border-radius: var(--radius-sm);
+  transition: color .15s ease;
+}
+.section-title:hover { color: var(--accent); }
+.section-title:focus-visible { outline: none; box-shadow: var(--ring); }
+.section-caret {
+  display: inline-block; font-size: 11px; color: var(--muted);
+  transition: transform .18s ease;
+}
+.section.collapsed .section-caret { transform: rotate(-90deg); }
+.section.collapsed .section-body { display: none; }
+
 /* 通用信息：自适应网格的键值卡片 */
 .profile-grid {
   display: grid;
@@ -390,3 +406,57 @@ svg.chart { display: block; }
   .panel { padding: 12px; }
   th, td { padding: 9px 8px; }
 }
+
+/* ============================================================
+   交易复盘浮窗（盈亏 Tab 点击代码弹出，复用 overlay）
+   ============================================================ */
+/* 指标卡网格 */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.metric {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--panel-2);
+  padding: 12px 14px;
+}
+.metric-big {
+  grid-column: span 2;
+  background: linear-gradient(135deg, var(--accent-soft), transparent);
+  border-color: var(--accent);
+}
+.metric-label { font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+.metric-hint { cursor: help; opacity: .7; }
+.metric-value {
+  font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.metric-big .metric-value { font-size: 26px; }
+
+.analysis-summary {
+  font-size: 14px; margin: 0 0 12px; padding: 10px 14px;
+  background: var(--panel-2); border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+}
+.obs-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.obs {
+  display: flex; gap: 8px; align-items: flex-start;
+  font-size: 13.5px; line-height: 1.5;
+  padding: 9px 12px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--panel-2);
+}
+.obs-icon { flex: 0 0 auto; }
+.obs-good { border-left: 3px solid var(--up); }
+.obs-warn { border-left: 3px solid #e0a800; }
+.obs-info { border-left: 3px solid var(--accent); }
+.disclaimer {
+  font-size: 12px; color: var(--muted); margin: 12px 0 0; line-height: 1.6;
+}
+
+.tag {
+  display: inline-block; font-size: 11px; padding: 1px 6px;
+  border-radius: 6px; background: var(--accent-soft); color: var(--accent);
+}
+.deals-meta { font-size: 12px; margin-bottom: 8px; }
+.scroll-table.tall { max-height: 480px; }

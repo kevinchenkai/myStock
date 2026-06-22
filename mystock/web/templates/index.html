@@ -32,6 +32,7 @@
   <div class="tabs">
     <div class="tab active" data-tab="positions">我的持仓</div>
     <div class="tab" data-tab="trades">我的交易</div>
+    <div class="tab" data-tab="pnl">交易盈亏</div>
   </div>
 
   <div class="container">
@@ -66,6 +67,20 @@
       <div id="orders-table"></div>
       <div id="deals-table" style="display:none;"></div>
     </div>
+
+    <!-- 交易盈亏 -->
+    <div class="panel" id="panel-pnl" style="display:none;">
+      <div class="toolbar">
+        <div class="filter" data-filter="pnl">
+          <span class="filter-label">市场</span>
+          <span class="chip active" data-market="">全部</span>
+          <span class="chip" data-market="US">美股</span>
+          <span class="chip" data-market="HK">港股</span>
+        </div>
+        <div class="muted" id="pnl-meta"></div>
+      </div>
+      <div id="pnl-table"></div>
+    </div>
   </div>
 
   <!-- 个股详情下钻 -->
@@ -79,6 +94,7 @@
     </div>
   </div>
 
+  <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

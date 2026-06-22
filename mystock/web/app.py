@@ -9,6 +9,9 @@
   GET /api/deals?code=...      历史成交（可按 code 过滤）
   GET /api/quotes?code=...&start=...&end=...   某代码日线
   GET /api/stock/<code>        聚合：该股票行情 + 订单 + 成交
+  GET /api/stock/<code>/profile    通用信息（公司/估值，读自 stock_profiles）
+  GET /api/stock/<code>/analysis   交易复盘（成交明细 + FIFO 回合 + 复盘统计）
+  GET /api/pnl                 交易盈亏（已实现，每股一行）
 """
 from __future__ import annotations
 
@@ -20,6 +23,7 @@ from flask import Flask, jsonify, render_template, request
 
 from ..config import CONFIG
 from .. import db as dbmod
+from ..pnl import compute_pnl, analyze_stock
 
 app = Flask(__name__)
 
@@ -118,6 +122,56 @@ def api_deals():
         else:
             cur = conn.execute("SELECT * FROM deals ORDER BY create_time DESC")
         return jsonify(rows_to_list(cur))
+    finally:
+        conn.close()
+
+
+@app.route("/api/pnl")
+def api_pnl():
+    """交易盈亏（已实现）：按成交数据，移动平均成本法 + 持仓成本兜底。"""
+    conn = get_db()
+    try:
+        cur = conn.execute("SELECT * FROM deals")
+        deals = rows_to_list(cur)
+        # 成本兜底：positions 最新快照里每只股的 cost_price
+        cur = conn.execute("SELECT MAX(snapshot_date) AS d FROM positions")
+        row = cur.fetchone()
+        latest = row["d"] if row else None
+        cost_fallback: dict = {}
+        if latest:
+            cur = conn.execute(
+                "SELECT code, cost_price FROM positions WHERE snapshot_date = ?",
+                (latest,),
+            )
+            cost_fallback = {r["code"]: r["cost_price"] for r in cur.fetchall()}
+        return jsonify({"rows": compute_pnl(deals, cost_fallback)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/stock/<code>/analysis")
+def api_stock_analysis(code: str):
+    """单只股票交易复盘：成交明细 + FIFO 配对回合 + 复盘统计 + 客观观察。"""
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "SELECT * FROM deals WHERE code = ? ORDER BY create_time ASC", (code,)
+        )
+        deals = rows_to_list(cur)
+        # 成本兜底：positions 最新快照该股 cost_price
+        cur = conn.execute("SELECT MAX(snapshot_date) AS d FROM positions")
+        row = cur.fetchone()
+        latest = row["d"] if row else None
+        fb = None
+        if latest:
+            cur = conn.execute(
+                "SELECT cost_price FROM positions WHERE snapshot_date = ? AND code = ?",
+                (latest, code),
+            )
+            r = cur.fetchone()
+            fb = r["cost_price"] if r else None
+        analysis = analyze_stock(deals, fb)
+        return jsonify({"code": code, "deals": deals, "analysis": analysis})
     finally:
         conn.close()
 
