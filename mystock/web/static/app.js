@@ -397,10 +397,11 @@ function renderPnl() {
 
 // ---------- 个股详情下钻 ----------
 const overlay = document.getElementById("overlay");
-document.getElementById("detail-close").addEventListener("click", () => overlay.classList.remove("open"));
-overlay.addEventListener("click", (e) => { if (e.target === overlay) overlay.classList.remove("open"); });
+document.getElementById("detail-close").addEventListener("click", () => { overlay.classList.remove("open"); destroyChart(); });
+overlay.addEventListener("click", (e) => { if (e.target === overlay) { overlay.classList.remove("open"); destroyChart(); } });
 
 async function openStock(code) {
+  destroyChart();   // 重开前销毁上一个图表实例
   overlay.classList.add("open");
   document.getElementById("detail-title").textContent = code;
   const body = document.getElementById("detail-body");
@@ -411,11 +412,12 @@ async function openStock(code) {
       d.name ? `${code} · ${d.name}` : code;
     body.innerHTML =
       section("通用信息", `<div id="detail-profile"><div class="empty">加载通用信息中…</div></div>`) +
-      section("价格走势（收盘价）", renderChart(d.quotes)) +
+      section("价格走势（K线）", renderChart(d.quotes)) +
       section(`历史日线（${d.quotes.length} 条）`, renderQuotesTable(d.quotes)) +
       section(`我的订单（${d.orders.length} 条）`, renderDetailOrders(d.orders)) +
       section(`我的成交（${d.deals.length} 条）`, renderDetailDeals(d.deals));
     bindSectionToggles(body);
+    mountChart();        // 占位容器已入 DOM，挂载蜡烛图 + 成交量
     loadProfile(code);   // 通用信息走 yfinance 实时接口，异步填充
   } catch (e) {
     body.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
@@ -424,6 +426,7 @@ async function openStock(code) {
 
 // ---------- 交易复盘浮窗（与个股详情共用 overlay）----------
 async function openAnalysis(code) {
+  destroyChart();   // 复盘浮窗不含图表，复用 overlay 前先销毁残留实例
   overlay.classList.add("open");
   document.getElementById("detail-title").textContent = `${code} · 交易复盘`;
   const body = document.getElementById("detail-body");
@@ -611,41 +614,103 @@ function renderProfile(p) {
   return `<div class="profile-grid">${items}</div>`;
 }
 
-// 简单的收盘价折线 SVG。涨段红、跌段绿（相对前一日收盘）。
+// ---------- 价格走势：蜡烛图 + 成交量（Lightweight-Charts）----------
+// 该库需真实 DOM 容器 + 创建后注入数据，故 renderChart 只产出占位容器，
+// 数据暂存到 _chartData，待 DOM 插入后由 mountChart 挂载。
+let _chartHandle = null;   // 当前图表实例（浮窗关闭时销毁）
+let _chartData = null;     // 待挂载的 quotes
+
 function renderChart(quotes) {
+  _chartData = quotes;
   if (!quotes || quotes.length < 2) {
     return `<div class="empty">行情数据不足，无法绘图</div>`;
   }
-  const W = Math.max(720, quotes.length * 6);
-  const H = 240, pad = 36;
-  const closes = quotes.map((q) => Number(q.close)).filter((x) => isFinite(x));
-  const min = Math.min(...closes), max = Math.max(...closes);
-  const range = max - min || 1;
-  const x = (i) => pad + (i * (W - 2 * pad)) / (quotes.length - 1);
-  const y = (v) => H - pad - ((v - min) / range) * (H - 2 * pad);
+  return `<div class="chart-host" id="chart-host"></div>`;
+}
 
-  let segs = "";
-  for (let i = 1; i < quotes.length; i++) {
-    const prev = Number(quotes[i - 1].close);
-    const cur = Number(quotes[i].close);
-    if (!isFinite(prev) || !isFinite(cur)) continue;
-    const cls = cur > prev ? "up" : cur < prev ? "down" : "flat";
-    const color = cls === "up" ? "var(--up)" : cls === "down" ? "var(--down)" : "var(--flat)";
-    segs += `<line x1="${x(i - 1).toFixed(1)}" y1="${y(prev).toFixed(1)}" x2="${x(i).toFixed(1)}" y2="${y(cur).toFixed(1)}" stroke="${color}" stroke-width="1.6"/>`;
+// 读取当前主题下的 CSS 变量颜色（红涨绿跌、深浅主题一致）。
+function chartColors() {
+  const cs = getComputedStyle(document.body);
+  const v = (name, fallback) => (cs.getPropertyValue(name).trim() || fallback);
+  return {
+    up: v("--up", "#e23d3d"),
+    down: v("--down", "#1ca362"),
+    border: v("--border", "#ddd"),
+    muted: v("--muted", "#888"),
+    text: v("--text", "#222"),
+    bg: v("--panel", "#fff"),
+  };
+}
+
+// 销毁当前图表（浮窗关闭/重开时调用），避免内存泄漏与重复挂载。
+function destroyChart() {
+  if (_chartHandle) {
+    try { _chartHandle.remove(); } catch (e) {}
+    _chartHandle = null;
   }
-  // 轴标签
-  const first = quotes[0].date, last = quotes[quotes.length - 1].date;
-  return `
-    <div class="chart-wrap">
-      <svg class="chart" width="${W}" height="${H}">
-        <line x1="${pad}" y1="${H - pad}" x2="${W - pad}" y2="${H - pad}" stroke="var(--border)"/>
-        <line x1="${pad}" y1="${pad}" x2="${pad}" y2="${H - pad}" stroke="var(--border)"/>
-        <text x="${pad}" y="${pad - 12}" fill="var(--muted)" font-size="11">高 ${fmtNum(max)}</text>
-        <text x="${pad}" y="${H - pad + 16}" fill="var(--muted)" font-size="11">低 ${fmtNum(min)} · ${first}</text>
-        <text x="${W - pad}" y="${H - pad + 16}" fill="var(--muted)" font-size="11" text-anchor="end">${last}</text>
-        ${segs}
-      </svg>
-    </div>`;
+  _chartData = null;
+}
+
+// 在占位容器已插入 DOM 后挂载蜡烛图 + 成交量副图。
+function mountChart() {
+  const host = document.getElementById("chart-host");
+  if (!host || !_chartData || _chartData.length < 2) return;
+  if (typeof LightweightCharts === "undefined") {
+    host.innerHTML = `<div class="empty">图表库未加载</div>`;
+    return;
+  }
+  const c = chartColors();
+  const chart = LightweightCharts.createChart(host, {
+    width: host.clientWidth || 720,
+    height: 320,
+    layout: { background: { color: "transparent" }, textColor: c.muted },
+    grid: {
+      vertLines: { color: c.border },
+      horzLines: { color: c.border },
+    },
+    rightPriceScale: { borderColor: c.border },
+    timeScale: { borderColor: c.border, timeVisible: false },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  });
+
+  // 蜡烛主图：红涨绿跌
+  const candle = chart.addCandlestickSeries({
+    upColor: c.up, downColor: c.down,
+    wickUpColor: c.up, wickDownColor: c.down,
+    borderUpColor: c.up, borderDownColor: c.down,
+  });
+  const candleData = [];
+  const volData = [];
+  for (const q of _chartData) {
+    const o = Number(q.open), h = Number(q.high), l = Number(q.low), cl = Number(q.close);
+    if (![o, h, l, cl].every(isFinite)) continue;
+    candleData.push({ time: q.date, open: o, high: h, low: l, close: cl });
+    const vol = Number(q.volume);
+    if (isFinite(vol)) {
+      volData.push({ time: q.date, value: vol, color: cl >= o ? c.up : c.down });
+    }
+  }
+  candle.setData(candleData);
+
+  // 成交量副图：底部 20% 高度的直方图
+  const vol = chart.addHistogramSeries({
+    priceFormat: { type: "volume" },
+    priceScaleId: "vol",
+  });
+  chart.priceScale("vol").applyOptions({
+    scaleMargins: { top: 0.8, bottom: 0 },
+  });
+  vol.setData(volData);
+
+  chart.timeScale().fitContent();
+
+  // 容器宽度自适应（浮窗大小变化时）
+  const ro = new ResizeObserver(() => {
+    if (_chartHandle === chart) chart.applyOptions({ width: host.clientWidth });
+  });
+  ro.observe(host);
+
+  _chartHandle = chart;
 }
 
 function renderQuotesTable(quotes) {

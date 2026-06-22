@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "mystock-preview",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-lc", "source \"$(conda info --base)/etc/profile.d/conda.sh\" && conda activate mk && python -c \"from mystock.web import app as a; a.app.run(host='127.0.0.1', port=8899, debug=False)\""],
+      "port": 8899
+    }
+  ]
+}
