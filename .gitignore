@@ -236,6 +236,9 @@ data/
 # 个人交易数据导出
 **/datasets/
 
+# Claude Code 本地配置（预览服务器等，因人而异）——不提交
+.claude/
+
 # macOS
 .DS_Store
 **/.DS_Store
