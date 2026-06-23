@@ -15,7 +15,7 @@ from typing import Optional
 
 import pandas as pd
 
-from ..code_map import futu_to_yf
+from ..code_map import futu_market_of, futu_to_yf
 from . import config as mlcfg
 from . import db as mldb
 
@@ -35,11 +35,13 @@ def _require_yf() -> None:
 # ---------------------------------------------------------------------------
 # 1) 日线
 # ---------------------------------------------------------------------------
-def fetch_daily(futu_code: str, now: str, max_retries: int = 3) -> list[dict]:
-    """抓单标的 5 年日线 → ml_quotes_1d 行。"""
+def fetch_daily(futu_code: str, now: str, max_retries: int = 3,
+                period: str | None = None) -> list[dict]:
+    """抓单标的日线 → ml_quotes_1d 行。period 默认 5 年，增量时传短窗（如 '1mo'）。"""
     _require_yf()
     sym = futu_to_yf(futu_code)
-    df = _yf_history(sym, period=mlcfg.DAILY_PERIOD, interval="1d", max_retries=max_retries)
+    df = _yf_history(sym, period=period or mlcfg.DAILY_PERIOD, interval="1d",
+                     max_retries=max_retries)
     if df is None or df.empty:
         return []
     df = df.reset_index()
@@ -66,26 +68,30 @@ def fetch_daily(futu_code: str, now: str, max_retries: int = 3) -> list[dict]:
 # ---------------------------------------------------------------------------
 # 2) 1 小时线
 # ---------------------------------------------------------------------------
-def fetch_hourly(futu_code: str, now: str, max_retries: int = 3) -> list[dict]:
-    """抓单标的约 2 年 1h → ml_quotes_1h 行。时间戳转 UTC 存。"""
+def fetch_hourly(futu_code: str, now: str, max_retries: int = 3,
+                 period: str | None = None) -> list[dict]:
+    """抓单标的 1h → ml_quotes_1h 行。period 默认约 2 年，增量时传短窗（如 '5d'）。"""
     _require_yf()
     sym = futu_to_yf(futu_code)
-    df = _yf_history(sym, period=mlcfg.HOURLY_PERIOD, interval="60m", max_retries=max_retries)
+    df = _yf_history(sym, period=period or mlcfg.HOURLY_PERIOD, interval="60m",
+                     max_retries=max_retries)
     if df is None or df.empty:
         return []
     df = df.reset_index()
     ts_col = "Datetime" if "Datetime" in df.columns else df.columns[0]
+    # 交易所本地时区：港股 Asia/Hong_Kong，美股 America/New_York。
+    # ts_et 存交易所本地时间 → 模拟器按 ts_et[:10] 分交易日才正确（HK 09:30≠NY 日期）。
+    local_tz = "Asia/Hong_Kong" if futu_market_of(futu_code) == "HK" else "America/New_York"
     rows = []
     for _, r in df.iterrows():
         ts = pd.to_datetime(r[ts_col])
-        # yfinance intraday 带时区（美东）；统一转 UTC 存，另存美东本地便于核对
         ts_utc = ts.tz_convert("UTC") if ts.tzinfo else ts.tz_localize("UTC")
-        ts_et = ts.tz_convert("America/New_York") if ts.tzinfo else ts
+        ts_local = ts.tz_convert(local_tz) if ts.tzinfo else ts
         rows.append({
             "symbol": sym,
             "futu_code": futu_code,
             "ts_utc": ts_utc.strftime("%Y-%m-%d %H:%M:%S"),
-            "ts_et": ts_et.strftime("%Y-%m-%d %H:%M:%S"),
+            "ts_et": ts_local.strftime("%Y-%m-%d %H:%M:%S"),
             "open": _f(r, "Open"),
             "high": _f(r, "High"),
             "low": _f(r, "Low"),
@@ -161,37 +167,64 @@ def _f(row, col):
     return None
 
 
+def _latest_date(conn, sym: str) -> str | None:
+    """ML 库中该标的日线的最新日期（无则 None）。用于判断增量。"""
+    cur = conn.execute("SELECT MAX(date) FROM ml_quotes_1d WHERE symbol=?", (sym,))
+    r = cur.fetchone()
+    return r[0] if r and r[0] else None
+
+
+def _is_fresh(latest: str | None, max_gap_days: int = 5) -> bool:
+    """库中最新日期距今 ≤ max_gap_days（含周末缓冲）→ 视为有数据、走增量。"""
+    if not latest:
+        return False
+    from datetime import date
+    try:
+        y, m, d = map(int, latest.split("-"))
+        return (date.today() - date(y, m, d)).days <= max_gap_days
+    except Exception:  # noqa: BLE001
+        return False
+
+
 # ---------------------------------------------------------------------------
 # 主流程
 # ---------------------------------------------------------------------------
-def run() -> None:
-    print("== myStock ML fetch ==")
+def run(full: bool = False) -> None:
+    """采集。默认增量：库中已有近期数据则只抓短窗（省网络）；首次或 full=True 抓全量。
+    UPSERT 幂等，增量短窗 + 全量历史在库内自然合并。
+    强制全量：python -m mystock.ml.fetch --full  或  run(full=True)。
+    """
+    print("== myStock ML fetch ==" + ("（全量）" if full else "（增量优先）"))
     mldb.init_ml_db()
     conn = mldb.get_ml_connection()
     now = mldb.now_str()
     try:
         for code in mlcfg.TARGETS:
             sym = futu_to_yf(code)
+            incremental = (not full) and _is_fresh(_latest_date(conn, sym))
+            d_period = "1mo" if incremental else None   # None=全量(5y/2y)
+            h_period = "5d" if incremental else None
+            tag = "增量" if incremental else "全量"
             # 日线
             try:
-                rows = fetch_daily(code, now)
+                rows = fetch_daily(code, now, period=d_period)
                 n = mldb.upsert(conn, "ml_quotes_1d", rows)
                 rng = (rows[0]["date"], rows[-1]["date"]) if rows else ("", "")
                 mldb.log_sync(conn, "yf_1d", symbol=sym, range_start=rng[0],
-                              range_end=rng[1], row_count=n, message=f"{n} daily rows")
-                print(f"  [1d] {sym}: {n} rows {rng[0]}..{rng[1]}")
+                              range_end=rng[1], row_count=n, message=f"{tag} {n} daily rows")
+                print(f"  [1d/{tag}] {sym}: {n} rows {rng[0]}..{rng[1]}")
             except Exception as e:  # noqa: BLE001
                 mldb.log_sync(conn, "yf_1d", symbol=sym, status="error", message=str(e))
                 print(f"  [1d] {sym}: ERROR {e}")
 
             # 1h
             try:
-                rows = fetch_hourly(code, now)
+                rows = fetch_hourly(code, now, period=h_period)
                 n = mldb.upsert(conn, "ml_quotes_1h", rows)
                 rng = (rows[0]["ts_utc"], rows[-1]["ts_utc"]) if rows else ("", "")
                 mldb.log_sync(conn, "yf_1h", symbol=sym, range_start=rng[0],
-                              range_end=rng[1], row_count=n, message=f"{n} hourly rows")
-                print(f"  [1h] {sym}: {n} rows {rng[0]}..{rng[1]}")
+                              range_end=rng[1], row_count=n, message=f"{tag} {n} hourly rows")
+                print(f"  [1h/{tag}] {sym}: {n} rows {rng[0]}..{rng[1]}")
             except Exception as e:  # noqa: BLE001
                 mldb.log_sync(conn, "yf_1h", symbol=sym, status="error", message=str(e))
                 print(f"  [1h] {sym}: ERROR {e}")
@@ -209,4 +242,5 @@ def run() -> None:
 
 
 if __name__ == "__main__":
-    run()
+    import sys
+    run(full="--full" in sys.argv)

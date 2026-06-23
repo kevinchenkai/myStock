@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 import numpy as np
 import pandas as pd
 
+from . import config as mlcfg
 from . import data as mldata
 from .features import FEATURE_COLS, build_features
 from .policy import Action, LinUCB, N_ACTIONS, RulePolicy, enumerate_actions
@@ -35,6 +36,10 @@ class BTConfig:
     high_alpha: float = 0.9
     low_alpha: float = 0.1
     bandit_alpha: float = 0.5
+    # P3.1 改进开关
+    excess_reward: bool = True    # 奖励=相对 buy&hold 的超额（直接对齐"打赢持有"）
+    epsilon: float = 0.05         # bandit ε-探索（逃离早期坏臂）
+    reward_scale: float = 50.0    # 超额奖励放大，提升 LinUCB 学习信号
 
 
 def _state_vec(row: pd.Series) -> np.ndarray:
@@ -61,8 +66,9 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
 
     split_at = valid[int(len(valid) * cfg.train_frac)]
     train_df = feat.loc[[i for i in valid if i < split_at]]
-    model = IntervalModel(seed=cfg.seed, high_alpha=cfg.high_alpha,
-                          low_alpha=cfg.low_alpha).fit(train_df)
+    lo_a, hi_a = mlcfg.alpha_for(code)  # 按股自适应分位（与报告一致）
+    model = IntervalModel(seed=cfg.seed, high_alpha=hi_a,
+                          low_alpha=lo_a).fit(train_df)
 
     test_idx = [i for i in valid if i >= split_at]
     dim = 1 + len(FEATURE_COLS)
@@ -70,7 +76,8 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
     # 各策略独立账户
     accs = {k: Account(cash=cfg.init_cash) for k in ("rule", "bandit", "human")}
     rule = RulePolicy(qty_units=1)
-    bandit = LinUCB(n_actions=N_ACTIONS, dim=dim, alpha=cfg.bandit_alpha, seed=cfg.seed)
+    bandit = LinUCB(n_actions=N_ACTIONS, dim=dim, alpha=cfg.bandit_alpha,
+                    seed=cfg.seed, epsilon=cfg.epsilon)
 
     # 人类真实成交按天索引（用于 human_replay 在测试区间回放）
     deals = mldata.load_deals(code, db_path)
@@ -79,7 +86,9 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         deals_by_day.setdefault(str(d["create_time"])[:10], []).append(d)
 
     nav_curves = {k: [] for k in ("rule", "bandit", "human", "buy_hold")}
+    nav_dates: list[str] = []
     bh_shares = None
+    bh_prev = cfg.init_cash  # 上一步 buy&hold 净值（算超额奖励用）
 
     for i in test_idx:
         row = feat.iloc[i]
@@ -95,7 +104,11 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         # --- buy_hold：期初一次性买入并持有 ---
         if bh_shares is None:
             bh_shares = cfg.init_cash / close_t
-        nav_curves["buy_hold"].append(bh_shares * mark_next)
+        bh_now = bh_shares * mark_next
+        bh_step = bh_now - bh_prev   # buy&hold 本步净值变化（超额奖励基准）
+        bh_prev = bh_now
+        nav_curves["buy_hold"].append(bh_now)
+        nav_dates.append(next_day)
 
         # --- S0 规则 ---
         _apply(accs["rule"], rule.act(_ctx(accs["rule"], close_t), L_hat, H_hat), bars, cfg)
@@ -112,7 +125,10 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         chosen = by_id[chosen_id]
         _apply(accs["bandit"], chosen, bars, cfg)
         eq_after = accs["bandit"].equity(mark_next)
-        reward = (eq_after - eq_before) / cfg.init_cash  # 标准化回合净值变化
+        step_pnl = eq_after - eq_before
+        # P3.1：奖励=相对 buy&hold 的超额（直接对齐"打赢持有"），放大提升学习信号
+        raw = (step_pnl - bh_step) if cfg.excess_reward else step_pnl
+        reward = raw / cfg.init_cash * cfg.reward_scale
         bandit.update(chosen_id, x, reward)
         nav_curves["bandit"].append(eq_after)
 
@@ -141,6 +157,7 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         "init_cash": cfg.init_cash,
         "backend": "lightgbm" if _lgb() else "sklearn",
         "nav_curves": nav_curves,
+        "nav_dates": nav_dates,
     }
 
 

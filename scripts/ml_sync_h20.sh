@@ -28,10 +28,11 @@ tar czf - \
   mystock/ml/simulator.py mystock/ml/calibrate.py \
   mystock/ml/features.py mystock/ml/predictor.py \
   mystock/ml/policy.py mystock/ml/backtest.py \
+  mystock/ml/report.py mystock/ml/offline_rl.py \
   mystock/code_map.py \
-  scripts/ml_fetch.sh scripts/ml_setup_h20.sh scripts/ml_sync_h20.sh scripts/ml_vllm.sh \
+  scripts/ml.sh scripts/ml_setup_h20.sh scripts/ml_sync_h20.sh scripts/ml_vllm.sh \
   docs/ML_OVERVIEW.md docs/ML_PLAN.md \
-  tests/test_ml_simulator.py tests/test_ml_policy.py \
+  tests/test_ml_simulator.py tests/test_ml_policy.py tests/test_ml_offline_rl.py \
   2>/dev/null \
   | ${SSH} "${H20_HOST}" "tar xzf - -C ${H20_DIR} 2>/dev/null && find ${H20_DIR} -name '._*' -delete && echo '✓ 代码已解包到远端'"
 

@@ -94,10 +94,12 @@ class RulePolicy:
 class LinUCB:
     """每个动作一组线性模型，按 UCB 选动作。reward 为该步回合净值（标准化）。"""
 
-    def __init__(self, n_actions: int, dim: int, alpha: float = 0.5, seed: int = 0):
+    def __init__(self, n_actions: int, dim: int, alpha: float = 0.5,
+                 seed: int = 0, epsilon: float = 0.0):
         self.n_actions = n_actions
         self.dim = dim
         self.alpha = alpha
+        self.epsilon = epsilon          # ε-探索（P3.1）
         self.A = [np.eye(dim) for _ in range(n_actions)]
         self.b = [np.zeros(dim) for _ in range(n_actions)]
         self.rng = np.random.default_rng(seed)
@@ -106,6 +108,9 @@ class LinUCB:
         return np.linalg.solve(self.A[a], self.b[a])
 
     def select(self, x: np.ndarray, valid: list[int]) -> int:
+        # ε-greedy：小概率随机探索，逃离早期被坏 reward 锁死的臂
+        if self.epsilon > 0 and self.rng.random() < self.epsilon:
+            return int(self.rng.choice(valid))
         best, best_p = valid[0], -np.inf
         for a in valid:
             Ainv = np.linalg.inv(self.A[a])
