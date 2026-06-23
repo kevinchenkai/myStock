@@ -209,7 +209,8 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None) -> Pa
                          f"<td style='text-align:right'>{fe.get('bandit',0):,.0f}</td>"
                          f"<td style='text-align:right'>{fe.get('buy_hold',0):,.0f}</td>"
                          f"<td style='text-align:center'>{beat}</td>"
-                         f"<td>{pred['L_hat']:,.2f} ~ {pred['H_hat']:,.2f}</td></tr>")
+                         f"<td>{pred['L_hat']:,.2f} ~ {pred['H_hat']:,.2f}</td>"
+                         f"<td style='text-align:right'>{pred['width_pct']:.2f}%</td></tr>")
 
     page = f"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <title>myStock ML 回测报告 {today}</title>
@@ -222,7 +223,8 @@ h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}</style></
 <table style="border-collapse:collapse;min-width:560px">
   <tr style="border-bottom:1px solid #ccc"><th style="text-align:left">标的</th>
     <th style="text-align:right">Bandit 期末</th><th style="text-align:right">买入持有</th>
-    <th>超越</th><th style="text-align:left">次日预测区间</th></tr>
+    <th>超越</th><th style="text-align:left">次日预测区间</th>
+    <th style="text-align:right">区间宽</th></tr>
   {summary_rows}
 </table>
 <p style="color:#888;font-size:12px">"超越"= Bandit 期末净值是否高于买入持有。结论看相对值，绝对收益不单独采信。</p>
