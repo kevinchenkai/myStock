@@ -105,6 +105,10 @@ def upsert_profiles(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
     return _upsert(conn, "stock_profiles", rows, ["futu_code"])
 
 
+def upsert_fx_rates(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
+    return _upsert(conn, "fx_rates", rows, ["pair", "date"])
+
+
 def get_profile(conn: sqlite3.Connection, futu_code: str) -> Optional[dict]:
     """读取某代码的通用信息（无则返回 None）。"""
     cur = conn.execute(

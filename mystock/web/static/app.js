@@ -61,8 +61,11 @@ document.querySelectorAll(".tab").forEach((t) => {
     document.getElementById("panel-positions").style.display = tab === "positions" ? "" : "none";
     document.getElementById("panel-trades").style.display = tab === "trades" ? "" : "none";
     document.getElementById("panel-pnl").style.display = tab === "pnl" ? "" : "none";
+    document.getElementById("panel-fx").style.display = tab === "fx" ? "" : "none";
+    if (tab !== "fx") destroyFxChart();   // 离开汇率 Tab 释放图表
     if (tab === "trades") loadTrades();
     if (tab === "pnl") loadPnl();
+    if (tab === "fx") loadFx();
   });
 });
 
@@ -83,6 +86,7 @@ const state = {
   orders: { raw: [], market: "" },
   deals: { raw: [], market: "" },
   pnl: { raw: [], market: "", sort: { key: null, dir: 0 } },
+  fx: { raw: [], pair: "USDCNY" },
 };
 
 function byMarket(rows, market) {
@@ -395,6 +399,101 @@ function renderPnl() {
   bindSortHeaders(wrap, st.sort, renderPnl);
 }
 
+// ---------- 美元汇率（USD/CNY）----------
+let fxLoaded = false;
+let _fxChartHandle = null;
+
+async function loadFx() {
+  const info = document.getElementById("fx-info");
+  const host = document.getElementById("fx-chart");
+  if (fxLoaded) { mountFxChart(); return; }   // 重入：重建图表
+  fxLoaded = true;
+  info.innerHTML = `<div class="empty">加载中…</div>`;
+  try {
+    const data = await getJSON(`/api/fx?pair=${encodeURIComponent(state.fx.pair)}`);
+    state.fx.raw = data.rows || [];
+    renderFx();
+  } catch (e) {
+    fxLoaded = false;  // 失败允许重试
+    info.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+    host.innerHTML = "";
+  }
+}
+
+function renderFx() {
+  const info = document.getElementById("fx-info");
+  const host = document.getElementById("fx-chart");
+  // 只取有收盘价的交易日（当天未收盘的行 close 可能为空）
+  const rows = state.fx.raw.filter((r) => r.close !== null && r.close !== "" && isFinite(Number(r.close)));
+  if (rows.length < 2) {
+    info.innerHTML = `<div class="empty">暂无汇率数据，请先运行 update.sh。</div>`;
+    host.innerHTML = "";
+    return;
+  }
+
+  const first = rows[0], last = rows[rows.length - 1];
+  const closes = rows.map((r) => Number(r.close));
+  const min = Math.min(...closes), max = Math.max(...closes);
+  const chg = Number(last.close) - Number(first.close);
+  const chgPct = (chg / Number(first.close)) * 100;
+
+  // 基本信息卡（中性配色，不套红涨绿跌：汇率涨跌语义中性）
+  info.innerHTML = `
+    <div class="fx-head">
+      <div class="fx-pair">美元 / 人民币 · USDCNY</div>
+      <div class="fx-latest">${fmtNum(last.close, 4)}
+        <span class="fx-sub">最新（${esc(last.date)}）</span></div>
+    </div>
+    <div class="metric-flex">
+      <div class="metric"><div class="metric-label">区间最高</div><div class="metric-value">${fmtNum(max, 4)}</div></div>
+      <div class="metric"><div class="metric-label">区间最低</div><div class="metric-value">${fmtNum(min, 4)}</div></div>
+      <div class="metric"><div class="metric-label">区间涨跌</div><div class="metric-value">${fmtSigned(chg.toFixed(4))} (${fmtSigned(chgPct.toFixed(2), "%")})</div></div>
+      <div class="metric"><div class="metric-label">数据区间</div><div class="metric-value fx-range">${esc(first.date)} ~ ${esc(last.date)}</div></div>
+      <div class="metric"><div class="metric-label">交易日数</div><div class="metric-value">${fmtInt(rows.length)}</div></div>
+    </div>
+    <div class="disclaimer">汇率来源 yfinance（CNY=X）；close = 1 美元对应的人民币。涨跌仅为客观变动，不代表方向判断。</div>`;
+
+  mountFxChart();
+}
+
+function destroyFxChart() {
+  if (_fxChartHandle) {
+    try { _fxChartHandle.remove(); } catch (e) {}
+    _fxChartHandle = null;
+  }
+}
+
+// 折线趋势图（中性主题色）。USDCNY 单一汇率看趋势用折线优于蜡烛。
+function mountFxChart() {
+  destroyFxChart();
+  const host = document.getElementById("fx-chart");
+  const rows = state.fx.raw.filter((r) => r.close !== null && r.close !== "" && isFinite(Number(r.close)));
+  if (!host || rows.length < 2 || typeof LightweightCharts === "undefined") return;
+
+  const c = chartColors();
+  const chart = LightweightCharts.createChart(host, {
+    width: host.clientWidth || 720,
+    height: 320,
+    layout: { background: { color: "transparent" }, textColor: c.muted },
+    grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
+    rightPriceScale: { borderColor: c.border },
+    timeScale: { borderColor: c.border, timeVisible: false },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  });
+  const line = chart.addLineSeries({
+    color: c.accent, lineWidth: 2,
+    priceLineVisible: false, lastValueVisible: true,
+  });
+  line.setData(rows.map((r) => ({ time: r.date, value: Number(r.close) })));
+  chart.timeScale().fitContent();
+
+  const ro = new ResizeObserver(() => {
+    if (_fxChartHandle === chart) chart.applyOptions({ width: host.clientWidth });
+  });
+  ro.observe(host);
+  _fxChartHandle = chart;
+}
+
 // ---------- 个股详情下钻 ----------
 const overlay = document.getElementById("overlay");
 document.getElementById("detail-close").addEventListener("click", () => { overlay.classList.remove("open"); destroyChart(); });
@@ -639,6 +738,7 @@ function chartColors() {
     muted: v("--muted", "#888"),
     text: v("--text", "#222"),
     bg: v("--panel", "#fff"),
+    accent: v("--accent", "#3b82f6"),
   };
 }
 

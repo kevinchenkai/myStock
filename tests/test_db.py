@@ -54,6 +54,26 @@ def test_quotes_upsert_overwrites_same_day():
         os.remove(path)
 
 
+def test_fx_rates_upsert_overwrites_same_day():
+    conn, path = _conn()
+    try:
+        row = {
+            "pair": "USDCNY", "date": "2025-01-02",
+            "open": 7.30, "high": 7.31, "low": 7.29, "close": 7.30,
+            "synced_at": "now",
+        }
+        db.upsert_fx_rates(conn, [row])
+        # 当天重抓覆盖（close 修正）
+        db.upsert_fx_rates(conn, [dict(row, close=7.35)])
+        cur = conn.execute("SELECT COUNT(*) AS c, close FROM fx_rates WHERE pair='USDCNY'")
+        r = cur.fetchone()
+        assert r["c"] == 1
+        assert r["close"] == 7.35
+    finally:
+        conn.close()
+        os.remove(path)
+
+
 def test_position_snapshot_replace():
     conn, path = _conn()
     try:

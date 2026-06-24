@@ -111,6 +111,65 @@ def fetch_daily(
     return rows
 
 
+def fetch_fx(
+    yf_symbol: str = "CNY=X",
+    pair: str = "USDCNY",
+    start: str = "2025-01-01",
+    end: Optional[str] = None,
+    now: str = "",
+    max_retries: int = 3,
+    sleep_sec: float = 1.0,
+) -> list[dict]:
+    """抓取外汇日线，返回 fx_rates 入库 dict 列表。
+
+    默认 CNY=X，即美元兑人民币（close = 1 美元对应的人民币）。
+    外汇对仅有 OHLC，无成交量/分红。单源失败由调用方记 sync_log。
+
+    Args:
+        yf_symbol: yfinance 外汇代码（USDCNY 为 'CNY=X'）。
+        pair: 入库的货币对标识（如 'USDCNY'）。
+        start/end: 'YYYY-MM-DD'，end 为 None 表示到今天。
+    """
+    _require_yf()
+
+    last_err: Optional[Exception] = None
+    df = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            df = yf.Ticker(yf_symbol).history(
+                start=start, end=end, auto_adjust=False
+            )
+            break
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            if attempt < max_retries:
+                time.sleep(sleep_sec * attempt)
+            else:
+                raise YFError(f"抓取汇率 {yf_symbol} 失败（{max_retries} 次重试）: {e}") from e
+
+    if df is None or df.empty:
+        return []
+
+    df = df.reset_index()
+    date_col = "Date" if "Date" in df.columns else df.columns[0]
+
+    rows = []
+    for _, r in df.iterrows():
+        date_str = pd.to_datetime(r[date_col]).strftime("%Y-%m-%d")
+        row = {
+            "pair": pair,
+            "date": date_str,
+            "open": None, "high": None, "low": None, "close": None,
+            "synced_at": now,
+        }
+        for yf_col, db_col in (("Open", "open"), ("High", "high"),
+                               ("Low", "low"), ("Close", "close")):
+            if yf_col in df.columns and pd.notna(r[yf_col]):
+                row[db_col] = float(r[yf_col])
+        rows.append(row)
+    return rows
+
+
 def _profile_from_info(info: dict) -> dict:
     """从 yfinance Ticker.info 提取常用公司/估值信息，键为 stock_profiles 列名。"""
     market_cap = info.get("marketCap")

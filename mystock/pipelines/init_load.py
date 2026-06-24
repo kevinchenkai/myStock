@@ -163,6 +163,24 @@ def collect_profiles(conn) -> None:
     print(f"[profiles] 完成：{msg}")
 
 
+def collect_fx(conn, start: str, end: str, pair: str = "USDCNY",
+               yf_symbol: str = "CNY=X") -> None:
+    """抓取美元-人民币（或其它）汇率日线，UPSERT 入库。
+
+    随每日 update 刷新（当天覆盖）。失败不中断整体。
+    """
+    now = _now()
+    source = f"fx_{pair.lower()}"
+    try:
+        rows = yc.fetch_fx(yf_symbol=yf_symbol, pair=pair, start=start, end=end, now=now)
+        n = db.upsert_fx_rates(conn, rows)
+        db.write_sync_log(conn, source, start, end, n, "ok")
+        print(f"[fx] {pair} UPSERT {n} 条（{start} ~ {end}）")
+    except Exception as e:  # noqa: BLE001
+        db.write_sync_log(conn, source, start, end, 0, "error", str(e))
+        print(f"[fx] {pair} 失败: {e}", file=sys.stderr)
+
+
 def run() -> int:
     start = CONFIG.start_date
     end = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -181,6 +199,8 @@ def run() -> int:
         collect_deals(conn, start, end)
         # yfinance 用日期粒度
         collect_quotes(conn, start, end_date)
+        # 美元-人民币汇率日线
+        collect_fx(conn, start, end_date)
         # 通用信息（依赖 quotes 已更新的跳过名单，故放在最后）
         collect_profiles(conn)
     finally:

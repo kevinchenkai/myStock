@@ -12,6 +12,7 @@
   GET /api/stock/<code>/profile    通用信息（公司/估值，读自 stock_profiles）
   GET /api/stock/<code>/analysis   交易复盘（成交明细 + FIFO 回合 + 复盘统计）
   GET /api/pnl                 交易盈亏（已实现，每股一行）
+  GET /api/fx?pair=USDCNY      外汇日线（默认美元兑人民币）
 """
 from __future__ import annotations
 
@@ -172,6 +173,25 @@ def api_stock_analysis(code: str):
             fb = r["cost_price"] if r else None
         analysis = analyze_stock(deals, fb)
         return jsonify({"code": code, "deals": deals, "analysis": analysis})
+    finally:
+        conn.close()
+
+
+@app.route("/api/fx")
+def api_fx():
+    """外汇日线（默认 USDCNY，美元兑人民币）。
+
+    返回 {pair, rows:[{date, open, high, low, close}, ...]}，按日期升序。
+    """
+    pair = request.args.get("pair", "USDCNY")
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "SELECT date, open, high, low, close FROM fx_rates "
+            "WHERE pair = ? ORDER BY date ASC",
+            (pair,),
+        )
+        return jsonify({"pair": pair, "rows": rows_to_list(cur)})
     finally:
         conn.close()
 

@@ -370,13 +370,32 @@ th.sortable .arrow { font-size: 9px; color: var(--accent); margin-left: 3px; }
 .profile-val a { color: var(--accent); text-decoration: none; }
 .profile-val a:hover { text-decoration: underline; }
 
-/* 价格走势：Lightweight-Charts 蜡烛图容器 */
+/* 价格走势：Lightweight-Charts 图表容器（蜡烛图 / 汇率折线图共用） */
 .chart-host {
   width: 100%; height: 320px;
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--panel-2);
   overflow: hidden;
 }
+
+/* 美元汇率 Tab 基本信息 */
+#fx-info { margin-bottom: 14px; }
+/* 自适应宽度的指标卡行：每张卡按内容自然伸展，整行不够再换行；卡内不折字。 */
+.metric-flex {
+  display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 8px;
+}
+.metric-flex .metric {
+  flex: 1 1 auto; min-width: 120px;
+}
+.metric-flex .metric-value { white-space: nowrap; }
+.fx-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px; margin-bottom: 12px;
+}
+.fx-pair { font-size: 15px; font-weight: 600; color: var(--text); }
+.fx-latest { font-size: 26px; font-weight: 700; color: var(--accent); }
+.fx-sub { font-size: 12px; font-weight: 400; color: var(--muted); margin-left: 6px; }
+.fx-range { font-size: 13px; }
 
 .scroll-table {
   max-height: 280px; overflow: auto;

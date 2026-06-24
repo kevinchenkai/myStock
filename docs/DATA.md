@@ -20,6 +20,7 @@
 | `deals` | 历史**成交回报** | deal_id | 873 | 2025-01-03 ~ 2026-06-18 | 富途 |
 | `daily_quotes` | **日线行情**（OHLCV+复权+分红拆股） | (yf_symbol, date) | 13491 | 2025-01-02 ~ 2026-06-18 | yfinance |
 | `stock_profiles` | 公司 / **估值通用信息** | futu_code | 38 | 当前快照 | yfinance |
+| `fx_rates` | **外汇日线**（美元兑人民币 USDCNY） | (pair, date) | 381 | 2025-01-02 ~ 至今 | yfinance |
 | `quote_skiplist` | 行情**跳过名单**（退市/无数据） | futu_code | 39 | — | 系统 |
 | `sync_log` | **同步日志**（运维元数据） | id | 21 | — | 系统 |
 
@@ -196,6 +197,27 @@
 
 ---
 
+## 5b. fx_rates — 外汇日线（yfinance）
+
+美元兑人民币（及未来可扩展的其它货币对）日线。来自 yfinance `CNY=X`，从 2025-01-01 起，
+按 `(pair, date)` UPSERT（当天覆盖）。外汇对**仅有 OHLC，无成交量/分红/复权**。
+
+| 列 | 类型 | 含义 | 取值 / 备注 |
+| --- | --- | --- | --- |
+| `pair` | TEXT | 货币对（主键之一） | 当前仅 `USDCNY`；预留以便扩展 |
+| `date` | TEXT | 交易日（主键之一） | `YYYY-MM-DD` |
+| `open` `high` `low` `close` | REAL | 开/高/低/收盘汇率 | `close` = **1 美元对应的人民币**（如 6.7745） |
+| `synced_at` | TEXT | 入库时间 | |
+
+**坑点 / 注意**
+
+- ⚠️ **当天行可能 `close` 为空**：外汇当天未收盘时只有部分价。前端 / 分析须**过滤 `close` 为 NULL/空** 的行（注意 `Number(null)` / `Number("")` 在 JS 中等于 0，不能只用 `isFinite` 判断）。
+- 观测区间 close ∈ [6.757, 7.350]（2025-01 ~ 2026-06，人民币整体升值约 7%）。
+- 与股票行情相互独立，做"金额换汇到统一货币"时即可用此表按日期取汇率。
+- yfinance 的 `CNY=X` 即 USDCNY；切勿与 `CNH=X`（离岸）混淆。
+
+---
+
 ## 6. quote_skiplist — 行情跳过名单（运维）
 
 连续多次抓取为空（退市 / yfinance 无数据）的代码，后续跳过以减少无效请求。**分析时可用作"数据质量黑名单"**。
@@ -219,7 +241,7 @@
 | 列 | 类型 | 含义 |
 | --- | --- | --- |
 | `id` | INTEGER | 自增主键 |
-| `source` | TEXT | 数据源：`futu_position`/`futu_order`/`futu_deal`/`yfinance`/`yf_profile` |
+| `source` | TEXT | 数据源：`futu_position`/`futu_order`/`futu_deal`/`yfinance`/`yf_profile`/`fx_usdcny` |
 | `range_start` `range_end` | TEXT | 本次抓取覆盖区间 |
 | `row_count` | INTEGER | 影响行数 |
 | `status` | TEXT | `ok` / `error` |

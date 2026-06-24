@@ -94,6 +94,20 @@ CREATE TABLE IF NOT EXISTS stock_profiles (
     synced_at           TEXT                  -- 入库时间
 );
 
+-- 外汇日线（yfinance），pair + date 唯一。
+-- 当前用于「美元汇率」Tab：USDCNY（美元兑人民币，1 美元 = close 人民币）。
+-- pair 列预留，便于未来扩展其它汇率对。外汇对仅有 OHLC，无成交量/分红。
+CREATE TABLE IF NOT EXISTS fx_rates (
+    pair            TEXT NOT NULL,        -- 货币对，如 USDCNY
+    date            TEXT NOT NULL,        -- YYYY-MM-DD
+    open            REAL,
+    high            REAL,
+    low             REAL,
+    close           REAL,                 -- 收盘汇率（1 美元 = close 人民币）
+    synced_at       TEXT,                 -- 入库时间
+    PRIMARY KEY (pair, date)
+);
+
 -- 行情跳过名单：连续多次抓取为空（如退市 / yfinance 无数据）的代码，
 -- 后续直接跳过，避免重复无效请求与库的退市警告噪音。
 CREATE TABLE IF NOT EXISTS quote_skiplist (
@@ -123,3 +137,4 @@ CREATE INDEX IF NOT EXISTS idx_deals_code ON deals(code);
 CREATE INDEX IF NOT EXISTS idx_deals_order ON deals(order_id);
 CREATE INDEX IF NOT EXISTS idx_quotes_futu ON daily_quotes(futu_code);
 CREATE INDEX IF NOT EXISTS idx_positions_code ON positions(code);
+CREATE INDEX IF NOT EXISTS idx_fx_pair_date ON fx_rates(pair, date);
