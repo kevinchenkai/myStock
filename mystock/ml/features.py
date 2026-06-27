@@ -27,10 +27,12 @@ def build_features(daily: pd.DataFrame) -> pd.DataFrame:
     adj_low = df["low"] * ratio
     adj_open = df["open"] * ratio
 
-    ret1 = adj.pct_change()
+    # fill_method=None：不前向填充缺口（日线连续无内部 NA，行为不变）；
+    # 显式指定以消除 pandas 弃用告警（默认 'pad' 将被移除）。
+    ret1 = adj.pct_change(fill_method=None)
     df["ret_1d"] = ret1
-    df["ret_5d"] = adj.pct_change(5)
-    df["ret_10d"] = adj.pct_change(10)
+    df["ret_5d"] = adj.pct_change(5, fill_method=None)
+    df["ret_10d"] = adj.pct_change(10, fill_method=None)
     df["vol_5d"] = ret1.rolling(5).std()
     df["vol_20d"] = ret1.rolling(20).std()
 
