@@ -20,13 +20,22 @@ import pandas as pd
 
 from .features import FEATURE_COLS, build_features
 
-# fit 用 DataFrame（带列名）、predict 用 numpy（无列名）会触发这条无害告警。
-# 我们保证列顺序一致（FEATURE_COLS），故安全静默，避免例行日志噪音。
-warnings.filterwarnings(
-    "ignore",
-    message="X does not have valid feature names",
-    category=UserWarning,
-)
+
+def _predict_silent(model, X):
+    """对 fit 过的模型做 numpy 预测，并精确静默 sklearn/lightgbm 的
+    "X does not have valid feature names" 无害告警。
+
+    根因：lightgbm 即便用 numpy fit 也会自动合成列名（Column_0..），predict 传
+    裸 numpy 时校验层判定"无列名 vs 有列名"不一致而告警。我们保证列顺序一致
+    （FEATURE_COLS），故安全静默。用 catch_warnings 局部作用，不污染全局、
+    不被外部 -W 覆盖（比模块级 filterwarnings 更稳健）。
+    """
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", message="X does not have valid feature names",
+            category=UserWarning,
+        )
+        return model.predict(X)
 
 try:
     import lightgbm as lgb
@@ -77,7 +86,7 @@ class IntervalModel:
 
     def predict_ret(self, df: pd.DataFrame):
         X = df[FEATURE_COLS].to_numpy()
-        return self.m_low.predict(X), self.m_high.predict(X)
+        return _predict_silent(self.m_low, X), _predict_silent(self.m_high, X)
 
     def predict_prices(self, df: pd.DataFrame):
         """返回 (L_hat, H_hat) 价位，相对各行 close 还原。"""

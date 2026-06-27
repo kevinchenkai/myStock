@@ -23,7 +23,7 @@ from . import config as mlcfg
 from . import data as mldata
 from .features import FEATURE_COLS, build_features
 from .policy import Action, LinUCB, N_ACTIONS, RulePolicy, enumerate_actions
-from .predictor import IntervalModel
+from .predictor import IntervalModel, _predict_silent
 from .simulator import Account, BUY, SELL, match_limit_order
 
 
@@ -97,8 +97,8 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         bars = bars_by_day.get(next_day)
         if not bars:
             continue
-        L_hat = close_t * (1 + float(model.m_low.predict(row[FEATURE_COLS].values.reshape(1, -1))[0]))
-        H_hat = close_t * (1 + float(model.m_high.predict(row[FEATURE_COLS].values.reshape(1, -1))[0]))
+        L_hat = close_t * (1 + float(_predict_silent(model.m_low, row[FEATURE_COLS].values.reshape(1, -1))[0]))
+        H_hat = close_t * (1 + float(_predict_silent(model.m_high, row[FEATURE_COLS].values.reshape(1, -1))[0]))
         mark_next = _mark_price(feat, i + 1)
 
         # --- buy_hold：期初一次性买入并持有 ---

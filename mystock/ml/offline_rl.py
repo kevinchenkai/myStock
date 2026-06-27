@@ -53,7 +53,7 @@ def collect_dataset(code: str, cfg: RLConfig, db_path=None):
     train_idx = [i for i in valid if i < split_at]   # 仅训练区间 rollout
 
     # 训练区间内用全历史前段 fit 预测器（防泄漏：只用 < split 的数据）
-    from .predictor import IntervalModel
+    from .predictor import IntervalModel, _predict_silent
     model = IntervalModel(seed=cfg.seed, high_alpha=cfg.high_alpha,
                           low_alpha=cfg.low_alpha).fit(feat.loc[train_idx])
 
@@ -71,8 +71,8 @@ def collect_dataset(code: str, cfg: RLConfig, db_path=None):
             bars = bars_by_day.get(next_day)
             if not bars:
                 continue
-            L = close_t * (1 + float(model.m_low.predict(row[FEATURE_COLS].values.reshape(1, -1))[0]))
-            H = close_t * (1 + float(model.m_high.predict(row[FEATURE_COLS].values.reshape(1, -1))[0]))
+            L = close_t * (1 + float(_predict_silent(model.m_low, row[FEATURE_COLS].values.reshape(1, -1))[0]))
+            H = close_t * (1 + float(_predict_silent(model.m_high, row[FEATURE_COLS].values.reshape(1, -1))[0]))
             mark_next = _mark_price(feat, i + 1)
             if bh_shares is None:
                 bh_shares = cfg.init_cash / close_t
@@ -144,7 +144,7 @@ def eval_policy(code: str, cql, cfg: RLConfig, db_path=None) -> dict:
     split_at = valid[int(len(valid) * cfg.train_frac)]
     test_idx = [i for i in valid if i >= split_at]
 
-    from .predictor import IntervalModel
+    from .predictor import IntervalModel, _predict_silent
     model = IntervalModel(seed=cfg.seed, high_alpha=cfg.high_alpha,
                           low_alpha=cfg.low_alpha).fit(feat.loc[[i for i in valid if i < split_at]])
 
@@ -158,8 +158,8 @@ def eval_policy(code: str, cql, cfg: RLConfig, db_path=None) -> dict:
         bars = bars_by_day.get(next_day)
         if not bars:
             continue
-        L = close_t * (1 + float(model.m_low.predict(row[FEATURE_COLS].values.reshape(1, -1))[0]))
-        H = close_t * (1 + float(model.m_high.predict(row[FEATURE_COLS].values.reshape(1, -1))[0]))
+        L = close_t * (1 + float(_predict_silent(model.m_low, row[FEATURE_COLS].values.reshape(1, -1))[0]))
+        H = close_t * (1 + float(_predict_silent(model.m_high, row[FEATURE_COLS].values.reshape(1, -1))[0]))
         mark_next = _mark_price(feat, i + 1)
         if bh_shares is None:
             bh_shares = cfg.init_cash / close_t
