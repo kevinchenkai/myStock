@@ -245,6 +245,37 @@ header .sub .down { font-weight: 700; }
 .year-select:hover { border-color: var(--accent); color: var(--text); }
 .year-select:focus { outline: none; border-color: var(--accent); }
 
+/* ---------------- 财务统计（年度现金流，按市场分卡）---------------- */
+.finance-section {
+  margin-top: 28px; padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+.finance-section .toolbar { margin-bottom: 14px; }
+.section-title { margin: 0; font-size: 16px; font-weight: 700; }
+.finance-grid {
+  display: grid; gap: 14px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.finance-card {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--panel-2); padding: 16px 18px;
+}
+.finance-card-head {
+  display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px;
+}
+.finance-mkt { font-size: 15px; font-weight: 700; }
+.finance-ccy { font-size: 12px; color: var(--muted); }
+.finance-net {
+  font-size: 26px; font-weight: 800; font-variant-numeric: tabular-nums;
+}
+.finance-net-label { font-size: 12px; color: var(--muted); margin: 2px 0 12px; }
+.finance-rows { display: grid; gap: 6px; }
+.finance-row {
+  display: flex; justify-content: space-between; font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.finance-row > span:first-child { color: var(--muted); }
+
 /* ---------------- 表格 ---------------- */
 table { width: 100%; border-collapse: separate; border-spacing: 0; }
 th, td {

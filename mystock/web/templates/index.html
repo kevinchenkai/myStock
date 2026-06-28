@@ -88,6 +88,19 @@
         <div class="muted" id="pnl-meta"></div>
       </div>
       <div id="pnl-table"></div>
+
+      <!-- 财务统计：年度现金流（收-付），按美股/港股分别汇总 -->
+      <div class="finance-section">
+        <div class="toolbar">
+          <h3 class="section-title">财务统计</h3>
+          <div class="filter" data-filter="finance">
+            <span class="filter-label">年度</span>
+            <!-- 年份子 Tab 由 app.js 动态填充 -->
+            <span class="year-tabs"></span>
+          </div>
+        </div>
+        <div id="finance-body"></div>
+      </div>
     </div>
 
     <!-- 美元汇率 -->

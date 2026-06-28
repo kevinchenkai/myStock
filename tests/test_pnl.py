@@ -185,3 +185,51 @@ def test_analyze_empty():
     a = analyze_stock([])
     assert a["stats"]["closed_trips"] == 0
     assert a["observations"][0]["level"] == "info"
+
+
+# ---------- yearly_finance（年度现金流：收-付，按市场分组）----------
+from mystock.pnl import yearly_finance
+
+
+def test_finance_net_cashflow_by_market():
+    deals = [
+        _deal("US.X", "BUY", 100, 10, "2026-01-01 10:00:00"),   # 付 1000
+        _deal("US.X", "SELL", 130, 10, "2026-02-01 10:00:00"),  # 收 1300
+        _deal("HK.700", "BUY", 300, 100, "2026-03-01 10:00:00", market="HK"),  # 付 30000
+    ]
+    res = yearly_finance(deals, "2026")
+    us = next(m for m in res["markets"] if m["market"] == "US")
+    hk = next(m for m in res["markets"] if m["market"] == "HK")
+    assert us["net_cashflow"] == 300        # 1300 - 1000
+    assert us["currency"] == "USD"
+    assert us["sell_count"] == 1 and us["buy_count"] == 1
+    assert hk["net_cashflow"] == -30000     # 只买未卖 → 负（建仓支出）
+    assert hk["currency"] == "HKD"
+
+
+def test_finance_filters_by_year():
+    deals = [
+        _deal("US.X", "SELL", 130, 10, "2025-12-31 10:00:00"),  # 不在 2026
+        _deal("US.X", "SELL", 120, 5, "2026-01-01 10:00:00"),   # 在 2026
+    ]
+    res = yearly_finance(deals, "2026")
+    us = next(m for m in res["markets"] if m["market"] == "US")
+    assert us["sell_amount"] == 600         # 仅 2026 的 120*5
+    assert us["sell_count"] == 1
+
+
+def test_finance_available_years_desc():
+    deals = [
+        _deal("US.X", "BUY", 100, 1, "2024-05-01 10:00:00"),
+        _deal("US.X", "BUY", 100, 1, "2026-05-01 10:00:00"),
+        _deal("US.X", "BUY", 100, 1, "2025-05-01 10:00:00"),
+    ]
+    res = yearly_finance(deals, "2026")
+    assert res["available_years"] == ["2026", "2025", "2024"]
+
+
+def test_finance_empty_year_has_no_markets():
+    deals = [_deal("US.X", "BUY", 100, 1, "2025-05-01 10:00:00")]
+    res = yearly_finance(deals, "2026")
+    assert res["markets"] == []
+    assert res["year"] == "2026"

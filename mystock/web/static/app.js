@@ -86,6 +86,7 @@ const state = {
   orders: { raw: [], market: "", year: "" },
   deals: { raw: [], market: "", year: "" },
   pnl: { raw: [], market: "", sort: { key: null, dir: 0 } },
+  finance: { year: "", built: false },
   fx: { raw: [], pair: "USDCNY" },
 };
 
@@ -431,6 +432,78 @@ async function loadPnl() {
     pnlLoaded = false;  // 失败允许重试
     wrap.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
   }
+  loadFinance();   // 同一面板下的「财务统计」板块（默认当前年）
+}
+
+// ---------- 财务统计（年度现金流：收-付，按美股/港股分别汇总）----------
+let financeLoaded = false;
+async function loadFinance(year) {
+  const body = document.getElementById("finance-body");
+  // 首次进入用默认年（当前年）；之后由年份筛选传入
+  const y = year || state.finance.year || String(new Date().getFullYear());
+  state.finance.year = y;
+  financeLoaded = true;
+  body.innerHTML = `<div class="empty">加载中…</div>`;
+  try {
+    const data = await getJSON(`/api/finance?year=${encodeURIComponent(y)}`);
+    if (!state.finance.built) buildFinanceYearFilter(data.available_years || []);
+    renderFinance(data);
+  } catch (e) {
+    financeLoaded = false;
+    body.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+// 年份子 Tab：用数据中出现过的全部年份构建，默认高亮当前年。
+function buildFinanceYearFilter(years) {
+  const filter = document.querySelector('.filter[data-filter="finance"]');
+  if (!filter) return;
+  const tabsWrap = filter.querySelector(".year-tabs");
+  const list = years.length ? years : [String(new Date().getFullYear())];
+
+  tabsWrap.innerHTML = list
+    .map((y) => `<span class="chip${y === state.finance.year ? " active" : ""}" data-year="${y}">${y}</span>`)
+    .join("");
+
+  tabsWrap.querySelectorAll(".chip[data-year]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      tabsWrap.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      loadFinance(chip.dataset.year);
+    });
+  });
+  state.finance.built = true;
+}
+
+function renderFinance(data) {
+  const body = document.getElementById("finance-body");
+  const markets = data.markets || [];
+  if (!markets.length) {
+    body.innerHTML = `<div class="empty">${esc(data.year)} 年度无成交记录。</div>`;
+    return;
+  }
+  const NAME = { US: "美股", HK: "港股" };
+  const cards = markets.map((m) => {
+    const net = Number(m.net_cashflow);
+    return `
+      <div class="finance-card">
+        <div class="finance-card-head">
+          <span class="finance-mkt">${NAME[m.market] || esc(m.market)}</span>
+          <span class="finance-ccy">${esc(m.currency || "")}</span>
+        </div>
+        <div class="finance-net ${plClass(net)}">${fmtSigned(net.toFixed(2))}</div>
+        <div class="finance-net-label">净现金流（卖出额 − 买入额）</div>
+        <div class="finance-rows">
+          <div class="finance-row"><span>卖出额</span><span class="up">${fmtNum(m.sell_amount)}</span></div>
+          <div class="finance-row"><span>买入额</span><span class="down">${fmtNum(m.buy_amount)}</span></div>
+          <div class="finance-row"><span>卖出 / 买入笔数</span><span>${fmtInt(m.sell_count)} / ${fmtInt(m.buy_count)}</span></div>
+        </div>
+      </div>`;
+  }).join("");
+
+  body.innerHTML = `
+    <div class="finance-grid">${cards}</div>
+    <div class="disclaimer">口径：年度现金流（当年卖出总额 − 当年买入总额），仅统计该年度内的成交，不跨年配对成本。金额为标的本币（美股 USD / 港股 HKD），两市场不可相加。若当年只建仓未卖出，净现金流为负属正常支出，非真实亏损。</div>`;
 }
 
 function renderPnl() {

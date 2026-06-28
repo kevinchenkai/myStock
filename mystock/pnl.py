@@ -142,6 +142,86 @@ def compute_pnl(
 
 
 # ============================================================
+# 年度财务统计（现金流口径：收 - 付）
+# ============================================================
+
+def yearly_finance(deals: Iterable[dict], year: str) -> dict:
+    """统计某一年度内的成交现金流，按市场（美股 / 港股）分别汇总。
+
+    口径（经确认）：**年度现金流（收 - 付）**——只看 create_time 落在该年度内的
+    成交，不跨年配对成本。某市场该年的盈亏 = 当年卖出总额 - 当年买入总额。
+    注意：若当年只买未卖（建仓），盈亏会是大额负数，这是支出而非真实亏损——
+    前端需如实标注口径。金额为标的本币（HK→HKD、US→USD），两市场不可相加。
+
+    返回：
+      year：年度字符串。
+      markets：每个市场一行的汇总 dict 列表（仅含该年有成交的市场）。
+      available_years：deals 中出现过的全部年份（降序），供前端构建筛选。
+    """
+    year = str(year)
+    # 先扫一遍，收集所有出现过的年份（供前端年份筛选）
+    all_years: set[str] = set()
+    for d in deals if isinstance(deals, list) else list(deals):
+        y = str(d.get("create_time") or "")[:4]
+        if len(y) == 4 and y.isdigit():
+            all_years.add(y)
+
+    # 当年成交按市场聚合
+    agg: dict[str, dict] = {}
+    for d in (deals if isinstance(deals, list) else []):
+        if str(d.get("create_time") or "")[:4] != year:
+            continue
+        market = d.get("market") or ""
+        if market not in ("US", "HK"):
+            continue
+        side = str(d.get("trd_side") or "").upper()
+        price = _num(d.get("price"))
+        qty = _num(d.get("qty"))
+        if price is None or qty is None or qty <= 0:
+            continue
+        amt = price * qty
+        a = agg.setdefault(market, {
+            "buy_amount": 0.0, "sell_amount": 0.0,
+            "buy_qty": 0.0, "sell_qty": 0.0,
+            "buy_count": 0, "sell_count": 0,
+        })
+        if side == "BUY":
+            a["buy_amount"] += amt
+            a["buy_qty"] += qty
+            a["buy_count"] += 1
+        elif side == "SELL":
+            a["sell_amount"] += amt
+            a["sell_qty"] += qty
+            a["sell_count"] += 1
+
+    markets: list[dict] = []
+    # 固定顺序：美股、港股
+    for market in ("US", "HK"):
+        if market not in agg:
+            continue
+        a = agg[market]
+        net = a["sell_amount"] - a["buy_amount"]
+        markets.append({
+            "market": market,
+            "currency": _MARKET_CCY.get(market),
+            "buy_amount": a["buy_amount"],
+            "sell_amount": a["sell_amount"],
+            "buy_qty": a["buy_qty"],
+            "sell_qty": a["sell_qty"],
+            "buy_count": a["buy_count"],
+            "sell_count": a["sell_count"],
+            "deal_count": a["buy_count"] + a["sell_count"],
+            "net_cashflow": net,   # 卖出额 - 买入额（本币）
+        })
+
+    return {
+        "year": year,
+        "markets": markets,
+        "available_years": sorted(all_years, reverse=True),
+    }
+
+
+# ============================================================
 # 单只股票交易复盘（FIFO 配对，用于独立分析页）
 # ============================================================
 

@@ -12,6 +12,7 @@
   GET /api/stock/<code>/profile    通用信息（公司/估值，读自 stock_profiles）
   GET /api/stock/<code>/analysis   交易复盘（成交明细 + FIFO 回合 + 复盘统计）
   GET /api/pnl                 交易盈亏（已实现，每股一行）
+  GET /api/finance?year=2026   年度财务统计（现金流口径，按美股/港股分别汇总）
   GET /api/fx?pair=USDCNY      外汇日线（默认美元兑人民币）
 """
 from __future__ import annotations
@@ -24,7 +25,7 @@ from flask import Flask, jsonify, render_template, request
 
 from ..config import CONFIG
 from .. import db as dbmod
-from ..pnl import compute_pnl, analyze_stock
+from ..pnl import compute_pnl, analyze_stock, yearly_finance
 
 app = Flask(__name__)
 
@@ -146,6 +147,20 @@ def api_pnl():
             )
             cost_fallback = {r["code"]: r["cost_price"] for r in cur.fetchall()}
         return jsonify({"rows": compute_pnl(deals, cost_fallback)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/finance")
+def api_finance():
+    """年度财务统计：现金流口径（当年卖出额 - 买入额），按美股/港股分别汇总。"""
+    from datetime import datetime
+    year = request.args.get("year") or str(datetime.now().year)
+    conn = get_db()
+    try:
+        cur = conn.execute("SELECT * FROM deals")
+        deals = rows_to_list(cur)
+        return jsonify(yearly_finance(deals, year))
     finally:
         conn.close()
 
