@@ -83,8 +83,8 @@ document.querySelectorAll(".subtab").forEach((s) => {
 // 原始数据缓存（fetch 一次），筛选/排序在前端对缓存重渲染。
 const state = {
   positions: { raw: [], snapshot: null, market: "", sort: { key: null, dir: 0 } },
-  orders: { raw: [], market: "" },
-  deals: { raw: [], market: "" },
+  orders: { raw: [], market: "", year: "" },
+  deals: { raw: [], market: "", year: "" },
   pnl: { raw: [], market: "", sort: { key: null, dir: 0 } },
   fx: { raw: [], pair: "USDCNY" },
 };
@@ -93,8 +93,13 @@ function byMarket(rows, market) {
   return market ? rows.filter((r) => r.market === market) : rows;
 }
 
+// 按年份筛选：year 为 "" 时不过滤；否则按 create_time 前 4 位（YYYY-...）匹配。
+function byYear(rows, year) {
+  return year ? rows.filter((r) => String(r.create_time || "").slice(0, 4) === year) : rows;
+}
+
 // ---------- 市场筛选 ----------
-document.querySelectorAll(".filter").forEach((f) => {
+document.querySelectorAll('.filter:not([data-filter="year"])').forEach((f) => {
   const scope = f.dataset.filter; // positions / trades
   f.querySelectorAll(".chip").forEach((chip) => {
     chip.addEventListener("click", () => {
@@ -224,6 +229,80 @@ async function loadTrades() {
   if (tradesLoaded) return;
   tradesLoaded = true;
   await Promise.all([loadOrders(), loadDeals()]);
+  buildYearFilter();
+}
+
+// 时间筛选：最近三年做成子 Tab（chip），更早年份收进下拉框。
+// 默认只显示最近一年（当前年）。年份取自 orders + deals 的 create_time。
+function buildYearFilter() {
+  const filter = document.querySelector('.filter[data-filter="year"]');
+  if (!filter) return;
+  const tabsWrap = filter.querySelector(".year-tabs");
+  const select = filter.querySelector(".year-select");
+
+  // 汇总数据中出现过的全部年份（降序）
+  const years = new Set();
+  [...state.orders.raw, ...state.deals.raw].forEach((r) => {
+    const y = String(r.create_time || "").slice(0, 4);
+    if (/^\d{4}$/.test(y)) years.add(y);
+  });
+  const allYears = [...years].sort().reverse();
+
+  const recent = allYears.slice(0, 3);   // 最近三年 → 子 Tab
+  const older = allYears.slice(3);       // 更早 → 下拉框
+  const defaultYear = recent[0] || "";   // 默认最近一年
+
+  // 子 Tab（chip）
+  tabsWrap.innerHTML = recent
+    .map((y) => `<span class="chip" data-year="${y}">${y}</span>`)
+    .join("");
+
+  // 下拉框：占位项 + 更早年份；没有更早年份则隐藏
+  if (older.length) {
+    select.innerHTML =
+      `<option value="">更早…</option>` +
+      older.map((y) => `<option value="${y}">${y}</option>`).join("");
+    select.style.display = "";
+  } else {
+    select.innerHTML = "";
+    select.style.display = "none";
+  }
+
+  // 应用默认年份并高亮对应 chip
+  state.orders.year = defaultYear;
+  state.deals.year = defaultYear;
+  setActiveYear(filter, defaultYear);
+
+  // chip 点击（全部 + 最近三年）
+  filter.querySelectorAll(".chip[data-year]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+      applyYear(filter, chip.dataset.year);
+      select.value = "";   // 选了 chip 就重置下拉框
+    });
+  });
+
+  // 下拉框选择更早年份
+  select.addEventListener("change", () => {
+    if (select.value) applyYear(filter, select.value, /*fromSelect=*/true);
+  });
+
+  renderOrders();
+  renderDeals();
+}
+
+function applyYear(filter, year, fromSelect) {
+  state.orders.year = year;
+  state.deals.year = year;
+  setActiveYear(filter, fromSelect ? null : year);  // 来自下拉时不高亮任何 chip
+  renderOrders();
+  renderDeals();
+}
+
+// 高亮匹配 year 的 chip（year=null 时全部取消高亮，用于下拉选择更早年份）
+function setActiveYear(filter, year) {
+  filter.querySelectorAll(".chip[data-year]").forEach((c) => {
+    c.classList.toggle("active", year !== null && c.dataset.year === year);
+  });
 }
 
 function sideBadge(side) {
@@ -245,7 +324,7 @@ async function loadOrders() {
 
 function renderOrders() {
   const wrap = document.getElementById("orders-table");
-  const list = byMarket(state.orders.raw, state.orders.market);
+  const list = byYear(byMarket(state.orders.raw, state.orders.market), state.orders.year);
   if (!list.length) { wrap.innerHTML = `<div class="empty">暂无订单</div>`; return; }
   const rows = list.map((o) => `
       <tr>
@@ -285,7 +364,7 @@ async function loadDeals() {
 
 function renderDeals() {
   const wrap = document.getElementById("deals-table");
-  const list = byMarket(state.deals.raw, state.deals.market);
+  const list = byYear(byMarket(state.deals.raw, state.deals.market), state.deals.year);
   if (!list.length) { wrap.innerHTML = `<div class="empty">暂无成交</div>`; return; }
   const rows = list.map((d) => `
       <tr>

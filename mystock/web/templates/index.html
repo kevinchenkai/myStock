@@ -64,6 +64,13 @@
           <span class="chip" data-market="US">美股</span>
           <span class="chip" data-market="HK">港股</span>
         </div>
+        <div class="filter" data-filter="year">
+          <span class="filter-label">时间</span>
+          <span class="chip" data-year="">全部</span>
+          <!-- 最近三年子 Tab + 更早年份下拉，均由 app.js 动态填充 -->
+          <span class="year-tabs"></span>
+          <select class="year-select" title="选择更早年份"></select>
+        </div>
       </div>
       <div id="orders-table"></div>
       <div id="deals-table" style="display:none;"></div>
