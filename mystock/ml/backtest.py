@@ -97,9 +97,13 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         bars = bars_by_day.get(next_day)
         if not bars:
             continue
+        mark_next = _mark_price(feat, i + 1)
+        # 兜底：今日 close / 次日 mark 为 NaN 则跳过该日（否则 equity=qty*nan 会污染
+        # 整条净值曲线，总览显示 nan）。采集层已丢脏行，这里再防一道（DATA.md §4）。
+        if not (np.isfinite(close_t) and np.isfinite(mark_next)):
+            continue
         L_hat = close_t * (1 + float(_predict_silent(model.m_low, row[FEATURE_COLS].values.reshape(1, -1))[0]))
         H_hat = close_t * (1 + float(_predict_silent(model.m_high, row[FEATURE_COLS].values.reshape(1, -1))[0]))
-        mark_next = _mark_price(feat, i + 1)
 
         # --- buy_hold：期初一次性买入并持有 ---
         if bh_shares is None:

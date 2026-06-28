@@ -70,6 +70,13 @@ def _color_val(v: float) -> str:
     return f'<span style="color:{c}">{v:+,.2f}</span>'
 
 
+def _fmt_eq(v) -> str:
+    """总览期末净值格式化：None/NaN 显示为「—」而非裸 nan（防脏数据漏到展示层）。"""
+    if v is None or v != v:   # None 或 NaN
+        return "—"
+    return f"{v:,.0f}"
+
+
 def _metrics_guide() -> str:
     """报告顶部的"指标说明"块（可折叠）。解释四条曲线/数值如何对比着读。"""
     return f"""
@@ -204,10 +211,12 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None) -> Pa
                                 high_alpha=hi_a, low_alpha=lo_a)
         sections.append(_stock_section(code, bt, pred))
         fe = bt["final_equity"]
-        beat = "✓" if (fe.get("bandit") or 0) > (fe.get("buy_hold") or 0) else "✗"
+        b, bh = fe.get("bandit"), fe.get("buy_hold")
+        # NaN/None 时不下「超越」结论（nan 比较恒 False，会误判为 ✗）
+        beat = "—" if (b is None or b != b or bh is None or bh != bh) else ("✓" if b > bh else "✗")
         summary_rows += (f"<tr><td>{code}</td>"
-                         f"<td style='text-align:right'>{fe.get('bandit',0):,.0f}</td>"
-                         f"<td style='text-align:right'>{fe.get('buy_hold',0):,.0f}</td>"
+                         f"<td style='text-align:right'>{_fmt_eq(b)}</td>"
+                         f"<td style='text-align:right'>{_fmt_eq(bh)}</td>"
                          f"<td style='text-align:center'>{beat}</td>"
                          f"<td>{pred['L_hat']:,.2f} ~ {pred['H_hat']:,.2f}</td>"
                          f"<td style='text-align:right'>{pred['width_pct']:.2f}%</td></tr>")

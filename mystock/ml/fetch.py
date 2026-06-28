@@ -48,7 +48,7 @@ def fetch_daily(futu_code: str, now: str, max_retries: int = 3,
     date_col = "Date" if "Date" in df.columns else df.columns[0]
     rows = []
     for _, r in df.iterrows():
-        rows.append({
+        row = {
             "symbol": sym,
             "futu_code": futu_code,
             "date": pd.to_datetime(r[date_col]).strftime("%Y-%m-%d"),
@@ -61,7 +61,9 @@ def fetch_daily(futu_code: str, now: str, max_retries: int = 3,
             "dividends": _f(r, "Dividends"),
             "splits": _f(r, "Stock Splits"),
             "synced_at": now,
-        })
+        }
+        if _ohlc_ok(row):   # 丢弃 NaN/不完整行（防脏数据进库污染回测）
+            rows.append(row)
     return rows
 
 
@@ -87,7 +89,7 @@ def fetch_hourly(futu_code: str, now: str, max_retries: int = 3,
         ts = pd.to_datetime(r[ts_col])
         ts_utc = ts.tz_convert("UTC") if ts.tzinfo else ts.tz_localize("UTC")
         ts_local = ts.tz_convert(local_tz) if ts.tzinfo else ts
-        rows.append({
+        row = {
             "symbol": sym,
             "futu_code": futu_code,
             "ts_utc": ts_utc.strftime("%Y-%m-%d %H:%M:%S"),
@@ -98,7 +100,9 @@ def fetch_hourly(futu_code: str, now: str, max_retries: int = 3,
             "close": _f(r, "Close"),
             "volume": _f(r, "Volume"),
             "synced_at": now,
-        })
+        }
+        if _ohlc_ok(row):   # 丢弃 NaN/不完整行（同上，1h 撮合 bars 也须干净）
+            rows.append(row)
     return rows
 
 
@@ -165,6 +169,21 @@ def _f(row, col):
     if col in row and pd.notna(row[col]):
         return float(row[col])
     return None
+
+
+def _ohlc_ok(row: dict) -> bool:
+    """OHLC 四价齐全且为正才算可用行。
+
+    yfinance 偶发返回 NaN 行（最常见：盘后/周末重拉时撞上当日尚未结算的最新
+    bar，美股收盘 16:00 ET ≈ 次日北京清晨，周末 cron 易踩）。这类行 _f() 会转成
+    None；若写进库，回测 mark_next 取到 NaN → 净值曲线整条被污染 → 报告总览显示
+    nan。故在采集层就地丢弃——宁可当天少一根，也不让脏行进库（DATA.md §4）。
+    """
+    for k in ("open", "high", "low", "close"):
+        v = row.get(k)
+        if v is None or v != v or v <= 0:   # None / NaN / 非正
+            return False
+    return True
 
 
 def _latest_date(conn, sym: str) -> str | None:
