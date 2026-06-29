@@ -34,6 +34,22 @@ def _require_yf() -> None:
         raise YFError("未安装 yfinance。请先 `conda activate mk` 并 pip install yfinance")
 
 
+def _end_inclusive(end: Optional[str]) -> Optional[str]:
+    """yfinance 的 history(end=...) 是**排他**的（返回 bar 严格 < end），
+    会漏掉 end 当天的 bar。这里把 end 当天纳入：返回 end + 1 天。
+
+    入参 'YYYY-MM-DD'（或 None）；None 表示到今天，交给 yfinance 默认行为。
+    非法格式原样返回（让 yfinance 自行报错）。
+    """
+    if not end:
+        return end
+    try:
+        d = pd.to_datetime(end[:10]) + pd.Timedelta(days=1)
+        return d.strftime("%Y-%m-%d")
+    except (ValueError, TypeError):
+        return end
+
+
 # yfinance 列名 -> 数据库列名
 _COL_MAP = {
     "Open": "open",
@@ -64,6 +80,7 @@ def fetch_daily(
     """
     _require_yf()
     yf_symbol = futu_to_yf(futu_code)
+    end = _end_inclusive(end)   # yfinance end 排他 → 纳入 end 当天
 
     last_err: Optional[Exception] = None
     for attempt in range(1, max_retries + 1):
@@ -131,6 +148,7 @@ def fetch_fx(
         start/end: 'YYYY-MM-DD'，end 为 None 表示到今天。
     """
     _require_yf()
+    end = _end_inclusive(end)   # yfinance end 排他 → 纳入 end 当天
 
     last_err: Optional[Exception] = None
     df = None
