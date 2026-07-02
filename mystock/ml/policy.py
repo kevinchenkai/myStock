@@ -104,9 +104,6 @@ class LinUCB:
         self.b = [np.zeros(dim) for _ in range(n_actions)]
         self.rng = np.random.default_rng(seed)
 
-    def _theta(self, a: int):
-        return np.linalg.solve(self.A[a], self.b[a])
-
     def select(self, x: np.ndarray, valid: list[int]) -> int:
         # ε-greedy：小概率随机探索，逃离早期被坏 reward 锁死的臂
         if self.epsilon > 0 and self.rng.random() < self.epsilon:

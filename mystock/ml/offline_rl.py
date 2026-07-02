@@ -15,14 +15,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
-import pandas as pd
 
 from . import config as mlcfg
 from . import data as mldata
-from .backtest import BTConfig, _mark_price, _state_vec, _apply, _ctx
+from .backtest import _mark_price, _state_vec, _apply, _ctx
 from .features import FEATURE_COLS, build_features
-from .policy import N_ACTIONS, RulePolicy, enumerate_actions
-from .simulator import Account, BUY, SELL, match_limit_order
+from .policy import RulePolicy, enumerate_actions
+from .simulator import Account
 
 
 @dataclass
@@ -31,12 +30,45 @@ class RLConfig:
     unit_shares: int = 5
     train_frac: float = 0.6
     seed: int = 0
-    high_alpha: float = 0.9
-    low_alpha: float = 0.1
+    # None → 按股自适应分位 config.alpha_for（与 P2/P3/报告同口径）。
+    # 显式传值可覆盖（docs 记录的 P4 负结果跑在旧默认 0.1/0.9 上）。
+    high_alpha: float | None = None
+    low_alpha: float | None = None
     n_episodes: int = 40          # rollout 多少条轨迹（不同 ε/种子）增样
     behavior_eps: float = 0.5     # 行为策略探索率（高→覆盖广，利于离线学习）
     n_steps: int = 20000          # CQL 训练步数
     reward_scale: float = 50.0
+
+
+def _prepare(code: str, cfg: RLConfig, db_path=None):
+    """加载特征 + 1h bars，按时间切分，fit 预测器并对全部决策行一次性推理。
+
+    collect_dataset / eval_policy 共用（去重复）。L/H 只随「日」变、不随 episode 变，
+    故在 episode 循环外预计算——原实现在 40 个 episode 里逐日单行 predict，
+    每股 ~6 万次冗余推理，纯浪费。
+    返回 (feat, bars_by_day, train_idx, test_idx, L_by_i, H_by_i)。
+    """
+    daily = mldata.load_daily(code, db_path)
+    feat = build_features(daily).reset_index(drop=True)
+    bars_by_day = mldata.intraday_bars_by_day(code, db_path)
+    valid = feat.dropna(subset=FEATURE_COLS + ["y_high_ret", "y_low_ret"]).index
+    valid = [i for i in valid if i + 1 < len(feat)]
+    split_at = valid[int(len(valid) * cfg.train_frac)]
+    train_idx = [i for i in valid if i < split_at]
+    test_idx = [i for i in valid if i >= split_at]
+
+    lo_a = cfg.low_alpha if cfg.low_alpha is not None else mlcfg.alpha_for(code)[0]
+    hi_a = cfg.high_alpha if cfg.high_alpha is not None else mlcfg.alpha_for(code)[1]
+    # 防泄漏：预测器只用 < split 的数据 fit；推理覆盖训练+测试全部决策行
+    from .predictor import IntervalModel
+    model = IntervalModel(seed=cfg.seed, high_alpha=hi_a,
+                          low_alpha=lo_a).fit(feat.loc[train_idx])
+    idx_all = train_idx + test_idx
+    lo_ret, hi_ret = model.predict_ret(feat.loc[idx_all])
+    closes = feat.loc[idx_all, "close"].to_numpy()
+    L_by_i = dict(zip(idx_all, closes * (1 + lo_ret)))
+    H_by_i = dict(zip(idx_all, closes * (1 + hi_ret)))
+    return feat, bars_by_day, train_idx, test_idx, L_by_i, H_by_i
 
 
 # ---------------------------------------------------------------------------
@@ -44,18 +76,7 @@ class RLConfig:
 # ---------------------------------------------------------------------------
 def collect_dataset(code: str, cfg: RLConfig, db_path=None):
     """返回 (observations, actions, rewards, terminals)，只用训练区间（防泄漏）。"""
-    daily = mldata.load_daily(code, db_path)
-    feat = build_features(daily).reset_index(drop=True)
-    bars_by_day = mldata.intraday_bars_by_day(code, db_path)
-    valid = feat.dropna(subset=FEATURE_COLS + ["y_high_ret", "y_low_ret"]).index
-    valid = [i for i in valid if i + 1 < len(feat)]
-    split_at = valid[int(len(valid) * cfg.train_frac)]
-    train_idx = [i for i in valid if i < split_at]   # 仅训练区间 rollout
-
-    # 训练区间内用全历史前段 fit 预测器（防泄漏：只用 < split 的数据）
-    from .predictor import IntervalModel, _predict_silent
-    model = IntervalModel(seed=cfg.seed, high_alpha=cfg.high_alpha,
-                          low_alpha=cfg.low_alpha).fit(feat.loc[train_idx])
+    feat, bars_by_day, train_idx, _, L_by_i, H_by_i = _prepare(code, cfg, db_path)
 
     rule = RulePolicy(qty_units=1)
     obs, acts, rews, terms = [], [], [], []
@@ -71,9 +92,11 @@ def collect_dataset(code: str, cfg: RLConfig, db_path=None):
             bars = bars_by_day.get(next_day)
             if not bars:
                 continue
-            L = close_t * (1 + float(_predict_silent(model.m_low, row[FEATURE_COLS].values.reshape(1, -1))[0]))
-            H = close_t * (1 + float(_predict_silent(model.m_high, row[FEATURE_COLS].values.reshape(1, -1))[0]))
             mark_next = _mark_price(feat, i + 1)
+            # NaN 兜底（与 backtest 同口径）：脏 mark 会污染 reward/equity
+            if not (np.isfinite(close_t) and np.isfinite(mark_next)):
+                continue
+            L, H = float(L_by_i[i]), float(H_by_i[i])
             if bh_shares is None:
                 bh_shares = cfg.init_cash / close_t
             bh_now = bh_shares * mark_next
@@ -136,17 +159,7 @@ def _cuda() -> bool:
 # 3) 用学到的策略在测试区间回测（与 P3 同口径）
 # ---------------------------------------------------------------------------
 def eval_policy(code: str, cql, cfg: RLConfig, db_path=None) -> dict:
-    daily = mldata.load_daily(code, db_path)
-    feat = build_features(daily).reset_index(drop=True)
-    bars_by_day = mldata.intraday_bars_by_day(code, db_path)
-    valid = feat.dropna(subset=FEATURE_COLS + ["y_high_ret", "y_low_ret"]).index
-    valid = [i for i in valid if i + 1 < len(feat)]
-    split_at = valid[int(len(valid) * cfg.train_frac)]
-    test_idx = [i for i in valid if i >= split_at]
-
-    from .predictor import IntervalModel, _predict_silent
-    model = IntervalModel(seed=cfg.seed, high_alpha=cfg.high_alpha,
-                          low_alpha=cfg.low_alpha).fit(feat.loc[[i for i in valid if i < split_at]])
+    feat, bars_by_day, _, test_idx, L_by_i, H_by_i = _prepare(code, cfg, db_path)
 
     acc = Account(cash=cfg.init_cash)
     bh_shares = None
@@ -158,9 +171,10 @@ def eval_policy(code: str, cql, cfg: RLConfig, db_path=None) -> dict:
         bars = bars_by_day.get(next_day)
         if not bars:
             continue
-        L = close_t * (1 + float(_predict_silent(model.m_low, row[FEATURE_COLS].values.reshape(1, -1))[0]))
-        H = close_t * (1 + float(_predict_silent(model.m_high, row[FEATURE_COLS].values.reshape(1, -1))[0]))
         mark_next = _mark_price(feat, i + 1)
+        if not (np.isfinite(close_t) and np.isfinite(mark_next)):
+            continue
+        L, H = float(L_by_i[i]), float(H_by_i[i])
         if bh_shares is None:
             bh_shares = cfg.init_cash / close_t
 

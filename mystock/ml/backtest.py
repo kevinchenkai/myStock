@@ -23,7 +23,7 @@ from . import config as mlcfg
 from . import data as mldata
 from .features import FEATURE_COLS, build_features
 from .policy import Action, LinUCB, N_ACTIONS, RulePolicy, enumerate_actions
-from .predictor import IntervalModel, _predict_silent
+from .predictor import IntervalModel
 from .simulator import Account, BUY, SELL, match_limit_order
 
 
@@ -73,6 +73,12 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
     test_idx = [i for i in valid if i >= split_at]
     dim = 1 + len(FEATURE_COLS)
 
+    # 预测向量化：模型 fit 后对全部测试行一次性推理（逐日单行 predict 是纯浪费，
+    # 结果与单行完全一致——同模型、同特征、确定性）。推理产出 ret，价位在循环内还原。
+    lo_ret, hi_ret = model.predict_ret(feat.loc[test_idx])
+    lo_by_i = dict(zip(test_idx, lo_ret))
+    hi_by_i = dict(zip(test_idx, hi_ret))
+
     # 各策略独立账户
     accs = {k: Account(cash=cfg.init_cash) for k in ("rule", "bandit", "human")}
     rule = RulePolicy(qty_units=1)
@@ -89,6 +95,7 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
     nav_dates: list[str] = []
     bh_shares = None
     bh_prev = cfg.init_cash  # 上一步 buy&hold 净值（算超额奖励用）
+    hit_n = hit_total = 0    # 区间命中统计（与 predictor 口径一致：次日真实高低全落入区间）
 
     for i in test_idx:
         row = feat.iloc[i]
@@ -102,8 +109,12 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         # 整条净值曲线，总览显示 nan）。采集层已丢脏行，这里再防一道（DATA.md §4）。
         if not (np.isfinite(close_t) and np.isfinite(mark_next)):
             continue
-        L_hat = close_t * (1 + float(_predict_silent(model.m_low, row[FEATURE_COLS].values.reshape(1, -1))[0]))
-        H_hat = close_t * (1 + float(_predict_silent(model.m_high, row[FEATURE_COLS].values.reshape(1, -1))[0]))
+        lo_r, hi_r = float(lo_by_i[i]), float(hi_by_i[i])
+        L_hat, H_hat = close_t * (1 + lo_r), close_t * (1 + hi_r)
+        # 区间命中：真实次日 high≤H_hat 且 low≥L_hat（ret 空间判定，与 predictor 口径一致）
+        hit_total += 1
+        if row["y_high_ret"] <= hi_r and row["y_low_ret"] >= lo_r:
+            hit_n += 1
 
         # --- buy_hold：期初一次性买入并持有 ---
         if bh_shares is None:
@@ -149,6 +160,8 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
     return {
         "code": code,
         "n_test_days": len(nav_curves["bandit"]),
+        # 测试窗区间命中率（与报告展示的自适应分位同口径，供报告直接引用）
+        "interval_hit_rate": round(hit_n / hit_total, 4) if hit_total else None,
         "net_value": {  # 达成净值（已实现，卖出−买入）
             "rule": round(accs["rule"].realized, 2),
             "bandit": round(accs["bandit"].realized, 2),
@@ -192,7 +205,6 @@ def _lgb():
 
 
 if __name__ == "__main__":
-    from . import config as mlcfg
     print(f"{'code':9} {'days':>5} {'rule':>9} {'bandit':>9} {'human':>9} {'buy_hold':>9}  net(bandit)")
     for code in mlcfg.TARGETS:
         r = run_backtest(code)
@@ -201,4 +213,4 @@ if __name__ == "__main__":
         fe = r["final_equity"]
         print(f"{code:9} {r['n_test_days']:>5} "
               f"{fe['rule']:>9} {fe['bandit']:>9} {fe['human']:>9} {fe['buy_hold']:>9}  "
-              f"净值={r['net_value']['bandit']}  [{r['backend']}]")
+              f"净值={r['net_value']['bandit']} 命中={r['interval_hit_rate']}  [{r['backend']}]")

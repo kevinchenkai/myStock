@@ -77,6 +77,13 @@ def _fmt_eq(v) -> str:
     return f"{v:,.0f}"
 
 
+def _fmt_pct(v) -> str:
+    """比例(0~1)格式化为百分比；None/NaN → 「—」。"""
+    if v is None or v != v:
+        return "—"
+    return f"{v * 100:.0f}%"
+
+
 def _metrics_guide() -> str:
     """报告顶部的"指标说明"块（可折叠）。解释四条曲线/数值如何对比着读。"""
     return f"""
@@ -186,7 +193,8 @@ def _stock_section(code: str, bt: dict, pred: dict) -> str:
           <th style="text-align:right">期末净值</th><th style="text-align:right">收益率</th></tr>
         {rows}
       </table>
-      <p style="color:#888;font-size:12px">测试 {bt['n_test_days']} 日，初始 {init:,.0f}，后端 {bt['backend']}。
+      <p style="color:#888;font-size:12px">测试 {bt['n_test_days']} 日，初始 {init:,.0f}，
+         区间命中 {_fmt_pct(bt.get('interval_hit_rate'))}，后端 {bt['backend']}。
          达成净值(卖−买)：Bandit {_color_val(nv['bandit'])} / 规则 {_color_val(nv['rule'])} / 人类 {_color_val(nv['human'])}</p>
       <div style="margin-top:10px;padding:10px 12px;background:#fafafa;border-left:3px solid #ccc;
            border-radius:4px;font-size:13px;line-height:1.7">
@@ -219,7 +227,8 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None) -> Pa
                          f"<td style='text-align:right'>{_fmt_eq(bh)}</td>"
                          f"<td style='text-align:center'>{beat}</td>"
                          f"<td>{pred['L_hat']:,.2f} ~ {pred['H_hat']:,.2f}</td>"
-                         f"<td style='text-align:right'>{pred['width_pct']:.2f}%</td></tr>")
+                         f"<td style='text-align:right'>{pred['width_pct']:.2f}%</td>"
+                         f"<td style='text-align:right'>{_fmt_pct(bt.get('interval_hit_rate'))}</td></tr>")
 
     page = f"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
 <title>myStock ML 回测报告 {today}</title>
@@ -233,10 +242,11 @@ h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}</style></
   <tr style="border-bottom:1px solid #ccc"><th style="text-align:left">标的</th>
     <th style="text-align:right">Bandit 期末</th><th style="text-align:right">买入持有</th>
     <th>超越</th><th style="text-align:left">次日预测区间</th>
-    <th style="text-align:right">区间宽</th></tr>
+    <th style="text-align:right">区间宽</th><th style="text-align:right">命中率</th></tr>
   {summary_rows}
 </table>
-<p style="color:#888;font-size:12px">"超越"= Bandit 期末净值是否高于买入持有。结论看相对值，绝对收益不单独采信。</p>
+<p style="color:#888;font-size:12px">"超越"= Bandit 期末净值是否高于买入持有。"命中率"= 测试窗内次日真实高/低
+全落进预测区间的比例（分位收窄的诚实代价，~50% 属预期，见指标说明）。结论看相对值，绝对收益不单独采信。</p>
 {''.join(sections)}
 <hr><p style="color:#aaa;font-size:12px">生成于 {dt.datetime.now():%Y-%m-%d %H:%M}。完整方案见 docs/ML_PLAN.md，速览见 docs/ML_OVERVIEW.md。</p>
 </body></html>"""

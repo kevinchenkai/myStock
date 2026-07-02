@@ -5,8 +5,8 @@
   2. 2 年 1 小时线（ml_quotes_1h）
   3. 生产库 deals/orders/positions 只读快照（ml_deals/ml_orders/ml_positions）
 
-仅 docs/ML_PLAN.md §1.5 锁定的 3 支美股：US.NVDA / US.TSLA / US.PDD。
-运行：python -m mystock.ml.fetch  或  bash scripts/ml_fetch.sh
+标的清单见 config.TARGETS（3 美股 + 3 港股，docs/ML_OVERVIEW.md §二）。
+运行：python -m mystock.ml.fetch [--full]  或  bash scripts/ml.sh data
 """
 from __future__ import annotations
 
@@ -193,16 +193,42 @@ def _latest_date(conn, sym: str) -> str | None:
     return r[0] if r and r[0] else None
 
 
-def _is_fresh(latest: str | None, max_gap_days: int = 5) -> bool:
-    """库中最新日期距今 ≤ max_gap_days（含周末缓冲）→ 视为有数据、走增量。"""
+def _latest_date_1h(conn, sym: str) -> str | None:
+    """ML 库中该标的 1h 线的最新交易日（ts_et 前 10 位；无则 None）。"""
+    cur = conn.execute("SELECT MAX(ts_et) FROM ml_quotes_1h WHERE symbol=?", (sym,))
+    r = cur.fetchone()
+    return r[0][:10] if r and r[0] else None
+
+
+def _gap_days(latest: str | None) -> int | None:
+    """库中最新日期距今天数（日历日）；无数据/解析失败返回 None（→ 全量）。"""
     if not latest:
-        return False
+        return None
     from datetime import date
     try:
-        y, m, d = map(int, latest.split("-"))
-        return (date.today() - date(y, m, d)).days <= max_gap_days
+        y, m, d = map(int, latest[:10].split("-"))
+        return (date.today() - date(y, m, d)).days
     except Exception:  # noqa: BLE001
-        return False
+        return None
+
+
+def _period_for(gap: int | None, tiers: list[tuple[int, str]]) -> str | None:
+    """按缺口挑抓取窗（yfinance 只认固定 period 集）。
+
+    tiers=[(max_gap, period)...] 升序；gap 落进哪档用哪档，全不中或无数据 → None(全量)。
+    日线与 1h **各自独立判断**——修复旧实现只看日线新鲜度的缺口：若 1h 抓取
+    连续失败数日而日线正常，旧逻辑仍只抓 5d 短窗，1h 会留下永久空洞直到 --full。
+    """
+    if gap is None:
+        return None
+    for max_gap, period in tiers:
+        if gap <= max_gap:
+            return period
+    return None
+
+
+D_TIERS = [(25, "1mo")]                 # 日线：缺口 ≤25 天抓近 1 月，否则全量 5y
+H_TIERS = [(4, "5d"), (25, "1mo")]      # 1h：≤4 天抓 5d、≤25 天抓 1mo，否则全量 730d
 
 
 # ---------------------------------------------------------------------------
@@ -220,18 +246,19 @@ def run(full: bool = False) -> None:
     try:
         for code in mlcfg.TARGETS:
             sym = futu_to_yf(code)
-            incremental = (not full) and _is_fresh(_latest_date(conn, sym))
-            d_period = "1mo" if incremental else None   # None=全量(5y/2y)
-            h_period = "5d" if incremental else None
-            tag = "增量" if incremental else "全量"
+            # 日线与 1h 各自按缺口挑窗（互不牵连；--full 一律全量）
+            d_period = None if full else _period_for(_gap_days(_latest_date(conn, sym)), D_TIERS)
+            h_period = None if full else _period_for(_gap_days(_latest_date_1h(conn, sym)), H_TIERS)
+            d_tag = f"增量{d_period}" if d_period else "全量"
+            h_tag = f"增量{h_period}" if h_period else "全量"
             # 日线
             try:
                 rows = fetch_daily(code, now, period=d_period)
                 n = mldb.upsert(conn, "ml_quotes_1d", rows)
                 rng = (rows[0]["date"], rows[-1]["date"]) if rows else ("", "")
                 mldb.log_sync(conn, "yf_1d", symbol=sym, range_start=rng[0],
-                              range_end=rng[1], row_count=n, message=f"{tag} {n} daily rows")
-                print(f"  [1d/{tag}] {sym}: {n} rows {rng[0]}..{rng[1]}")
+                              range_end=rng[1], row_count=n, message=f"{d_tag} {n} daily rows")
+                print(f"  [1d/{d_tag}] {sym}: {n} rows {rng[0]}..{rng[1]}")
             except Exception as e:  # noqa: BLE001
                 mldb.log_sync(conn, "yf_1d", symbol=sym, status="error", message=str(e))
                 print(f"  [1d] {sym}: ERROR {e}")
@@ -242,8 +269,8 @@ def run(full: bool = False) -> None:
                 n = mldb.upsert(conn, "ml_quotes_1h", rows)
                 rng = (rows[0]["ts_utc"], rows[-1]["ts_utc"]) if rows else ("", "")
                 mldb.log_sync(conn, "yf_1h", symbol=sym, range_start=rng[0],
-                              range_end=rng[1], row_count=n, message=f"{tag} {n} hourly rows")
-                print(f"  [1h/{tag}] {sym}: {n} rows {rng[0]}..{rng[1]}")
+                              range_end=rng[1], row_count=n, message=f"{h_tag} {n} hourly rows")
+                print(f"  [1h/{h_tag}] {sym}: {n} rows {rng[0]}..{rng[1]}")
             except Exception as e:  # noqa: BLE001
                 mldb.log_sync(conn, "yf_1h", symbol=sym, status="error", message=str(e))
                 print(f"  [1h] {sym}: ERROR {e}")

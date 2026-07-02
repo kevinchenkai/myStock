@@ -42,7 +42,7 @@ def alpha_for(code: str) -> tuple[float, float]:
 
 # ---- 抓取窗口（yfinance 实测硬限制，见 docs/ML_PLAN.md §2.1）----
 DAILY_PERIOD = "5y"      # 日线可取 5 年
-HOURLY_PERIOD = "730d"   # 1h 可取约 2 年；分段合并以绕过窗口限制
+HOURLY_PERIOD = "730d"   # 1h 上限约 2 年（730d 单次可取，无需分段）
 
 # ---- 路径（全部在 data/ml/ 下，已被 .gitignore 的 data/ 规则覆盖）----
 ML_DIR = ROOT_DIR / "data" / "ml"

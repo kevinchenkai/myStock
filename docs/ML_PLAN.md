@@ -1,6 +1,8 @@
 # 交易点位/数量预测 —— 机器学习方案（先 ML，后 RL；讨论稿 v0.6）
 
-> 状态：本文件为**完整方案 / 决策记录**。速览版（核心思路 + 数据 + 进度，一页看懂）见 [`docs/ML_OVERVIEW.md`](ML_OVERVIEW.md)。
+> 状态：本文件为**完整方案 / 决策记录**（历史文档，保留决策脉络不回写）。速览版（核心思路 + 数据 + 进度，一页看懂）见 [`docs/ML_OVERVIEW.md`](ML_OVERVIEW.md)。
+>
+> **现状注（2026-07-01，以 OVERVIEW 为准）**：① P0–P5 已全部完成并例行化（cron 每工作日跑）；② 标的已从 3 美股扩为 **3 美 + 3 港**（HK.00700/09988/01810，各股本币独立账户）；③ 文中 `scripts/ml_fetch.sh`、`scripts/ml_report.sh` 已**合并为统一入口 `scripts/ml.sh`**（data/train/publish/all）；④ 预测分位已按股自适应（`config.alpha_for`），非文中的固定 0.10/0.90。
 > 关联：数据口径见 [`docs/DATA.md`](DATA.md)，盈亏口径见 [`mystock/pnl.py`](../mystock/pnl.py)。
 > 训练/推理环境：2×H20（96GB，torch 2.10/cu129），SSH `vscode-h20-hh-970624@hanhai-prod.ai.kingsoft.com:2222`。
 > Conda Env：/home/share/user/chenkai/mystock-ml/env

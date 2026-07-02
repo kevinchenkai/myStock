@@ -3,8 +3,8 @@
 docs/ML_PLAN.md S1：预测 next-day high/low，输出 [L_hat, H_hat] 区间 + 不确定性。
 口径：
   - 目标用比例（y_high_ret / y_low_ret，相对今日 close），推理时还原成价位。
-  - high 预测偏高分位（默认 0.5/0.9），low 预测偏低分位（默认 0.5/0.1）——
-    取宽区间分位使 [L_hat,H_hat] 有覆盖意义。
+  - high 取上分位、low 取下分位张成区间 [L_hat, H_hat]。分位越靠 0.5 区间越窄、
+    命中率越低（宽度与覆盖直接对赌）；生产口径按股自适应（config.alpha_for）。
   - 评估：pinball loss + 区间命中率（真实 high/low 同时落在 [L_hat,H_hat] 的比例）+ MAE。
   - 切分：按时间 walk-forward，绝不随机打散（防泄漏）。
 
@@ -172,8 +172,9 @@ if __name__ == "__main__":
     from . import data as mldata
     for code in mlcfg.TARGETS:
         daily = mldata.load_daily(code)
-        res = walk_forward_eval(daily, code)
+        lo_a, hi_a = mlcfg.alpha_for(code)  # 与回测/报告同口径（按股自适应分位）
+        res = walk_forward_eval(daily, code, high_alpha=hi_a, low_alpha=lo_a)
         m = res.metrics
-        print(f"{code}: folds={res.n_folds} 区间命中={m['interval_hit_rate']}  "
+        print(f"{code}: folds={res.n_folds} α=({lo_a},{hi_a}) 区间命中={m['interval_hit_rate']}  "
               f"pinball(H/L)={m['pinball_high']}/{m['pinball_low']}  "
               f"MAE(H/L)={m['mae_high_ret']}/{m['mae_low_ret']}  [{m['backend']}]")
