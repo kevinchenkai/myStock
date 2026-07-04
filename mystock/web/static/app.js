@@ -166,6 +166,9 @@ function renderPositions() {
     return;
   }
 
+  // 组合概览始终基于整个快照（不受市场筛选影响）
+  renderPortfolioOverview(st.raw);
+
   let list = byMarket(st.raw, st.market);
   list = sortByNum(list, st.sort);   // dir: 1 升 / -1 降 / 0 原始顺序
 
@@ -187,6 +190,64 @@ function renderPositions() {
   wrap.innerHTML = `<table><thead><tr>${ths}</tr></thead><tbody>${rows}</tbody></table>`;
   bindCodeClicks(wrap);
   bindSortHeaders(wrap, state.positions.sort, renderPositions);
+}
+
+// 组合概览：用最新快照按币种（HKD/USD）分组汇总。零新数据。
+// 口径：不同币种不可相加（HK→HKD、US→USD 各成一组）；占比用支数（货币中性）。
+// 浮盈率 = 组内浮盈额合计 / 组内成本额合计（成本额 = 市值 - 浮盈，回避 cost_price≤0 的富途超卖噪声）。
+function renderPortfolioOverview(rows) {
+  const host = document.getElementById("portfolio-overview");
+  if (!host) return;
+  if (!rows || !rows.length) { host.innerHTML = ""; return; }
+
+  // 市场 → 币种（与全站口径一致）
+  const CCY = { HK: "HKD", US: "USD" };
+  const NAME = { HK: "港股", US: "美股" };
+
+  // 按市场分组（每个市场即单一币种）
+  const groups = {};
+  rows.forEach((p) => {
+    const mkt = p.market;
+    if (!CCY[mkt]) return;
+    const g = groups[mkt] || (groups[mkt] = {
+      market: mkt, currency: CCY[mkt],
+      mv: 0, pl: 0, count: 0, win: 0, loss: 0,
+    });
+    g.mv += Number(p.market_val) || 0;
+    g.pl += Number(p.pl_val) || 0;
+    g.count += 1;
+    const pl = Number(p.pl_val) || 0;
+    if (pl > 0) g.win += 1; else if (pl < 0) g.loss += 1;
+  });
+
+  const list = ["US", "HK"].filter((m) => groups[m]).map((m) => groups[m]);
+  if (!list.length) { host.innerHTML = ""; return; }
+
+  const totalCount = list.reduce((s, g) => s + g.count, 0);
+
+  const cards = list.map((g) => {
+    const cost = g.mv - g.pl;                 // 成本额（回避 cost_price≤0 噪声）
+    const plRatio = cost > 0 ? (g.pl / cost) * 100 : null;
+    const share = totalCount > 0 ? (g.count / totalCount) * 100 : 0;
+    return `
+      <div class="pf-card">
+        <div class="pf-card-head">
+          <span class="pf-mkt">${NAME[g.market]}</span>
+          <span class="pf-ccy">${esc(g.currency)}</span>
+          <span class="pf-share">${g.count} 支 · 占 ${share.toFixed(0)}%</span>
+        </div>
+        <div class="pf-mv">${fmtNum(g.mv)}<span class="pf-mv-label">总市值</span></div>
+        <div class="pf-rows">
+          <div class="pf-row"><span>浮动盈亏</span><span class="${plClass(g.pl)}">${fmtSigned(g.pl.toFixed(2))}</span></div>
+          <div class="pf-row"><span>浮盈率</span><span class="${plClass(g.pl)}">${plRatio === null ? "—" : fmtSigned(plRatio.toFixed(2), "%")}</span></div>
+          <div class="pf-row"><span>盈利 / 亏损 支数</span><span><span class="up">${g.win}</span> / <span class="down">${g.loss}</span></span></div>
+        </div>
+      </div>`;
+  }).join("");
+
+  host.innerHTML = `
+    <div class="pf-grid">${cards}</div>
+    <div class="disclaimer">组合概览基于最新快照（${esc(state.positions.snapshot || "")}）。不同币种不可相加，港股按 HKD、美股按 USD 分别汇总；占比按持仓支数（货币中性）。浮盈率 = 浮盈额 / 成本额。</div>`;
 }
 
 // 表头点击：倒序 → 正序 → 取消，循环切换。
