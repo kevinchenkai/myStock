@@ -99,6 +99,59 @@ def test_position_snapshot_replace():
         os.remove(path)
 
 
+def test_reset_quote_skiplist_all_and_selective():
+    conn, path = _conn()
+    try:
+        for code in ("US.A", "US.B", "US.C"):
+            db.record_quote_empty(conn, code, code.split(".")[1])
+        # 只重置指定代码
+        n = db.reset_quote_skiplist(conn, ["US.A"])
+        assert n == 1
+        left = {r["futu_code"] for r in conn.execute("SELECT futu_code FROM quote_skiplist")}
+        assert left == {"US.B", "US.C"}
+        # 清空全部
+        n = db.reset_quote_skiplist(conn)
+        assert n == 2
+        assert conn.execute("SELECT COUNT(*) c FROM quote_skiplist").fetchone()["c"] == 0
+    finally:
+        conn.close()
+        os.remove(path)
+
+
+def test_purge_code_removes_from_all_tables():
+    conn, path = _conn()
+    try:
+        # 在 orders / deals / skiplist 里放 US.YY 的记录
+        db.upsert_orders(conn, [{
+            "order_id": "O_YY", "market": "US", "code": "US.YY", "name": "YY",
+            "trd_side": "SELL", "order_type": None, "order_status": None,
+            "price": 50, "qty": 10, "dealt_qty": 10, "dealt_avg_price": 50,
+            "create_time": "2025-01-24 10:00:00", "updated_time": None,
+            "currency": "USD", "raw_json": "{}", "synced_at": "now",
+        }])
+        db.upsert_deals(conn, [{
+            "deal_id": "D_YY", "order_id": "O_YY", "market": "US", "code": "US.YY",
+            "name": "YY", "trd_side": "SELL", "price": 50, "qty": 10,
+            "create_time": "2025-01-24 10:00:00", "counter_broker_id": None,
+            "raw_json": "{}", "synced_at": "now",
+        }])
+        db.record_quote_empty(conn, "US.YY", "YY")
+        # 另放一条无关代码，确认不被误删
+        db.record_quote_empty(conn, "US.KEEP", "KEEP")
+
+        deleted = db.purge_code(conn, "US.YY")
+        assert deleted["orders"] == 1
+        assert deleted["deals"] == 1
+        assert deleted["quote_skiplist"] == 1
+        assert conn.execute("SELECT COUNT(*) c FROM orders WHERE code='US.YY'").fetchone()["c"] == 0
+        assert conn.execute("SELECT COUNT(*) c FROM deals WHERE code='US.YY'").fetchone()["c"] == 0
+        # 无关代码仍在
+        assert conn.execute("SELECT COUNT(*) c FROM quote_skiplist WHERE futu_code='US.KEEP'").fetchone()["c"] == 1
+    finally:
+        conn.close()
+        os.remove(path)
+
+
 def test_all_traded_codes_dedup():
     conn, path = _conn()
     try:

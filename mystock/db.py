@@ -170,8 +170,11 @@ def all_traded_codes(conn: sqlite3.Connection) -> list[str]:
 
 # ---------------- 行情跳过名单 ----------------
 
-# 连续抓到空数据多少次后加入跳过名单（达到即跳过，避免无效重试）
-SKIP_THRESHOLD = 2
+# 连续抓到空数据多少次后加入跳过名单（达到即跳过，避免无效重试）。
+# 阈值取 5：单次限频/网络抖动会让全部标的短暂抓空，阈值太低（如 2）会因
+# 一两次坏窗口把真实持仓标的误判为「无数据」并永久拉黑（skiplist 不自愈，
+# 被跳过的标的不再请求 → 无从触发 clear）。抬高阈值留足容错。
+SKIP_THRESHOLD = 5
 
 
 def get_quote_skiplist(conn: sqlite3.Connection) -> set[str]:
@@ -208,3 +211,46 @@ def clear_quote_skip(conn: sqlite3.Connection, futu_code: str) -> None:
     """某代码重新抓到数据时，从跳过名单移除（计数清零）。"""
     conn.execute("DELETE FROM quote_skiplist WHERE futu_code = ?", (futu_code,))
     conn.commit()
+
+
+def reset_quote_skiplist(
+    conn: sqlite3.Connection, codes: Optional[Sequence[str]] = None
+) -> int:
+    """手动重置跳过名单：清空后下次 update 会重新尝试抓这些标的的行情。
+
+    codes 为 None → 清空整个名单；否则只移除指定代码。返回删除的行数。
+    用于坏窗口（限频）误伤后的恢复。
+    """
+    if codes is None:
+        cur = conn.execute("DELETE FROM quote_skiplist")
+    else:
+        placeholders = ",".join("?" for _ in codes)
+        cur = conn.execute(
+            f"DELETE FROM quote_skiplist WHERE futu_code IN ({placeholders})",
+            list(codes),
+        )
+    conn.commit()
+    return cur.rowcount
+
+
+def purge_code(conn: sqlite3.Connection, futu_code: str) -> dict:
+    """彻底删除某代码在所有表中的数据（退市/清仓且不再关注时使用）。
+
+    删除 positions/orders/deals/daily_quotes/stock_profiles/quote_skiplist
+    中该代码的全部记录。**不可逆**：会影响历史交易盈亏与财务统计。
+    返回各表删除行数，便于调用方如实报告。
+    """
+    targets = [
+        ("positions", "code"),
+        ("orders", "code"),
+        ("deals", "code"),
+        ("daily_quotes", "futu_code"),
+        ("stock_profiles", "futu_code"),
+        ("quote_skiplist", "futu_code"),
+    ]
+    deleted = {}
+    for table, col in targets:
+        cur = conn.execute(f"DELETE FROM {table} WHERE {col} = ?", (futu_code,))
+        deleted[table] = cur.rowcount
+    conn.commit()
+    return deleted

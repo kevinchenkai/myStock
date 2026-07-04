@@ -62,6 +62,7 @@ conda activate mk && python -m pytest tests/ -q
 - **路由**：股票代码不含 `/`，路由用 `<code>`（string 转换器，遇 `/` 停）而非 `<path:code>`（会贪婪吞掉 `/profile`、`/analysis` 子路径）。
 - **P&L 口径**：盈亏 Tab 用移动平均成本（券商口径）；单股复盘用 FIFO 配对（干净的持有周期）。窗口前缺失的买入用 `positions.cost_price` 兜底；兜底成本 ≤ 0（富途超卖记账产物）视为不可用 → 记入 `uncovered_sell_qty`。
 - **复盘范围**：`analyze_stock` 仅做客观交易行为复盘，**不输出个性化投资建议**（你不是持牌投顾）。
+- **行情跳过名单（skiplist）不自愈**：连续抓空 `SKIP_THRESHOLD`（=5）次的代码会被跳过且不再请求 → 无从触发 `clear`。一次限频/网络抖动会批量抓空，阈值太低会误伤真实持仓。误伤后手动止血：`python -m mystock.pipelines.maintenance reset-skiplist [代码...]`（清空/指定重置）。退市清仓且不再关注的代码用 `... maintenance purge <代码>`（删所有表，**不可逆**，会改历史盈亏）。
 - **价格走势图**：用 vendored Lightweight-Charts（`static/vendor/`，离线、无构建步骤）。该库需真实 DOM 容器 + 创建后注入数据，故 `renderChart` 只产出占位容器，`openStock` 在 `innerHTML` 写入后调 `mountChart()` 挂载；浮窗关闭 / 切复盘时须 `destroyChart()` 释放。颜色从 CSS 变量读取以适配红涨绿跌 + 深浅主题。
 
 ## 安全 / 隐私（提交前务必检查）
