@@ -33,6 +33,7 @@
     <div class="tab active" data-tab="positions">我的持仓</div>
     <div class="tab" data-tab="trades">我的交易</div>
     <div class="tab" data-tab="pnl">交易盈亏</div>
+    <div class="tab" data-tab="trend">资产趋势</div>
     <div class="tab" data-tab="fx">美元汇率</div>
   </div>
 
@@ -103,6 +104,33 @@
         </div>
         <div id="finance-body"></div>
       </div>
+    </div>
+
+    <!-- 资产趋势：历史快照聚合，按币种分市值/浮盈两图 -->
+    <div class="panel" id="panel-trend" style="display:none;">
+      <div class="toolbar">
+        <div class="filter" data-filter="trend-range">
+          <span class="filter-label">时间</span>
+          <span class="chip active" data-days="30">30 天</span>
+          <span class="chip" data-days="90">90 天</span>
+          <span class="chip" data-days="360">360 天</span>
+          <span class="chip" data-days="0">全部</span>
+        </div>
+      </div>
+      <div id="trend-info"></div>
+      <div class="trend-block">
+        <h3 class="section-title">总市值趋势</h3>
+        <div class="chart-host" id="trend-mv-chart"></div>
+      </div>
+      <div class="trend-block">
+        <h3 class="section-title">浮动盈亏趋势</h3>
+        <div class="chart-host" id="trend-pl-chart"></div>
+      </div>
+      <div class="trend-block">
+        <h3 class="section-title">区间市值变化（每日环比）</h3>
+        <div id="trend-table"></div>
+      </div>
+      <div class="disclaimer" id="trend-disclaimer"></div>
     </div>
 
     <!-- 美元汇率 -->

@@ -61,10 +61,13 @@ document.querySelectorAll(".tab").forEach((t) => {
     document.getElementById("panel-positions").style.display = tab === "positions" ? "" : "none";
     document.getElementById("panel-trades").style.display = tab === "trades" ? "" : "none";
     document.getElementById("panel-pnl").style.display = tab === "pnl" ? "" : "none";
+    document.getElementById("panel-trend").style.display = tab === "trend" ? "" : "none";
     document.getElementById("panel-fx").style.display = tab === "fx" ? "" : "none";
-    if (tab !== "fx") destroyFxChart();   // 离开汇率 Tab 释放图表
+    if (tab !== "fx") destroyFxChart();     // 离开汇率 Tab 释放图表
+    if (tab !== "trend") destroyTrendCharts();  // 离开趋势 Tab 释放图表
     if (tab === "trades") loadTrades();
     if (tab === "pnl") loadPnl();
+    if (tab === "trend") loadTrend();
     if (tab === "fx") loadFx();
   });
 });
@@ -87,6 +90,7 @@ const state = {
   deals: { raw: [], market: "", year: "" },
   pnl: { raw: [], market: "", sort: { key: null, dir: 0 } },
   finance: { year: "", built: false },
+  trend: { raw: [], days: 30 },
   fx: { raw: [], pair: "USDCNY" },
 };
 
@@ -100,7 +104,7 @@ function byYear(rows, year) {
 }
 
 // ---------- 市场筛选 ----------
-document.querySelectorAll('.filter:not([data-filter="year"])').forEach((f) => {
+document.querySelectorAll('.filter:not([data-filter="year"]):not([data-filter="trend-range"])').forEach((f) => {
   const scope = f.dataset.filter; // positions / trades
   f.querySelectorAll(".chip").forEach((chip) => {
     chip.addEventListener("click", () => {
@@ -612,6 +616,247 @@ function renderPnl() {
   bindSortHeaders(wrap, st.sort, renderPnl);
 }
 
+// ---------- 资产趋势（历史快照聚合，按币种分市值/浮盈两图）----------
+let trendLoaded = false;
+let _trendCharts = [];   // 持有已挂载的图表实例，切 Tab 时统一销毁
+
+// 时间窗切换（30/90/360/全部）：改窗后重渲染（数据已全量缓存，纯前端过滤）
+document.querySelectorAll('.filter[data-filter="trend-range"] .chip').forEach((chip) => {
+  chip.addEventListener("click", () => {
+    if (chip.classList.contains("disabled")) return;   // 数据不足的档不可点
+    const f = chip.closest(".filter");
+    f.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    state.trend.days = Number(chip.dataset.days) || 0;
+    if (state.trend.raw.length) renderTrend();
+  });
+});
+
+// 数据跨度不足的档位置灰禁用，并把默认选中落到「能填满的最大档」。
+// 数据每天 +1，档位会随之自动解锁。返回选中的 days。
+function syncTrendRangeChips() {
+  const chips = [...document.querySelectorAll('.filter[data-filter="trend-range"] .chip')];
+  if (!chips.length) return state.trend.days;
+  const dates = [...new Set(state.trend.raw.map((r) => r.date))].sort();
+  // 数据实际跨度（自然日，含端点）
+  let span = 0;
+  if (dates.length >= 2) {
+    span = Math.round(
+      (new Date(dates[dates.length - 1]) - new Date(dates[0])) / 86400000
+    ) + 1;
+  }
+
+  // 某档是否可用：days=0（全部）恒可用；否则要求数据跨度 ≥ 该档
+  const usable = (days) => days === 0 || span >= days;
+
+  chips.forEach((c) => {
+    const d = Number(c.dataset.days) || 0;
+    const ok = usable(d);
+    c.classList.toggle("disabled", !ok);
+    c.title = ok ? "" : `数据跨度仅 ${span} 天，不足 ${d} 天`;
+  });
+
+  // 若当前选中档已不可用，落到「可用的最大档」（优先大区间，最后是全部）
+  const order = [360, 90, 30, 0];   // 从大到小；0=全部兜底
+  if (!usable(state.trend.days)) {
+    state.trend.days = order.find((d) => usable(d));
+  }
+  // 高亮当前选中档
+  chips.forEach((c) => {
+    c.classList.toggle("active", (Number(c.dataset.days) || 0) === state.trend.days);
+  });
+  return state.trend.days;
+}
+
+async function loadTrend() {
+  const info = document.getElementById("trend-info");
+  if (trendLoaded) { mountTrendCharts(); return; }   // 重入：重建图表
+  trendLoaded = true;
+  info.innerHTML = `<div class="empty">加载中…</div>`;
+  try {
+    const data = await getJSON("/api/asset-trend");
+    state.trend.raw = data.rows || [];
+    syncTrendRangeChips();   // 依据数据跨度置灰档位并定默认档
+    renderTrend();
+  } catch (e) {
+    trendLoaded = false;   // 失败允许重试
+    info.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+// 按时间窗过滤原始行：days=0 表示全部；否则保留最新快照日往前 days 个自然日内的行。
+function trendRows() {
+  const rows = state.trend.raw;
+  const days = state.trend.days;
+  if (!days || !rows.length) return rows;
+  const dates = rows.map((r) => r.date).sort();
+  const last = dates[dates.length - 1];
+  // 截止日往前 days 天（含端点）；字符串日期直接比较即可
+  const cutoff = new Date(last + "T00:00:00");
+  cutoff.setDate(cutoff.getDate() - (days - 1));
+  const cutoffStr = cutoff.toISOString().slice(0, 10);
+  return rows.filter((r) => r.date >= cutoffStr);
+}
+
+// 把过滤后的行按市场分组成时间序列：{US:[{date,mv,pl}...], HK:[...]}
+function trendSeries() {
+  const byMkt = {};
+  trendRows().forEach((r) => {
+    (byMkt[r.market] || (byMkt[r.market] = [])).push({
+      date: r.date,
+      mv: Number(r.market_val) || 0,
+      pl: Number(r.pl_val) || 0,
+    });
+  });
+  return byMkt;
+}
+
+const TREND_MKT = { US: { name: "美股", ccy: "USD" }, HK: { name: "港股", ccy: "HKD" } };
+
+function renderTrend() {
+  const info = document.getElementById("trend-info");
+  const disc = document.getElementById("trend-disclaimer");
+  const rows = trendRows();
+  const dates = [...new Set(rows.map((r) => r.date))].sort();
+  if (dates.length < 2) {
+    const hint = state.trend.raw.length && state.trend.days
+      ? `当前时间窗（${state.trend.days} 天）内快照不足 2 天，试试更长区间或「全部」。`
+      : `历史快照不足（需 ≥ 2 天）。每次 update 会新增一天，积累后即可看趋势。`;
+    info.innerHTML = `<div class="empty">${hint}</div>`;
+    disc.textContent = "";
+    destroyTrendCharts();
+    return;
+  }
+
+  const byMkt = trendSeries();
+  // 每市场：首末市值/浮盈、区间变化
+  const cards = ["US", "HK"].filter((m) => byMkt[m]).map((m) => {
+    const s = byMkt[m], meta = TREND_MKT[m];
+    const first = s[0], last = s[s.length - 1];
+    const mvChg = last.mv - first.mv;
+    const mvPct = first.mv > 0 ? (mvChg / first.mv) * 100 : null;
+    return `
+      <div class="trend-card">
+        <div class="trend-card-head"><span class="trend-mkt">${meta.name}</span><span class="trend-ccy">${meta.ccy}</span></div>
+        <div class="trend-mv">${fmtNum(last.mv)}<span class="trend-mv-label">最新市值</span></div>
+        <div class="trend-rows">
+          <div class="trend-row"><span>区间市值变化</span><span class="${plClass(mvChg)}">${fmtSigned(mvChg.toFixed(0))}${mvPct === null ? "" : ` (${fmtSigned(mvPct.toFixed(2), "%")})`}</span></div>
+          <div class="trend-row"><span>最新浮动盈亏</span><span class="${plClass(last.pl)}">${fmtSigned(last.pl.toFixed(0))}</span></div>
+        </div>
+      </div>`;
+  }).join("");
+
+  info.innerHTML = `<div class="trend-grid">${cards}</div>`;
+  const windowLabel = state.trend.days ? `近 ${state.trend.days} 天` : "全部区间";
+  disc.textContent =
+    `${windowLabel}：${dates.length} 个快照（${dates[0]} ~ ${dates[dates.length - 1]}）。` +
+    `不同币种不可相加，美股（USD）与港股（HKD）各一条线、同图双 Y 轴。` +
+    `周末/休市日快照沿用前值，趋势线呈平台期属正常。`;
+
+  renderTrendTable();
+  mountTrendCharts();
+}
+
+// 区间市值变化表：每个快照日一行，市值 + 相对上一快照日的环比%（按市场分列）。
+// 最新日在上（倒序），便于一眼看近期变化。
+function renderTrendTable() {
+  const wrap = document.getElementById("trend-table");
+  if (!wrap) return;
+  const byMkt = trendSeries();
+  const dates = [...new Set(trendRows().map((r) => r.date))].sort();
+
+  // 市场 → {date: {mv, pct}}；pct 相对该市场上一快照日
+  const pctByMkt = {};
+  ["US", "HK"].forEach((m) => {
+    const s = byMkt[m];
+    if (!s) return;
+    const map = {};
+    s.forEach((row, i) => {
+      const prev = i > 0 ? s[i - 1].mv : null;
+      map[row.date] = {
+        mv: row.mv,
+        pct: prev && prev > 0 ? ((row.mv - prev) / prev) * 100 : null,
+      };
+    });
+    pctByMkt[m] = map;
+  });
+
+  const cols = ["US", "HK"].filter((m) => byMkt[m]);
+  const ths = cols.map((m) =>
+    `<th>${TREND_MKT[m].name}市值(${TREND_MKT[m].ccy})</th><th>环比</th>`
+  ).join("");
+
+  const rows = dates.slice().reverse().map((date) => {
+    const cells = cols.map((m) => {
+      const d = pctByMkt[m][date];
+      if (!d) return `<td>—</td><td>—</td>`;
+      // |pct| < 0.005 四舍五入后为 0，归一成 0.00% 避免出现 -0.00%
+      const pct = d.pct === null ? null : (Math.abs(d.pct) < 0.005 ? 0 : d.pct);
+      const pctTxt = pct === null ? "—" : fmtSigned(pct.toFixed(2), "%");
+      return `<td>${fmtNum(d.mv, 0)}</td><td class="${plClass(pct)}">${pctTxt}</td>`;
+    }).join("");
+    return `<tr><td class="text">${esc(date)}</td>${cells}</tr>`;
+  }).join("");
+
+  wrap.innerHTML = `<div class="scroll-table"><table>
+    <thead><tr><th class="text">日期</th>${ths}</tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+
+function destroyTrendCharts() {
+  _trendCharts.forEach((ch) => { try { ch.remove(); } catch (e) {} });
+  _trendCharts = [];
+}
+
+// 在一个容器里画两市场的时序：US 与 HK 各一条线，各自独立 Y 轴（量级差大）。
+// pick(row) 从 {mv,pl} 取要画的值。
+function mountOneTrendChart(hostId, pick) {
+  const host = document.getElementById(hostId);
+  if (!host || typeof LightweightCharts === "undefined") return;
+  const byMkt = trendSeries();
+  const c = chartColors();
+
+  const chart = LightweightCharts.createChart(host, {
+    width: host.clientWidth || 720,
+    height: 300,
+    layout: { background: { color: "transparent" }, textColor: c.muted },
+    grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
+    rightPriceScale: { borderColor: c.border },       // US（USD）
+    leftPriceScale: { borderColor: c.border, visible: true },  // HK（HKD）
+    timeScale: { borderColor: c.border, timeVisible: false },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  });
+
+  // US 走右轴（accent 蓝），HK 走左轴（muted 灰），避免与红涨绿跌语义混淆
+  const cfg = [
+    { m: "US", scaleId: "right", color: c.accent },
+    { m: "HK", scaleId: "left", color: c.muted },
+  ];
+  cfg.forEach(({ m, scaleId, color }) => {
+    if (!byMkt[m]) return;
+    const line = chart.addLineSeries({
+      color, lineWidth: 2, priceScaleId: scaleId,
+      priceLineVisible: false, lastValueVisible: true,
+      title: TREND_MKT[m].name,
+    });
+    line.setData(byMkt[m].map((r) => ({ time: r.date, value: pick(r) })));
+  });
+  chart.timeScale().fitContent();
+
+  const ro = new ResizeObserver(() => {
+    if (_trendCharts.includes(chart)) chart.applyOptions({ width: host.clientWidth });
+  });
+  ro.observe(host);
+  _trendCharts.push(chart);
+}
+
+function mountTrendCharts() {
+  destroyTrendCharts();
+  if (trendRows().length < 2) return;
+  mountOneTrendChart("trend-mv-chart", (r) => r.mv);
+  mountOneTrendChart("trend-pl-chart", (r) => r.pl);
+}
+
 // ---------- 美元汇率（USD/CNY）----------
 let fxLoaded = false;
 let _fxChartHandle = null;
@@ -712,6 +957,20 @@ const overlay = document.getElementById("overlay");
 document.getElementById("detail-close").addEventListener("click", () => { overlay.classList.remove("open"); destroyChart(); });
 overlay.addEventListener("click", (e) => { if (e.target === overlay) { overlay.classList.remove("open"); destroyChart(); } });
 
+// 数据新鲜度提示：把最新日线日期与滞后天数亮出来。
+// 行情为只读库、天然慢一拍（当天 bar 次日入），滞后 > 3 天则提示可能需 update。
+function dataFreshnessBanner(quotes) {
+  if (!quotes || !quotes.length) return "";
+  const last = quotes[quotes.length - 1].date;
+  const today = new Date();
+  const lag = Math.round((today - new Date(last + "T00:00:00")) / 86400000);
+  const stale = lag > 3;
+  const lagTxt = lag <= 0 ? "今日" : `${lag} 天前`;
+  return `<div class="freshness${stale ? " stale" : ""}">
+    <span class="freshness-dot"></span>
+    最新数据时间：<b>${esc(last)}</b>（${lagTxt}）${stale ? " · 数据可能滞后，建议运行 update.sh" : ""}</div>`;
+}
+
 async function openStock(code) {
   destroyChart();   // 重开前销毁上一个图表实例
   overlay.classList.add("open");
@@ -723,6 +982,7 @@ async function openStock(code) {
     document.getElementById("detail-title").textContent =
       d.name ? `${code} · ${d.name}` : code;
     body.innerHTML =
+      dataFreshnessBanner(d.quotes) +
       section("通用信息", `<div id="detail-profile"><div class="empty">加载通用信息中…</div></div>`) +
       section("价格走势（K线）", renderChart(d.quotes)) +
       section(`历史日线（${d.quotes.length} 条）`, renderQuotesTable(d.quotes)) +

@@ -13,6 +13,7 @@
   GET /api/stock/<code>/analysis   交易复盘（成交明细 + FIFO 回合 + 复盘统计）
   GET /api/pnl                 交易盈亏（已实现，每股一行）
   GET /api/finance?year=2026   年度财务统计（现金流口径，按美股/港股分别汇总）
+  GET /api/asset-trend         资产趋势（历史快照聚合，按市场分组的市值/浮盈时序）
   GET /api/fx?pair=USDCNY      外汇日线（默认美元兑人民币）
 """
 from __future__ import annotations
@@ -207,6 +208,31 @@ def api_fx():
             (pair,),
         )
         return jsonify({"pair": pair, "rows": rows_to_list(cur)})
+    finally:
+        conn.close()
+
+
+@app.route("/api/asset-trend")
+def api_asset_trend():
+    """资产趋势：按历史持仓快照，聚合每日每市场的总市值/浮盈/持仓数。
+
+    跨币种不可相加，故按市场（HK→HKD、US→USD）分组返回，前端各画一条线。
+    返回 {rows:[{date, market, currency, market_val, pl_val, count}, ...]}，
+    按日期、市场升序。
+    """
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "SELECT snapshot_date AS date, market, "
+            "  SUM(market_val) AS market_val, SUM(pl_val) AS pl_val, COUNT(*) AS count "
+            "FROM positions GROUP BY snapshot_date, market "
+            "ORDER BY snapshot_date ASC, market ASC"
+        )
+        rows = rows_to_list(cur)
+        ccy = {"HK": "HKD", "US": "USD"}
+        for r in rows:
+            r["currency"] = ccy.get(r["market"])
+        return jsonify({"rows": rows})
     finally:
         conn.close()
 
