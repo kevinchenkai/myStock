@@ -1,0 +1,992 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>myStock · 项目接手指南</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f6;
+    --border: #e3e3e8;
+    --text: #1f2330;
+    --muted: #6b7280;
+    --primary: #c0392b;
+    --primary-dark: #8e2a20;
+    --accent: #2c6fbb;
+    --up: #d23a35;     /* 红涨 */
+    --down: #2e8b57;   /* 绿跌 */
+    --code-bg: #f5f3ee;
+    --code-text: #2a2a2a;
+    --warn: #b8770b;
+    --ok: #2e8b57;
+  }
+  html[data-theme="dark"] {
+    --bg: #15171d;
+    --surface: #1d2028;
+    --surface-2: #242833;
+    --border: #33384a;
+    --text: #e4e6ee;
+    --muted: #9aa0b0;
+    --primary: #e57368;
+    --primary-dark: #c0392b;
+    --accent: #6ea3d6;
+    --code-bg: #1b1e26;
+    --code-text: #e4e6ee;
+    --warn: #e0a93b;
+    --ok: #4cae7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) {
+      --bg: #15171d;
+      --surface: #1d2028;
+      --surface-2: #242833;
+      --border: #33384a;
+      --text: #e4e6ee;
+      --muted: #9aa0b0;
+      --primary: #e57368;
+      --primary-dark: #c0392b;
+      --accent: #6ea3d6;
+      --code-bg: #1b1e26;
+      --code-text: #e4e6ee;
+      --warn: #e0a93b;
+      --ok: #4cae7a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Layout */
+  .layout { display: flex; min-height: 100vh; }
+  nav.toc {
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 18px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  nav.toc h2 {
+    font-size: 13px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); margin: 24px 0 8px;
+  }
+  nav.toc h2:first-child { margin-top: 0; }
+  nav.toc a {
+    display: block; color: var(--text); padding: 4px 10px;
+    border-radius: 6px; font-size: 14px;
+  }
+  nav.toc a:hover { background: var(--surface-2); text-decoration: none; }
+  nav.toc a.sub { padding-left: 22px; font-size: 13px; color: var(--muted); }
+
+  main {
+    flex: 1; max-width: 980px; padding: 40px 48px 120px; margin: 0 auto;
+  }
+
+  header.hero {
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 18px; margin-bottom: 32px;
+  }
+  header.hero .badge {
+    display: inline-block; background: var(--primary); color: #fff;
+    font-size: 12px; padding: 2px 10px; border-radius: 999px;
+    letter-spacing: 1px; margin-bottom: 12px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 32px; }
+  header.hero p { margin: 0; color: var(--muted); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 24px; }
+  h2 {
+    font-size: 24px; border-left: 4px solid var(--primary);
+    padding-left: 12px; margin: 0 0 18px;
+  }
+  h3 { font-size: 18px; margin: 28px 0 10px; color: var(--text); }
+  h4 { font-size: 15px; margin: 18px 0 8px; color: var(--accent); }
+
+  p { margin: 10px 0; }
+  ul, ol { margin: 10px 0; padding-left: 24px; }
+  li { margin: 4px 0; }
+
+  .lead {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; margin: 16px 0;
+  }
+
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "JetBrains Mono", monospace;
+    background: var(--code-bg); color: var(--code-text);
+    padding: 1px 6px; border-radius: 4px; font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-text);
+    padding: 14px 16px; border-radius: 8px; overflow-x: auto;
+    border: 1px solid var(--border); font-size: 13px; line-height: 1.55;
+  }
+  pre code { background: transparent; padding: 0; }
+
+  table {
+    width: 100%; border-collapse: collapse; margin: 14px 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; font-size: 14px;
+  }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td code, th code { white-space: nowrap; }
+
+  .callout {
+    border-left: 4px solid var(--accent); background: var(--surface);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 14px 0;
+  }
+  .callout.warn { border-color: var(--warn); }
+  .callout.danger { border-color: var(--up); }
+  .callout.ok { border-color: var(--ok); }
+  .callout .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;
+  }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.danger .tag { color: var(--up); }
+  .callout.ok .tag { color: var(--ok); }
+
+  .up { color: var(--up); font-weight: 600; }
+  .down { color: var(--down); font-weight: 600; }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.toc { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 24px 18px 80px; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  .ascii {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    white-space: pre; font-size: 12.5px; line-height: 1.5;
+    background: var(--code-bg); color: var(--code-text);
+    padding: 14px; border-radius: 8px; overflow-x: auto;
+    border: 1px solid var(--border);
+  }
+
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 12px; background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--muted);
+  }
+
+  .theme-toggle {
+    position: fixed; right: 20px; bottom: 20px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 14px; cursor: pointer;
+    color: var(--text); font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    z-index: 100;
+  }
+  .theme-toggle:hover { background: var(--surface-2); }
+
+  .file-block {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; margin: 10px 0;
+  }
+  .file-block .path {
+    font-family: "SF Mono", Menlo, monospace; font-weight: 600;
+    color: var(--primary); font-size: 13px;
+  }
+  .file-block .desc { color: var(--muted); font-size: 13px; margin-top: 2px; }
+</style>
+</head>
+<body>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("mystock-doc-theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+
+<div class="layout">
+
+<nav class="toc">
+  <h2>起步</h2>
+  <a href="#overview">1 · 项目是什么</a>
+  <a href="#architecture">2 · 架构与数据流</a>
+  <a href="#quickstart">3 · 5 分钟跑起来</a>
+  <a href="#structure">4 · 目录结构</a>
+
+  <h2>核心模块</h2>
+  <a href="#config">5 · config.py 配置</a>
+  <a href="#codemap">6 · code_map.py 代码映射</a>
+  <a href="#db">7 · db.py 数据库封装</a>
+  <a href="#collectors">8 · collectors 采集层</a>
+  <a href="#pipelines">9 · pipelines 流水线</a>
+  <a href="#pnl">10 · pnl.py 盈亏计算</a>
+  <a href="#web">11 · web 层 (Flask + JS)</a>
+
+  <h2>数据与口径</h2>
+  <a href="#schema">12 · 数据库表结构</a>
+  <a href="#datadict">13 · 数据字典速查</a>
+  <a href="#conventions">14 · 关键口径与约定</a>
+  <a href="#gotchas">15 · 已知坑点</a>
+
+  <h2>ML 与运维</h2>
+  <a href="#ml">16 · ML 子系统概览</a>
+  <a href="#ops">17 · 运维与维护</a>
+  <a href="#security">18 · 安全与隐私</a>
+  <a href="#onboarding">19 · 接手清单</a>
+</nav>
+
+<main>
+
+<header class="hero">
+  <span class="badge">PROJECT ONBOARDING</span>
+  <h1>myStock · 项目接手指南</h1>
+  <p>个人港股 / 美股 持仓、交易、行情的本地化数据系统 —— 一份从零到接手的完整导读</p>
+  <p style="margin-top:8px;">
+    <span class="pill">Python 3.10+</span>
+    <span class="pill">Flask</span>
+    <span class="pill">SQLite</span>
+    <span class="pill">futu-api</span>
+    <span class="pill">yfinance</span>
+    <span class="pill">单机 / 单用户 / 无鉴权</span>
+  </p>
+</header>
+
+<!-- ============ 1. 项目是什么 ============ -->
+<section id="overview">
+  <h2>1 · 项目是什么</h2>
+  <div class="lead">
+    <p><strong>一句话</strong>：把分散在 <strong>富途</strong>（持仓 / 历史订单 / 历史成交）和 <strong>yfinance</strong>（每日行情 / 公司信息）的数据，统一抓进本地 SQLite，再用本地 Flask 页面查询、下钻到单只股票、计算交易盈亏与复盘。</p>
+  </div>
+
+  <h3>定位与边界</h3>
+  <ul>
+    <li><strong>单用户、单机、无登录鉴权</strong>。Web 服务默认只监听 <code>127.0.0.1:8888</code>。</li>
+    <li>市场范围<strong>仅 HK（港股）与 US（美股）</strong>，无 A 股、无其它市场。</li>
+    <li><strong>Web 层只读 SQLite</strong>，绝不直接调富途 / yfinance —— 保证页面快、可离线。</li>
+    <li>新增抓取功能 → 放进 pipeline；新增展示功能 → 只读库。<strong>这条边界不能破。</strong></li>
+  </ul>
+
+  <h3>它解决了什么</h3>
+  <ul>
+    <li>富途只给"当前"持仓，历史快照不可回补 —— 本项目随 <code>update.sh</code> 逐日自然积累。</li>
+    <li>富途界面看不到"已实现盈亏 / 回合复盘 / 年度现金流 / 资产趋势"等聚合视图 —— 本项目自己算。</li>
+    <li>跨数据源（富途 + yfinance）的代码、币种、时间口径不统一 —— 本项目用 <code>code_map.py</code> 与 <code>currency</code> 字段统一。</li>
+  </ul>
+
+  <h3>阅读建议</h3>
+  <p>先 §1–§4 建立全局观 → §5–§11 逐模块读源码 → §12–§15 建立数据与口径直觉 → §16+ 了解 ML 扩展与运维。<code>CLAUDE.md</code>、<code>README.md</code>、<code>docs/DATA.md</code> 是权威文档，本指南是它们的导读与索引。</p>
+</section>
+
+<!-- ============ 2. 架构与数据流 ============ -->
+<section id="architecture">
+  <h2>2 · 架构与数据流</h2>
+
+  <div class="ascii">富途 OpenD（本地网关 127.0.0.1:11111）──┐ futu-api
+                                        │
+yfinance（行情 / 通用信息）──────────────┴──► collectors ──► SQLite (data/mystock.db) ──► Web (Flask :8888)
+                                          采集层            本地库                      只读展示层
+  </div>
+
+  <h3>三层职责</h3>
+  <table>
+    <thead><tr><th>层</th><th>位置</th><th>职责</th><th>能否离线</th></tr></thead>
+    <tbody>
+      <tr><td>采集层</td><td><code>mystock/collectors/</code></td><td>从富途 OpenD 与 yfinance 拉数据，清洗后写库</td><td>否（需网络 / OpenD 登录）</td></tr>
+      <tr><td>存储层</td><td><code>data/mystock.db</code> (SQLite)</td><td>8 张表，全部 UPSERT 幂等</td><td>是</td></tr>
+      <tr><td>展示层</td><td><code>mystock/web/</code></td><td>Flask 路由 + 原生 JS 前端，只读库</td><td>是</td></tr>
+    </tbody>
+  </table>
+
+  <h3>典型数据流（以"持仓"为例）</h3>
+  <ol>
+    <li><code>scripts/update.sh</code> → <code>mystock.pipelines.update_load</code></li>
+    <li>调用 <code>collectors.futu_client.FutuClient</code> 连本地 OpenD，<code>position_list_query</code></li>
+    <li><code>futu_client.position_rows()</code> 把 DataFrame 规整成入库 dict</li>
+    <li><code>db.replace_position_snapshot()</code>：先删除当天，再 UPSERT（保证已清仓标的不残留）</li>
+    <li>用户浏览器 → <code>GET /api/positions</code> → Flask 查最新快照 → JSON 返回 → <code>app.js</code> 渲染表格</li>
+  </ol>
+
+  <div class="callout">
+    <span class="tag">边界铁律</span>
+    展示层 <strong>只读</strong> SQLite。任何"在页面上点一下触发抓取"的需求都不应实现 —— 抓取永远走 pipeline 脚本。这保证页面快、可离线、可重复。
+  </div>
+</section>
+
+<!-- ============ 3. 快速跑起来 ============ -->
+<section id="quickstart">
+  <h2>3 · 5 分钟跑起来</h2>
+
+  <h3>前置条件</h3>
+  <ul>
+    <li>本机已装 <strong>conda</strong>（Miniconda / Anaconda 均可）。</li>
+    <li><strong>富途 OpenD</strong> 已启动并登录（默认 <code>127.0.0.1:11111</code>）。下载：<a href="https://openapi.futunn.com/" target="_blank">openapi.futunn.com</a>。否则富途数据抓取会失败。</li>
+    <li>交易密码：推荐用环境变量 <code>export MYSTOCK_FUTU_TRADE_PWD='你的交易密码'</code>，不要写进文件、不要进 git。</li>
+  </ul>
+
+  <h3>三步脚本（顺序：init → update → server）</h3>
+  <pre><code># 1) 首次全量：建环境 + 建库 + 全量抓取（幂等，可重复）
+bash scripts/init.sh
+
+# 2) 之后不定期增量更新（需 OpenD 已登录）
+bash scripts/update.sh
+
+# 3) 启动 Web（仅读库，不抓取）
+bash scripts/server.sh
+# 浏览器打开 http://localhost:8888</code></pre>
+
+  <div class="callout warn">
+    <span class="tag">注意</span>
+    所有脚本会自动 <code>conda activate mk</code>。<strong>改了后端路由 / pnl 逻辑后必须重启 <code>server.sh</code></strong>（运行中的 Flask 进程不会热加载）；改前端 JS/CSS 后<strong>刷新浏览器</strong>即可，无需重启。
+  </div>
+
+  <h3>测试</h3>
+  <pre><code>conda activate mk
+python -m pytest tests/ -q</code></pre>
+  <p>测试必须在 <code>mk</code> 环境跑（base anaconda python 无 yfinance 会报 <code>YFError</code>）。现有测试覆盖 <code>code_map</code> / <code>db</code> / <code>pnl</code> / <code>yf_client</code> 及 ML 子模块。</p>
+</section>
+
+<!-- ============ 4. 目录结构 ============ -->
+<section id="structure">
+  <h2>4 · 目录结构</h2>
+
+  <div class="ascii">myStock/
+├── README.md                     # 面向开发者的完整说明
+├── CLAUDE.md                     # Claude Code 工作约定（亦为本指南的母本）
+├── docs/
+│   ├── DATA.md                   # 数据字典（面向分析/建模，必读）
+│   ├── ML_PLAN.md                # ML 完整方案与决策记录
+│   ├── ML_OVERVIEW.md            # ML 速览（一页看懂）
+│   └── 项目接手指南.html          # ← 本文件
+├── environment.yml               # conda 环境 mk
+├── config.example.yaml           # 配置模板
+├── config.yaml                   # 真实配置（.gitignore，勿提交）
+├── data/
+│   ├── mystock.db                # 生产 SQLite（.gitignore）
+│   └── ml/mystock_ml.db          # ML 独立库（.gitignore）
+├── scripts/
+│   ├── init.sh / update.sh / server.sh   # 主流程三脚本
+│   ├── ml.sh                            # ML 统一入口（data/train/publish/all）
+│   └── ml_setup_h20.sh / ml_sync_h20.sh / ml_vllm.sh  # H20 GPU 运维
+├── mystock/                      # ← 源码主包
+│   ├── config.py     db.py     code_map.py   pnl.py   schema.sql
+│   ├── collectors/{futu_client,yf_client}.py
+│   ├── pipelines/{init_load,update_load,maintenance}.py
+│   ├── web/{app.py, templates/index.html, static/{app.js,theme.js,style.css, vendor/}}
+│   └── ml/                       # ML 子包（独立库，与 web 解耦）
+└── tests/                        # pytest 单测
+</div>
+
+  <h3>关键文件职责速查</h3>
+  <table>
+    <thead><tr><th>路径</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td><code>mystock/config.py</code></td><td>读 <code>config.yaml</code>；交易密码用环境变量 <code>MYSTOCK_FUTU_TRADE_PWD</code> 覆盖</td></tr>
+      <tr><td><code>mystock/code_map.py</code></td><td>富途 ↔ yfinance 代码互转（纯函数，HK.00700↔0700.HK、US.AAPL↔AAPL）</td></tr>
+      <tr><td><code>mystock/db.py</code></td><td>SQLite 连接 / 建表 / 通用 UPSERT / 跳过名单 / purge</td></tr>
+      <tr><td><code>mystock/schema.sql</code></td><td>8 张表的 DDL</td></tr>
+      <tr><td><code>mystock/collectors/futu_client.py</code></td><td>富途持仓/订单/成交抓取，含限频退避与 80 天窗口分段</td></tr>
+      <tr><td><code>mystock/collectors/yf_client.py</code></td><td>yfinance 日线 + 汇率 + 公司信息（<code>fetch_daily</code> / <code>fetch_fx</code> / <code>fetch_profile</code>）</td></tr>
+      <tr><td><code>mystock/pipelines/init_load.py</code></td><td>全量初始化（建库 + 全量抓取 + profiles）</td></tr>
+      <tr><td><code>mystock/pipelines/update_load.py</code></td><td>增量更新（当天覆盖，profiles 全量刷新）</td></tr>
+      <tr><td><code>mystock/pipelines/maintenance.py</code></td><td>手动运维：skiplist / reset-skiplist / purge</td></tr>
+      <tr><td><code>mystock/pnl.py</code></td><td>盈亏：<code>compute_pnl</code>（移动平均成本）/ <code>analyze_stock</code>（FIFO 回合复盘）/ <code>yearly_finance</code></td></tr>
+      <tr><td><code>mystock/web/app.py</code></td><td>Flask 路由（只读 API + 页面）</td></tr>
+      <tr><td><code>mystock/web/static/app.js</code></td><td>前端逻辑（无构建步骤，原生 JS，~1300 行）</td></tr>
+      <tr><td><code>mystock/web/static/theme.js</code></td><td>三态主题切换（跟随系统 / 浅色 / 深色）</td></tr>
+      <tr><td><code>mystock/web/static/vendor/</code></td><td>vendored Lightweight-Charts（K 线图，离线）</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ============ 5. config.py ============ -->
+<section id="config">
+  <h2>5 · config.py —— 配置</h2>
+  <p>读取仓库根目录的 <code>config.yaml</code>；不存在时回退到 <code>config.example.yaml</code> 的默认值并打印提示。模块加载时即创建单例 <code>CONFIG</code>，各模块直接 <code>from .config import CONFIG</code> 使用。</p>
+
+  <h3>关键属性</h3>
+  <table>
+    <thead><tr><th>属性</th><th>来源（yaml）</th><th>默认</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>CONFIG.futu_host / port</code></td><td><code>futu.host / port</code></td><td><code>127.0.0.1 / 11111</code></td><td>OpenD 网关地址</td></tr>
+      <tr><td><code>CONFIG.futu_trade_pwd</code></td><td><code>futu.trade_pwd</code></td><td>空</td><td><strong>环境变量 <code>MYSTOCK_FUTU_TRADE_PWD</code> 优先</strong>；为空则不 <code>unlock_trade</code></td></tr>
+      <tr><td><code>CONFIG.futu_trd_env</code></td><td><code>futu.trd_env</code></td><td><code>REAL</code></td><td>历史成交仅支持 <code>REAL</code></td></tr>
+      <tr><td><code>CONFIG.start_date</code></td><td><code>collect.start_date</code></td><td><code>2025-01-01</code></td><td>历史订单/成交/行情抓取起点</td></tr>
+      <tr><td><code>CONFIG.markets</code></td><td><code>collect.markets</code></td><td><code>["HK","US"]</code></td><td>过滤只保留 HK / US</td></tr>
+      <tr><td><code>CONFIG.db_path</code></td><td><code>db.path</code></td><td><code>data/mystock.db</code></td><td>相对路径会拼到仓库根</td></tr>
+      <tr><td><code>CONFIG.web_host / port</code></td><td><code>web.host / port</code></td><td><code>127.0.0.1 / 8888</code></td><td>Flask 监听</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout danger">
+    <span class="tag">安全</span>
+    交易密码<strong>绝不硬编码、绝不进 git</strong>。<code>config.yaml</code> 与 <code>config.*.local.yaml</code> 已在 <code>.gitignore</code>。优先用环境变量。
+  </div>
+</section>
+
+<!-- ============ 6. code_map.py ============ -->
+<section id="codemap">
+  <h2>6 · code_map.py —— 代码映射</h2>
+  <p>纯函数模块，富途代码 ↔ yfinance 代码互转。是跨数据源关联的枢纽，有完整单测。</p>
+
+  <table>
+    <thead><tr><th>市场</th><th>富途</th><th>yfinance</th><th>规则</th></tr></thead>
+    <tbody>
+      <tr><td>港股</td><td><code>HK.00700</code></td><td><code>0700.HK</code></td><td>去 <code>HK.</code> → 数字规整为 4 位 → 加 <code>.HK</code></td></tr>
+      <tr><td>美股</td><td><code>US.AAPL</code></td><td><code>AAPL</code></td><td>去 <code>US.</code>，直接用 ticker</td></tr>
+    </tbody>
+  </table>
+
+  <h3>核心函数</h3>
+  <ul>
+    <li><code>futu_to_yf(futu_code)</code>：<code>HK.00700 → 0700.HK</code>，<code>US.AAPL → AAPL</code></li>
+    <li><code>yf_to_futu(yf_symbol)</code>：反向；港股富途用 5 位（<code>0700.HK → HK.00700</code>）</li>
+    <li><code>normalize_hk_number(num)</code>：港股数字去前导 0 后补足 4 位（<code>00700 → 0700</code>，<code>09988 → 9988</code>）</li>
+    <li><code>futu_market_of(futu_code)</code>：从代码取 <code>HK</code> / <code>US</code> 前缀</li>
+  </ul>
+
+  <div class="callout">
+    <span class="tag">跨表 JOIN 一律用富途代码</span>
+    <code>daily_quotes</code> 与 <code>stock_profiles</code> 同时有 <code>yf_symbol</code> 和 <code>futu_code</code> 两列，但跨表关联<strong>统一用 <code>futu_code</code></strong>，避免位数/后缀差异。
+  </div>
+</section>
+
+<!-- ============ 7. db.py ============ -->
+<section id="db">
+  <h2>7 · db.py —— 数据库封装</h2>
+  <p>所有写库走 <strong>UPSERT</strong>（<code>INSERT ... ON CONFLICT(...) DO UPDATE</code>），天然幂等，可重复执行。</p>
+
+  <h3>核心 API</h3>
+  <table>
+    <thead><tr><th>函数</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>get_connection()</code></td><td>返回 SQLite 连接，<code>row_factory=Row</code>（按列名访问），自动建父目录</td></tr>
+      <tr><td><code>init_db()</code></td><td>执行 <code>schema.sql</code>，<code>IF NOT EXISTS</code> 可重复</td></tr>
+      <tr><td><code>_upsert(conn, table, rows, conflict_keys)</code></td><td>通用 UPSERT，按主键冲突时更新非主键列</td></tr>
+      <tr><td><code>upsert_positions / orders / deals / quotes / profiles / fx_rates</code></td><td>各表的语义化封装</td></tr>
+      <tr><td><code>replace_position_snapshot(conn, date, rows)</code></td><td>持仓专用：先 DELETE 当天再插入，保证已清仓标的不残留</td></tr>
+      <tr><td><code>write_sync_log / last_sync_point</code></td><td>同步日志；增量更新据此取上次 range_end</td></tr>
+      <tr><td><code>all_traded_codes(conn)</code></td><td>从 positions/orders/deals 去重得到全部富途代码</td></tr>
+    </tbody>
+  </table>
+
+  <h3>跳过名单（quote_skiplist）机制</h3>
+  <p>对连续抓不到数据的标的计数，达阈值 <code>SKIP_THRESHOLD = 5</code> 后加入名单，后续直接跳过，避免无效请求与退市噪音。</p>
+  <ul>
+    <li><code>record_quote_empty(conn, code, yf_symbol)</code>：空数据计数 +1</li>
+    <li><code>get_quote_skiplist(conn)</code>：返回 <code>empty_count &gt;= 5</code> 的代码集合</li>
+    <li><code>clear_quote_skip(conn, code)</code>：重新抓到数据则移出名单</li>
+    <li><code>reset_quote_skiplist(conn, codes=None)</code>：手动重置（None=全清，或指定代码）</li>
+    <li><code>purge_code(conn, code)</code>：<strong>不可逆</strong>，从所有表彻底删除某代码（会改历史盈亏）</li>
+  </ul>
+
+  <div class="callout warn">
+    <span class="tag">不自愈</span>
+    进入名单的代码不再请求 → 无从触发 <code>clear</code>。一次限频/网络抖动可能批量抓空误伤真实持仓。误伤后手动止血：<br>
+    <code>python -m mystock.pipelines.maintenance reset-skiplist [代码...]</code>
+  </div>
+</section>
+
+<!-- ============ 8. collectors ============ -->
+<section id="collectors">
+  <h2>8 · collectors —— 采集层</h2>
+
+  <h3>8.1 futu_client.py —— 富途</h3>
+  <div class="file-block">
+    <div class="path">mystock/collectors/futu_client.py</div>
+    <div class="desc">通过本地 OpenD 网关通信，不直连富途服务器。历史成交仅支持 TrdEnv.REAL。</div>
+  </div>
+  <ul>
+    <li><strong>限频控制</strong>：富途历史订单/成交接口限频"每 30 秒最多 10 次"。<code>RATE_LIMIT_INTERVAL=3.2s</code> 窗口间隔，命中限频关键字自动退避 <code>RATE_LIMIT_BACKOFF=30s</code> 重试（最多 5 次）。</li>
+    <li><strong>80 天窗口分段</strong>：<code>WINDOW_DAYS=80</code>，<code>_date_windows(start, end)</code> 把长区间切成 ≤80 天窗口逐段查询后 <code>pd.concat</code> 合并（单次默认仅 90 天）。</li>
+    <li><code>FutuClient(market)</code>：上下文管理器，<code>__enter__</code> 连接 + <code>_maybe_unlock</code>，<code>__exit__</code> 关闭。</li>
+    <li>三个查询：<code>query_positions()</code> / <code>query_orders(start, end)</code> / <code>query_deals(start, end)</code>。</li>
+    <li>三个规整函数：<code>position_rows()</code> / <code>order_rows()</code> / <code>deal_rows()</code> 把 DataFrame 转入库 dict；<code>_g(row, *names)</code> 按候选列名取首个非空值（兼容富途字段名变化）。</li>
+    <li><code>raw_json</code>：原始记录整行 JSON 化后入库，schema 之外的信息可后续解析。</li>
+  </ul>
+
+  <h3>8.2 yf_client.py —— yfinance</h3>
+  <div class="file-block">
+    <div class="path">mystock/collectors/yf_client.py</div>
+    <div class="desc">日线 + 外汇 + 公司信息。带重试与退避，yfinance 自身日志级别抬高至 CRITICAL（退市噪音由 skiplist 接管）。</div>
+  </div>
+  <ul>
+    <li><code>_end_inclusive(end)</code>：<strong>yfinance 的 <code>history(end=...)</code> 是排他的</strong>（只返回 &lt; end 的 bar），传 <code>end=今天</code> 会漏当天。本函数把 end + 1 天修正，确保抓到"当天"这根 bar。日线与汇率统一经此修正。</li>
+    <li><code>fetch_daily(futu_code, start, end)</code>：单标的日线，<code>auto_adjust=False</code> 同时保留 <code>close</code> 与 <code>adj_close</code>，含 <code>dividends</code> / <code>stock_splits</code>。</li>
+    <li><code>fetch_fx(yf_symbol="CNY=X", pair="USDCNY")</code>：外汇日线，<code>close</code> = 1 美元对应的人民币。外汇对仅有 OHLC，无成交量/分红。</li>
+    <li><code>_profile_from_info(info)</code> + <code>fetch_profile(futu_code)</code>：从 <code>Ticker.info</code> 提取公司/估值字段；全为空视为无有效资料（退市），返回 None 不入库。</li>
+  </ul>
+
+  <div class="callout">
+    <span class="tag">单标的失败不中断整体</span>
+    <code>fetch_daily</code> 抛异常会被 pipeline 捕获、记 <code>sync_log</code> 后继续下一个标的。这是"失败可恢复"原则的体现。
+  </div>
+</section>
+
+<!-- ============ 9. pipelines ============ -->
+<section id="pipelines">
+  <h2>9 · pipelines —— 流水线</h2>
+
+  <h3>9.1 init_load.py（全量，<code>init.sh</code> 调用）</h3>
+  <p>流程：<code>init_db()</code> → <code>collect_positions</code> → <code>collect_orders(start, end)</code> → <code>collect_deals</code> → <code>collect_quotes(start, end_date)</code> → <code>collect_fx</code> → <code>collect_profiles</code>（放最后，依赖 quotes 已更新的跳过名单）。每步写 <code>sync_log</code>。</p>
+  <p><code>collect_quotes</code> 会先 <code>get_quote_skiplist</code> 过滤，对抓到空的标的 <code>record_quote_empty</code>，抓到数据则 <code>clear_quote_skip</code>。结束汇总 <code>X ok / Y empty / Z err / N skipped</code>。</p>
+
+  <h3>9.2 update_load.py（增量，<code>update.sh</code> 调用）</h3>
+  <p>复用 <code>init_load</code> 的各 <code>collect_*</code>，仅改起点：</p>
+  <ul>
+    <li><code>_incremental_start(conn, source, fmt)</code>：取上次成功同步的 <code>range_end</code> 的<strong>日期部分当天 00:00</strong>（保证当天数据被重抓覆盖）；无记录则回退 <code>start_date</code>。</li>
+    <li>持仓：始终覆盖当天快照。</li>
+    <li>订单/成交：从"上次同步点当天 00:00"重抓（UPSERT 天然幂等）。</li>
+    <li>行情/汇率：从上次 range_end 当天重抓（PK 覆盖）。</li>
+    <li>profiles：每日全量刷新（UPSERT 覆盖）。</li>
+  </ul>
+
+  <h3>9.3 maintenance.py（手动运维）</h3>
+  <pre><code>conda activate mk
+
+# 查看跳过名单
+python -m mystock.pipelines.maintenance skiplist
+
+# 清空整个跳过名单（下次 update 重新尝试全部）
+python -m mystock.pipelines.maintenance reset-skiplist
+
+# 只重置指定代码
+python -m mystock.pipelines.maintenance reset-skiplist US.AAPL HK.00700
+
+# 彻底删除某代码在所有表的数据（退市/清仓且不再关注；不可逆，会改历史盈亏）
+python -m mystock.pipelines.maintenance purge US.YY</code></pre>
+</section>
+
+<!-- ============ 10. pnl.py ============ -->
+<section id="pnl">
+  <h2>10 · pnl.py —— 盈亏计算（项目核心算法）</h2>
+
+  <h3>两套口径并存</h3>
+  <table>
+    <thead><tr><th>函数</th><th>口径</th><th>用途</th></tr></thead>
+    <tbody>
+      <tr><td><code>compute_pnl(deals, cost_fallback)</code></td><td><strong>移动平均成本</strong>（券商口径）</td><td>盈亏 Tab 列表（每股一行）</td></tr>
+      <tr><td><code>analyze_stock(deals, cost_fallback)</code></td><td><strong>FIFO 配对</strong>（干净的持有周期）</td><td>单股复盘浮窗（回合 + 胜率/盈亏比）</td></tr>
+      <tr><td><code>yearly_finance(deals, year)</code></td><td>年度现金流（卖出额 − 买入额）</td><td>财务统计板块，按美股/港股分别汇总</td></tr>
+    </tbody>
+  </table>
+
+  <h3>移动平均成本法（<code>compute_pnl</code>）</h3>
+  <ul>
+    <li>同一标的按 <code>create_time</code> 升序处理。BUY：累加 <code>held_qty</code> 与 <code>held_cost</code>。</li>
+    <li>SELL：先用窗口内持仓（<code>avg = held_cost / held_qty</code>）配平，<code>realized += (price - avg) * matched</code>，按比例扣减基数。</li>
+    <li><strong>成本兜底</strong>：抓取起点（<code>start_date</code>）前的建仓买入不在库里 → 卖出量 &gt; 窗口内买入量时，剩余用 <code>positions.cost_price</code> 兜底。</li>
+    <li><strong>兜底成本 ≤ 0 视为不可用</strong>（富途超卖记账产物，如 <code>US.AAPL = -1233.96</code>），对应数量记入 <code>uncovered_sell_qty</code>，<strong>不计入盈亏</strong>，对用户透明。</li>
+    <li>已实现盈亏率：相对"已卖出部分的成本"，避免被未平仓部分稀释。</li>
+    <li>默认按 <code>realized_pnl</code> 降序输出。</li>
+  </ul>
+
+  <h3>FIFO 回合复盘（<code>analyze_stock</code>）</h3>
+  <ul>
+    <li>维护买入 lot 队列 <code>[[qty, price, time], ...]</code>，卖出时从队首按 FIFO 配对，每对记一回合（含 <code>hold_days</code>、<code>pnl</code>、<code>pnl_ratio</code>）。</li>
+    <li>剩余卖出无对应买入：兜底成本配一回合（标 <code>fallback=True</code>），否则记 <code>uncovered_sell_qty</code>。</li>
+    <li><code>stats</code>：胜率、盈亏比（<code>profit_factor = 总盈利/总亏损</code>）、平均/最大/最小持有天数、最大盈/亏单。</li>
+    <li><code>_build_observations</code>：生成<strong>客观交易行为复盘提示</strong>（good / warn / info），仅事实陈述，<strong>不输出投资建议</strong>（非持牌投顾）。</li>
+  </ul>
+
+  <div class="callout warn">
+    <span class="tag">口径差异</span>
+    移动平均成本与 FIFO 配对结果会有小差异 —— <strong>建模前先明确口径</strong>。盈亏均为<strong>税前毛额</strong>（无费用字段，<code>raw_json</code> 也没有费用明细）。
+  </div>
+
+  <h3>币种</h3>
+  <p><code>deals</code> 表无 <code>currency</code> 列，<code>pnl.py</code> 用 <code>_MARKET_CCY = {"HK": "HKD", "US": "USD"}</code> 按 market 推断。合计<strong>按币种分别汇总，HKD / USD 不混算</strong>。</p>
+</section>
+
+<!-- ============ 11. web 层 ============ -->
+<section id="web">
+  <h2>11 · web 层 —— Flask + 原生 JS</h2>
+
+  <h3>11.1 后端 app.py</h3>
+  <p>只读 SQLite，渲染页面与提供 JSON API。不触发任何抓取。数据库不存在时返回 503。</p>
+
+  <h4>页面</h4>
+  <ul>
+    <li><code>GET /</code> → <code>templates/index.html</code>（5 个 Tab + 个股下钻浮窗）</li>
+  </ul>
+
+  <h4>JSON API</h4>
+  <table>
+    <thead><tr><th>接口</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td><code>GET /api/positions</code></td><td>最新快照的持仓</td></tr>
+      <tr><td><code>GET /api/orders?code=</code></td><td>历史订单（可按富途代码过滤）</td></tr>
+      <tr><td><code>GET /api/deals?code=</code></td><td>历史成交</td></tr>
+      <tr><td><code>GET /api/pnl</code></td><td>交易盈亏（已实现，按成交数据，移动平均成本 + 持仓成本兜底）</td></tr>
+      <tr><td><code>GET /api/finance?year=2026</code></td><td>年度财务统计（现金流口径，按美股/港股分别汇总）</td></tr>
+      <tr><td><code>GET /api/asset-trend</code></td><td>资产趋势（历史快照聚合，按市场分组）</td></tr>
+      <tr><td><code>GET /api/fx?pair=USDCNY</code></td><td>外汇日线（默认美元兑人民币）</td></tr>
+      <tr><td><code>GET /api/quotes?code=&start=&end=</code></td><td>某代码日线</td></tr>
+      <tr><td><code>GET /api/stock/&lt;code&gt;</code></td><td>聚合：该股票行情 + 订单 + 成交</td></tr>
+      <tr><td><code>GET /api/stock/&lt;code&gt;/profile</code></td><td>通用信息（公司/估值，读自 <code>stock_profiles</code>）</td></tr>
+      <tr><td><code>GET /api/stock/&lt;code&gt;/analysis</code></td><td>单股交易复盘：成交 + FIFO 回合 + 统计 + 客观观察</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout danger">
+    <span class="tag">路由陷阱</span>
+    股票代码不含 <code>/</code>，路由必须用 <code>&lt;code&gt;</code>（string 转换器，遇 <code>/</code> 停），<strong>不能用 <code>&lt;path:code&gt;</code></strong> —— 后者会贪婪吞掉 <code>/profile</code>、<code>/analysis</code> 子路径。
+  </div>
+
+  <h3>11.2 前端 app.js / theme.js / style.css</h3>
+  <ul>
+    <li><strong>无构建步骤</strong>，原生 JS。改动后用 <code>node --check mystock/web/static/app.js</code> 做语法检查。</li>
+    <li>首次加载缓存数据，筛选/排序均在缓存上重渲染；数据变化后<strong>刷新页面</strong>即可。</li>
+    <li>关键工具函数：<code>plClass(v)</code>（按涨跌返回 <code>up/down/flat</code> CSS class）、<code>fmtNum / fmtInt / fmtSigned</code>、<code>getJSON(url)</code>。</li>
+    <li><strong>排序</strong>：数值列表头点击循环 <code>倒序▼ → 正序▲ → 取消</code>，空值恒排末尾。</li>
+    <li><strong>主题</strong>：<code>theme.js</code> 三态循环"跟随系统 → 浅色 → 深色"，<code>localStorage</code> 记忆；<code>&lt;head&gt;</code> 内首屏脚本提前应用，防闪烁。</li>
+  </ul>
+
+  <h3>11.3 价格走势图（Lightweight-Charts）</h3>
+  <ul>
+    <li>用 vendored 的 <code>static/vendor/lightweight-charts.standalone.production.js</code>（离线、无构建）。</li>
+    <li>该库需真实 DOM 容器 + 创建后注入数据：<code>renderChart</code> 只产出占位容器，<code>openStock</code> 在 <code>innerHTML</code> 写入后调 <code>mountChart()</code> 挂载。</li>
+    <li>浮窗关闭 / 切复盘时<strong>必须 <code>destroyChart()</code></strong> 释放，避免内存泄漏。</li>
+    <li>颜色从 CSS 变量读取以适配红涨绿跌 + 深浅主题。</li>
+  </ul>
+</section>
+
+<!-- ============ 12. 表结构 ============ -->
+<section id="schema">
+  <h2>12 · 数据库表结构（schema.sql）</h2>
+  <p>8 张表。完整 DDL 见 <code>mystock/schema.sql</code>；字段级数据字典见 <code>docs/DATA.md</code> 与本指南 §13。</p>
+
+  <table>
+    <thead><tr><th>表</th><th>用途</th><th>主键</th><th>来源</th></tr></thead>
+    <tbody>
+      <tr><td><code>positions</code></td><td>持仓<strong>每日快照</strong>（状态，非流水）</td><td>(snapshot_date, market, code)</td><td>富途</td></tr>
+      <tr><td><code>orders</code></td><td>历史<strong>委托订单</strong>（事件流水）</td><td>order_id</td><td>富途</td></tr>
+      <tr><td><code>deals</code></td><td>历史<strong>成交回报</strong>（盈亏最权威事实表）</td><td>deal_id</td><td>富途</td></tr>
+      <tr><td><code>daily_quotes</code></td><td>日线行情（OHLCV + 复权 + 分红拆股）</td><td>(yf_symbol, date)</td><td>yfinance</td></tr>
+      <tr><td><code>stock_profiles</code></td><td>公司/估值通用信息（横截面快照，无历史）</td><td>futu_code</td><td>yfinance</td></tr>
+      <tr><td><code>fx_rates</code></td><td>外汇日线（当前 USDCNY）</td><td>(pair, date)</td><td>yfinance</td></tr>
+      <tr><td><code>quote_skiplist</code></td><td>行情跳过名单（运维）</td><td>futu_code</td><td>系统</td></tr>
+      <tr><td><code>sync_log</code></td><td>同步日志（运维，增量起点）</td><td>id (自增)</td><td>系统</td></tr>
+    </tbody>
+  </table>
+
+  <h3>实体关系</h3>
+  <div class="ascii">stock_profiles ─┐ (futu_code)
+positions ──────┤ 每只股票一个 futu_code，跨表主键
+daily_quotes ───┘ (有 yf_symbol 和 futu_code 两列；跨表 JOIN 用 futu_code)
+
+orders 1 ──< deals N        (orders.order_id = deals.order_id)
+</div>
+
+  <h3>索引</h3>
+  <p><code>idx_orders_code</code> / <code>idx_deals_code</code> / <code>idx_deals_order</code> / <code>idx_quotes_futu</code> / <code>idx_positions_code</code> / <code>idx_fx_pair_date</code>。</p>
+</section>
+
+<!-- ============ 13. 数据字典速查 ============ -->
+<section id="datadict">
+  <h2>13 · 数据字典速查</h2>
+  <p>仅列字段含义与<strong>必须知道的坑</strong>。完整字段、取值范围、缺失率见 <code>docs/DATA.md</code>。</p>
+
+  <h3>positions —— 持仓每日快照</h3>
+  <ul>
+    <li><code>snapshot_date / market / code</code>（主键三件套）、<code>name / qty / can_sell_qty / nominal_price / market_val / pl_val / currency / updated_at</code></li>
+    <li><code>cost_price</code>：<strong>可能 ≤ 0</strong>（富途超卖/融券会计产物，观测 7 只美股为负，如 <code>US.AAPL=-1233.96</code>）。建模时 ≤0 视为缺失。</li>
+    <li><code>pl_ratio</code>：<strong>百分比数值</strong>（6364.24 表示 +6364.24%），非小数；异常大值通常对应近 0 成本。</li>
+    <li>历史快照<strong>不可回补</strong>（富途只给"当前"），随 <code>update.sh</code> 逐日积累。</li>
+  </ul>
+
+  <h3>orders —— 历史委托订单</h3>
+  <ul>
+    <li><code>order_id</code>（主键）、<code>trd_side(BUY/SELL)</code>、<code>order_type</code>、<code>order_status</code>、<code>price / qty / dealt_qty / dealt_avg_price</code>、<code>create_time / updated_time</code>、<code>raw_json</code></li>
+    <li><code>order_status</code> 枚举：<code>FILLED_ALL</code> / <code>CANCELLED_ALL</code> / <code>CANCELLED_PART</code> / <code>FAILED</code></li>
+    <li>派生：<code>是否成交 = order_status in (FILLED_ALL, CANCELLED_PART) 且 dealt_qty&gt;0</code>；撤单率、下单→撤单时长等行为特征可从此表算。</li>
+  </ul>
+
+  <h3>deals —— 历史成交回报（盈亏最权威）</h3>
+  <ul>
+    <li><code>deal_id</code>（主键，库内为字符串）、<code>order_id</code>、<code>trd_side</code>、<code>price / qty / create_time</code>、<code>raw_json</code></li>
+    <li><strong>无 <code>currency</code> 列</strong> —— 用 <code>market</code> 推断或 JOIN orders/positions。</li>
+    <li><strong>数据从 2025-01-01 起</strong>，更早买入缺失 → 卖出 &gt; 买入的标的需 <code>positions.cost_price</code> 兜底。</li>
+    <li>无手续费/税费字段 → <strong>盈亏均为税前毛额</strong>。</li>
+    <li><code>create_time</code> 毫秒级、交易所当地时区、<strong>无时区标记</strong>。跨市场排序前需统一时区。</li>
+  </ul>
+
+  <h3>daily_quotes —— 日线行情</h3>
+  <ul>
+    <li><code>yf_symbol / futu_code / date</code>、<code>open/high/low/close</code>（原始价）、<code>adj_close</code>（复权）、<code>volume / dividends / stock_splits</code></li>
+    <li><strong>算收益率/技术指标用 <code>adj_close</code></strong>（避免分红拆股日的假跳空）；展示原始价用 <code>close</code>。</li>
+    <li>各标的交易日数<strong>不等长</strong>，按 date 取交集或显式处理缺口。</li>
+  </ul>
+
+  <h3>stock_profiles —— 公司/估值</h3>
+  <ul>
+    <li><code>market_cap_mm / trailing_eps / target_mean_price</code> 是<strong>标的本币</strong>（HK→HKD、US→USD），<strong>不是美元</strong>。跨市场比较前必须换汇。</li>
+    <li><code>dividend_yield</code> 是<strong>百分比数值</strong>（8.32 表示 8.32%）。</li>
+    <li><strong>无历史</strong>：每天覆盖，只有最新值。需要估值时序必须自建快照归档。</li>
+  </ul>
+
+  <h3>fx_rates —— 外汇日线</h3>
+  <ul>
+    <li><code>pair(USDCNY) / date / open/high/low/close</code>，<code>close</code> = 1 美元对应的人民币。</li>
+    <li>当天未收盘时 <code>close</code> 可能为空，前端/分析须过滤（注意 JS 中 <code>Number(null)/Number("")===0</code>，不能只用 <code>isFinite</code>）。</li>
+    <li><code>CNY=X</code> 即 USDCNY；勿与 <code>CNH=X</code>（离岸）混淆。</li>
+  </ul>
+</section>
+
+<!-- ============ 14. 关键口径与约定 ============ -->
+<section id="conventions">
+  <h2>14 · 关键口径与约定</h2>
+
+  <h3>14.1 涨跌配色（全站统一，中国习惯）</h3>
+  <p><span class="up">红 = 涨</span>，<span class="down">绿 = 跌</span>，0 为中性灰。<strong>切勿用国际惯例反过来。</strong>前端统一走 <code>plClass()</code> 与 <code>.up/.down/.flat</code> CSS class。</p>
+
+  <h3>14.2 货币</h3>
+  <p>yfinance 的 <code>market_cap / EPS / 目标价</code>为<strong>标的本币</strong>（HK→HKD、US→USD），非 USD。展示时按 <code>currency</code> 字段标注，勿硬编码美元。跨币种（USD/HKD）<strong>不相加</strong>，按市场各画一条线 / 各一张卡。</p>
+
+  <h3>14.3 幂等与覆盖</h3>
+  <ul>
+    <li>所有写库用 UPSERT；当天可变数据（持仓快照、行情）以覆盖为准。</li>
+    <li>持仓用 <code>replace_position_snapshot</code>：先 DELETE 当天再 INSERT，保证已清仓标的不残留。</li>
+    <li><code>init.sh</code> / <code>update.sh</code> 可重复执行，不会产生重复数据。</li>
+  </ul>
+
+  <h3>14.4 资产趋势 / 组合概览口径</h3>
+  <p>均从已入库 <code>positions</code> 快照聚合，<strong>零新抓取</strong>（Web 只读边界）。跨币种不相加，按市场各画一条线 / 各一张卡；快照不可从富途回补，历史空缺只能随 <code>update.sh</code> 自然积累。</p>
+
+  <h3>14.5 复盘范围</h3>
+  <p><code>analyze_stock</code> 仅做<strong>客观交易行为复盘</strong>，不输出个性化投资建议（你不是持牌投顾）。</p>
+</section>
+
+<!-- ============ 15. 已知坑点 ============ -->
+<section id="gotchas">
+  <h2>15 · 已知坑点（踩坑预防清单）</h2>
+
+  <div class="callout danger">
+    <span class="tag">1. cost_price ≤ 0</span>
+    富途超卖/融券标的成本可能为负（会计产物，非真实成本）。<code>cost_price &lt;= 0</code> 一律视为缺失，不可直接当成本用。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">2. yfinance end 排他</span>
+    <code>Ticker().history(start, end)</code> 的 <code>end</code> 排他（只返回 &lt; end 的 bar），传 <code>end=今天</code> 会漏当天。统一经 <code>_end_inclusive</code>（end+1 天）修正。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">3. 跳过名单不自愈</span>
+    进入 skiplist 不再请求 → 无从触发 clear。一次限频批量抓空会误伤真实持仓。阈值取 5 留容错；误伤后 <code>maintenance reset-skiplist</code> 手动止血。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">4. 路由 &lt;path:code&gt; 吞子路径</span>
+    用 <code>&lt;code&gt;</code> 不用 <code>&lt;path:code&gt;</code>，否则 <code>/stock/HK.00700/profile</code> 会把 code 解析成 <code>HK.00700/profile</code>。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">5. 历史成交仅实盘</span>
+    <code>history_deal_list_query</code> 仅支持 <code>TrdEnv.REAL</code>，模拟环境不支持。配置 <code>trd_env: REAL</code>。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">6. 富途限频</span>
+    历史订单/成交接口"每 30 秒最多 10 次"。代码按 80 天窗口分段、窗口间 3.2s 间隔、命中限频 30s 退避重试。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">7. 持仓快照稀疏</span>
+    当前库快照日少，时序分析需先积累。历史空缺只能随 <code>update.sh</code> 自然积累，不可回补。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">8. 时区无标记</span>
+    成交/订单时间为交易所当地时区（HK=Asia/Hong_Kong，US=America/New_York）且库内不带时区标记。跨市场按时间排序前先统一时区。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">9. purge 不可逆</span>
+    <code>maintenance purge &lt;代码&gt;</code> 删所有表数据，<strong>会改历史盈亏</strong>。仅退市清仓且不再关注时用。
+  </div>
+</section>
+
+<!-- ============ 16. ML 子系统 ============ -->
+<section id="ml">
+  <h2>16 · ML 子系统概览</h2>
+  <p>独立于 web 生产系统，是后续研究性扩展。完整方案见 <code>docs/ML_PLAN.md</code>，速览见 <code>docs/ML_OVERVIEW.md</code>。</p>
+
+  <h3>核心思路：拆两层</h3>
+  <table>
+    <thead><tr><th>层</th><th>干什么</th><th>方法</th></tr></thead>
+    <tbody>
+      <tr><td>预测层（S1）</td><td>预测次日 [L̂, Ĥ] 区间</td><td>监督学习 / 分位数回归</td></tr>
+      <tr><td>决策层（S2/S3）</td><td>挂什么价、挂多少量</td><td>规则 → bandit → RL</td></tr>
+    </tbody>
+  </table>
+
+  <h3>工程解耦（关键边界）</h3>
+  <ul>
+    <li><strong>独立库</strong>：<code>data/ml/mystock_ml.db</code>，与 web 生产库 <code>mystock.db</code> 完全解耦。</li>
+    <li><strong>独立采集脚本</strong>：<code>scripts/ml.sh</code>（data/train/publish/all），<strong>不并入 <code>update.sh</code></strong>。</li>
+    <li><strong>独立 conda env</strong>：<code>mystock-ml</code>（H20 GPU 机器，与 base/vllm/comfyui 隔离）。</li>
+    <li><strong>全程不碰 web/生产库</strong>；达标稳定后（P6）才把推理结果写入 web 只读库。</li>
+  </ul>
+
+  <h3>数据扩充</h3>
+  <ul>
+    <li>5 年日线（1255 行/股）→ 预测层样本 ×3.4</li>
+    <li>2 年 1h 线（~5000 行/股）→ 撮合模拟器的盘中真实路径，覆盖全部成交窗口</li>
+    <li>标的：3 美（NVDA/TSLA/PDD）+ 3 港（HK.00700/09988/01810），各股独立账户、本币闭环</li>
+  </ul>
+
+  <h3>进度与结论（诚实记录）</h3>
+  <ul>
+    <li><strong>P1 撮合校准吻合率 88–90%</strong>（真实 orders 回放）→ 撮合可信。</li>
+    <li><strong>P2 预测层成立</strong>：次日区间命中 ~50%（按股自适应分位收窄后宽度↓25-30%）。</li>
+    <li><strong>P3.1 bandit 涨势局部有效</strong>：NVDA 超 buy&hold；TSLA 改善仍输；PDD 退化。regime 依赖。</li>
+    <li><strong>P4 离线 RL（CQL）无效（负结果）</strong>：三支全退化为"全程不动"，conservative_loss &gt; td_loss。符合方案预判 —— 小样本是硬天花板。</li>
+    <li><strong>go/no-go</strong>：停在 S1+S2 交付（预测层 + 规则/超额-bandit + 每日报告）。RL 记为已验证的负结果。</li>
+  </ul>
+
+  <h3>关键洞见</h3>
+  <ol>
+    <li>拆两层的设计被验证是对的 —— 预测层稳、可独立交付；避免端到端 RL 黑箱。</li>
+    <li><strong>奖励对齐比换更复杂的模型更管用</strong> —— 仅把奖励改成"相对 buy&hold 超额"，NVDA 就从输变赢。</li>
+    <li>小样本是硬天花板，RL 学不出有效策略不是调参问题，是数据量问题。</li>
+    <li>没有单一策略通吃：涨势 buy&hold 难超越；震荡/下行择时才有价值。下一步 = regime 感知 &gt; 扩样本 &gt; RL。</li>
+  </ol>
+
+  <h3>产物</h3>
+  <p>每日生成自包含 HTML 报告，归档 <code>data/ml/reports/&lt;date&gt;/</code>，红涨绿跌、不碰 web。cron 每工作日早 8 点（北京时间）跑 <code>ml.sh all</code>。</p>
+</section>
+
+<!-- ============ 17. 运维 ============ -->
+<section id="ops">
+  <h2>17 · 运维与维护</h2>
+
+  <h3>例行流程</h3>
+  <ol>
+    <li>确保富途 OpenD 已启动并登录。</li>
+    <li><code>bash scripts/update.sh</code> 增量更新。</li>
+    <li><code>bash scripts/server.sh</code> 启动 / 重启 Web。</li>
+  </ol>
+
+  <h3>常见问题</h3>
+  <table>
+    <thead><tr><th>现象</th><th>排查</th></tr></thead>
+    <tbody>
+      <tr><td>页面无数据 / <code>/api/*</code> 返回 503</td><td>数据库不存在，先 <code>bash scripts/init.sh</code></td></tr>
+      <tr><td>富途数据抓取失败</td><td>确认 OpenD 已启动登录、端口与 <code>config.yaml</code> 一致；查 <code>sync_log</code> 的 error 记录</td></tr>
+      <tr><td>历史成交为空</td><td>确认 <code>trd_env: REAL</code>（成交接口仅支持实盘）</td></tr>
+      <tr><td>某些股票没行情</td><td>退市/yfinance 无数据 → 进 <code>quote_skiplist</code>，属正常；个股详情页会提示"行情数据不足"</td></tr>
+      <tr><td>真实持仓被误跳过</td><td>限频批量抓空误伤 → <code>maintenance reset-skiplist [代码...]</code></td></tr>
+      <tr><td>退市清仓想彻底清除</td><td><code>maintenance purge &lt;代码&gt;</code>（不可逆，会改历史盈亏）</td></tr>
+    </tbody>
+  </table>
+
+  <h3>sync_log 用途</h3>
+  <p>每次抓取写一条，含 <code>source / range_start / range_end / row_count / status / message / run_at</code>。增量更新据此取上次同步点；排查时按 <code>status='error'</code> 过滤。</p>
+</section>
+
+<!-- ============ 18. 安全 ============ -->
+<section id="security">
+  <h2>18 · 安全与隐私（提交前务必检查）</h2>
+
+  <div class="callout danger">
+    <span class="tag">仓库为公开，以下绝不可提交</span>
+    <ul>
+      <li><code>config.yaml</code>（含交易密码）、<code>config.*.local.yaml</code></li>
+      <li><code>data/</code>、<code>*.db*</code>（真实持仓/交易数据）</li>
+    </ul>
+  </div>
+
+  <ul>
+    <li>交易密码只走环境变量或 <code>config.yaml</code>，<strong>绝不硬编码、绝不进 git</strong>。</li>
+    <li>提交前确认 diff 与新文件<strong>无密钥 / token / 密码</strong>。</li>
+    <li>ML 产物（报告）含真实交易信息，<code>data/ml/reports/</code> 已被 <code>.gitignore</code> 的 <code>data/</code> 规则覆盖；公网发布须由用户自己执行（不经 Claude，避免数据外泄闸）。</li>
+    <li>H20 为用户私人 GPU 机器，可直接 rsync 真实数据；但产物绝不进公开 git。</li>
+  </ul>
+</section>
+
+<!-- ============ 19. 接手清单 ============ -->
+<section id="onboarding">
+  <h2>19 · 接手清单（按顺序勾选）</h2>
+
+  <h3>环境就绪</h3>
+  <ul>
+    <li>☐ 安装 conda，<code>conda env create -f environment.yml</code>（或跑 <code>init.sh</code> 自动建）</li>
+    <li>☐ 安装并登录富途 OpenD（<code>127.0.0.1:11111</code>）</li>
+    <li>☐ <code>cp config.example.yaml config.yaml</code>，按需改端口/市场</li>
+    <li>☐ <code>export MYSTOCK_FUTU_TRADE_PWD='你的交易密码'</code></li>
+  </ul>
+
+  <h3>跑通主流程</h3>
+  <ul>
+    <li>☐ <code>bash scripts/init.sh</code> 全量初始化</li>
+    <li>☐ <code>bash scripts/server.sh</code> → 浏览器 <code>http://localhost:8888</code></li>
+    <li>☐ <code>conda activate mk && python -m pytest tests/ -q</code> 全绿</li>
+  </ul>
+
+  <h3>读源码（建议顺序）</h3>
+  <ul>
+    <li>☐ <code>CLAUDE.md</code> + <code>README.md</code>（全局）</li>
+    <li>☐ <code>mystock/config.py</code> + <code>code_map.py</code>（最小、最纯）</li>
+    <li>☐ <code>mystock/schema.sql</code> + <code>docs/DATA.md</code>（数据模型）</li>
+    <li>☐ <code>mystock/db.py</code>（UPSERT 与 skiplist 机制）</li>
+    <li>☐ <code>mystock/collectors/futu_client.py</code>（限频与窗口分段）</li>
+    <li>☐ <code>mystock/collectors/yf_client.py</code>（<code>_end_inclusive</code> 坑）</li>
+    <li>☐ <code>mystock/pipelines/init_load.py</code> + <code>update_load.py</code>（增量起点逻辑）</li>
+    <li>☐ <code>mystock/pnl.py</code>（移动平均 vs FIFO，兜底）</li>
+    <li>☐ <code>mystock/web/app.py</code> + <code>templates/index.html</code> + <code>static/app.js</code></li>
+  </ul>
+
+  <h3>动手验证（加深理解）</h3>
+  <ul>
+    <li>☐ <code>sqlite3 data/mystock.db</code> 看几张表的实际数据与行数</li>
+    <li>☐ 在持仓 Tab 点表头排序、切市场筛选、点代码下钻看 K 线与复盘浮窗</li>
+    <li>☐ <code>python -m mystock.pipelines.maintenance skiplist</code> 看跳过名单</li>
+    <li>☐ 跑一次 <code>bash scripts/update.sh</code>，观察 <code>sync_log</code> 新增记录</li>
+  </ul>
+
+  <h3>改动时的检查清单</h3>
+  <ul>
+    <li>☐ 新逻辑优先写成<strong>纯函数</strong>（可单测，参考 <code>pnl.py</code> / <code>code_map.py</code>）</li>
+    <li>☐ 抓取功能 → pipeline；展示功能 → 只读库</li>
+    <li>☐ 涉及金额：标注币种，跨币种不相加</li>
+    <li>☐ 涨跌配色：红涨绿跌</li>
+    <li>☐ 改后端 → 重启 <code>server.sh</code>；改前端 → <code>node --check app.js</code> + 刷新浏览器</li>
+    <li>☐ 提交前确认 diff 无密钥 / 无 <code>data/</code> / 无 <code>*.db</code></li>
+  </ul>
+
+  <div class="callout ok">
+    <span class="tag">完成上述清单，你已可独立维护本系统</span>
+    遇到不确定的口径，回到 <code>CLAUDE.md</code> 与 <code>docs/DATA.md</code> —— 它们是权威。
+  </div>
+</section>
+
+</main>
+</div>
+
+<button class="theme-toggle" id="theme-toggle">🌙 / ☀️ 切换主题</button>
+<script>
+  (function () {
+    var btn = document.getElementById('theme-toggle');
+    btn.addEventListener('click', function () {
+      var cur = document.documentElement.getAttribute('data-theme');
+      var sysDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var effective = cur || (sysDark ? 'dark' : 'light');
+      var next = effective === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      try { localStorage.setItem('mystock-doc-theme', next); } catch (e) {}
+    });
+  })();
+</script>
+
+</body>
+</html>
