@@ -34,6 +34,23 @@ def _require_yf() -> None:
         raise YFError("未安装 yfinance。请先 `conda activate mk` 并 pip install yfinance")
 
 
+def _is_rate_limited(e: Exception) -> bool:
+    """判断异常是否为 yfinance 的 IP 限频（Too Many Requests / 429）。"""
+    s = str(e).lower()
+    return "too many requests" in s or "rate limit" in s or "429" in s
+
+
+def _retry_sleep(attempt: int, sleep_sec: float, rate_limited: bool) -> None:
+    """重试退避：普通错误线性退避；限频用更长的指数退避（1→2→4…×sleep_sec 的更大基数）。
+
+    限频是 IP 级封禁，短间隔重试只会继续撞墙，需要给它更长的冷却时间。
+    """
+    if rate_limited:
+        time.sleep(sleep_sec * 4 * (2 ** (attempt - 1)))  # 4s / 8s / 16s …（sleep_sec=1）
+    else:
+        time.sleep(sleep_sec * attempt)
+
+
 def _end_inclusive(end: Optional[str]) -> Optional[str]:
     """yfinance 的 history(end=...) 是**排他**的（返回 bar 严格 < end），
     会漏掉 end 当天的 bar。这里把 end 当天纳入：返回 end + 1 天。
@@ -92,7 +109,7 @@ def fetch_daily(
         except Exception as e:  # noqa: BLE001
             last_err = e
             if attempt < max_retries:
-                time.sleep(sleep_sec * attempt)
+                _retry_sleep(attempt, sleep_sec, _is_rate_limited(e))
             else:
                 raise YFError(f"抓取 {yf_symbol} 失败（{max_retries} 次重试）: {e}") from e
 
@@ -161,7 +178,7 @@ def fetch_fx(
         except Exception as e:  # noqa: BLE001
             last_err = e
             if attempt < max_retries:
-                time.sleep(sleep_sec * attempt)
+                _retry_sleep(attempt, sleep_sec, _is_rate_limited(e))
             else:
                 raise YFError(f"抓取汇率 {yf_symbol} 失败（{max_retries} 次重试）: {e}") from e
 

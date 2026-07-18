@@ -11,12 +11,18 @@
 from __future__ import annotations
 
 import sys
+import time
 from datetime import datetime
 
 from .. import db
 from ..config import CONFIG
 from ..collectors import futu_client as fc
 from ..collectors import yf_client as yc
+
+# 批量抓取 yfinance 时，标的之间的节流间隔（秒）。
+# yfinance 按 IP 限频，密集连发易触发「Too Many Requests」。这里在每次
+# 请求前小睡一下，把请求摊开，显著降低撞限频的概率。第一个标的不睡。
+YF_THROTTLE_SEC = 0.5
 
 
 def _now() -> str:
@@ -98,7 +104,9 @@ def collect_quotes(conn, start: str, end: str) -> None:
     empty_codes = 0
     err_codes = 0
     print(f"[quotes] 准备抓取 {len(codes)} 个标的的日线…")
-    for code in codes:
+    for i, code in enumerate(codes):
+        if i:
+            time.sleep(YF_THROTTLE_SEC)  # 标的间节流，缓解 yfinance 限频
         try:
             rows = yc.fetch_daily(code, start=start, end=end, now=now)
             if not rows:
@@ -144,7 +152,9 @@ def collect_profiles(conn) -> None:
     empty_codes = 0
     err_codes = 0
     print(f"[profiles] 准备抓取 {len(codes)} 个标的的通用信息…")
-    for code in codes:
+    for i, code in enumerate(codes):
+        if i:
+            time.sleep(YF_THROTTLE_SEC)  # 标的间节流，缓解 yfinance 限频
         try:
             row = yc.fetch_profile(code, now=now)
             if not row:
