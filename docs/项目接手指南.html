@@ -383,7 +383,17 @@ python -m pytest tests/ -q</code></pre>
 │   ├── pipelines/{init_load,update_load,maintenance}.py
 │   ├── web/{app.py, templates/index.html, static/{app.js,theme.js,style.css, vendor/}}
 │   └── ml/                       # ML 子包（独立库，与 web 解耦）
-└── tests/                        # pytest 单测
+│       ├── config.py             # TARGETS / ALPHA_BY_CODE / COVERAGE_BY_CODE / coverage_for
+│       ├── features.py           # 16 维特征 + 标签（build_features）
+│       ├── predictor.py          # S1 分位数回归 + CQR 校准（IntervalModel.conformal）
+│       ├── calibrator.py         # 建议 2 CQR 纯函数（non-conformity score / 有限样本分位）
+│       ├── regime.py             # 建议 3 HMM regime（fit + 无泄漏 forward 算法 + GMM fallback）
+│       ├── policy.py             # S0 Rule / S2 LinUCB / RegimeLinUCB / RegimeRulePolicy
+│       ├── backtest.py           # 回测引擎 + compute_reward（raw/excess/sharpe/dd）
+│       ├── simulator.py          # 1h bar 限价单撮合 + Account
+│       ├── offline_rl.py         # S3 离线 RL（CQL，已验证负结果）
+│       └── report.py             # 每日 HTML 报告（_ReportCfg 三开关透传）
+└── tests/                        # pytest 单测（含 test_ml_{calibrator,regime,reward,policy,simulator,...}）
 </div>
 
   <h3>关键文件职责速查</h3>
@@ -404,6 +414,13 @@ python -m pytest tests/ -q</code></pre>
       <tr><td><code>mystock/web/static/app.js</code></td><td>前端逻辑（无构建步骤，原生 JS，~1300 行）</td></tr>
       <tr><td><code>mystock/web/static/theme.js</code></td><td>三态主题切换（跟随系统 / 浅色 / 深色）</td></tr>
       <tr><td><code>mystock/web/static/vendor/</code></td><td>vendored Lightweight-Charts（K 线图，离线）</td></tr>
+      <tr><td><code>mystock/ml/predictor.py</code></td><td>S1 分位数回归区间预测（LightGBM），<code>IntervalModel.conformal</code> 套 CQR 校准</td></tr>
+      <tr><td><code>mystock/ml/calibrator.py</code></td><td>建议 2 CQR 纯函数：non-conformity score、有限样本分位、apply、命中率/宽度</td></tr>
+      <tr><td><code>mystock/ml/regime.py</code></td><td>建议 3 HMM regime：<code>fit_regime</code> + <code>regime_proba_forward</code>（手写前向算法，无泄漏）+ GMM fallback</td></tr>
+      <tr><td><code>mystock/ml/policy.py</code></td><td>S0 <code>RulePolicy</code> / S2 <code>LinUCB</code> + regime 软切换版 <code>RegimeLinUCB</code> / <code>RegimeRulePolicy</code></td></tr>
+      <tr><td><code>mystock/ml/backtest.py</code></td><td>回测引擎；<code>compute_reward</code>（raw/excess/sharpe/drawdown_penalized 纯函数）；<code>BTConfig</code> 三开关</td></tr>
+      <tr><td><code>mystock/ml/report.py</code></td><td>每日 HTML 报告；<code>_ReportCfg</code> 默认开第一档三建议（DD惩罚+CQR+HMM）</td></tr>
+      <tr><td><code>mystock/ml/config.py</code></td><td>ML 子包配置：<code>TARGETS</code> / <code>ALPHA_BY_CODE</code> / <code>COVERAGE_BY_CODE</code> + <code>coverage_for()</code></td></tr>
     </tbody>
   </table>
 </section>
@@ -819,14 +836,14 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
 <!-- ============ 16. ML 子系统 ============ -->
 <section id="ml">
   <h2>16 · ML 子系统概览</h2>
-  <p>独立于 web 生产系统，是后续研究性扩展。完整方案见 <code>docs/ML_PLAN.md</code>，速览见 <code>docs/ML_OVERVIEW.md</code>。</p>
+  <p>独立于 web 生产系统，是后续研究性扩展。完整方案见 <code>docs/ML_PLAN.md</code>，速览见 <code>docs/ML_OVERVIEW.md</code>，新算法建议清单见 <code>docs/ML_ALGORITHM_PROPOSAL.md</code>。</p>
 
   <h3>核心思路：拆两层</h3>
   <table>
     <thead><tr><th>层</th><th>干什么</th><th>方法</th></tr></thead>
     <tbody>
-      <tr><td>预测层（S1）</td><td>预测次日 [L̂, Ĥ] 区间</td><td>监督学习 / 分位数回归</td></tr>
-      <tr><td>决策层（S2/S3）</td><td>挂什么价、挂多少量</td><td>规则 → bandit → RL</td></tr>
+      <tr><td>预测层（S1）</td><td>预测次日 [L̂, Ĥ] 区间</td><td>分位数回归 + <strong>CQR 校准</strong>（建议 2）</td></tr>
+      <tr><td>决策层（S2/S3）</td><td>挂什么价、挂多少量</td><td>规则 → bandit → RL；bandit 现为 <strong>regime 软切换</strong>（建议 3）+ <strong>风险调整 reward</strong>（建议 1）</td></tr>
     </tbody>
   </table>
 
@@ -834,7 +851,7 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
   <ul>
     <li><strong>独立库</strong>：<code>data/ml/mystock_ml.db</code>，与 web 生产库 <code>mystock.db</code> 完全解耦。</li>
     <li><strong>独立采集脚本</strong>：<code>scripts/ml.sh</code>（data/train/publish/all），<strong>不并入 <code>update.sh</code></strong>。</li>
-    <li><strong>独立 conda env</strong>：<code>mystock-ml</code>（H20 GPU 机器，与 base/vllm/comfyui 隔离）。</li>
+    <li><strong>独立 conda env</strong>：<code>mystock-ml</code>（H20 GPU 机器，与 base/vllm/comfyui 隔离）；本机训练用 <code>mk</code>（CPU 算法）。</li>
     <li><strong>全程不碰 web/生产库</strong>；达标稳定后（P6）才把推理结果写入 web 只读库。</li>
   </ul>
 
@@ -845,25 +862,63 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
     <li>标的：3 美（NVDA/TSLA/PDD）+ 3 港（HK.00700/09988/01810），各股独立账户、本币闭环</li>
   </ul>
 
+  <h3>第一档算法升级（2026-07 落地，<code>ml.sh train</code> 默认全开）</h3>
+  <p>按 <code>docs/ML_ALGORITHM_PROPOSAL.md</code> 第一档三条建议实施，全部 <strong>opt-in 默认开</strong>，回退保守口径只需改 <code>_ReportCfg</code> / <code>BTConfig</code> 三个字段。报告头部口径行标注当前模式：<code>reward=drawdown_penalized · CQR=on(目标70%) · regime=on(3态)</code>。</p>
+  <table>
+    <thead><tr><th>建议</th><th>模块</th><th>做什么</th><th>关键设计点</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>1 · 风险调整 reward</strong></td>
+        <td><code>backtest.compute_reward</code>（纯函数）</td>
+        <td>reward 从单一"超额"扩展为 4 模式：<code>raw</code> / <code>excess</code>（旧默认）/ <code>sharpe</code>（减近 20 步波动·scale）/ <code>drawdown_penalized</code>（减深回撤惩罚）</td>
+        <td>惩罚项与 base 同量级，不破坏 LinUCB 的 theta/bonus 平衡；纯函数可单测（<code>test_ml_reward.py</code> 18 例）</td>
+      </tr>
+      <tr>
+        <td><strong>2 · CQR 校准</strong></td>
+        <td><code>calibrator.py</code> + <code>IntervalModel.conformal</code> + <code>config.coverage_for</code></td>
+        <td>在分位数回归外套 split conformal：用训练末尾 <code>cal_frac</code> 算 non-conformity score（Romano 约定 <code>s=max(L̂−y_low, y_high−Ĥ)</code>），取 <code>⌈(n+1)(1−α)⌉</code> 分位得半宽 <code>q</code>，区间扩为 <code>[L̂−q, Ĥ+q]</code></td>
+        <td>有限样本覆盖率保证（标准 QR 只有渐近保证）；<code>q&gt;0</code> 扩展 / <code>q&lt;0</code> 自适应收紧；目标覆盖率按股可调 <code>COVERAGE_BY_CODE</code>，默认 0.70（收窄档）</td>
+      </tr>
+      <tr>
+        <td><strong>3 · HMM regime 软切换</strong></td>
+        <td><code>regime.py</code> + <code>policy.RegimeLinUCB</code> / <code>RegimeRulePolicy</code></td>
+        <td>3 维特征（日对数收益 / 20 日年化波动 / MA20−MA50 趋势展开）fit GaussianHMM（仅训练段）；按 <code>P(regime_t|x_1:t)</code> 软混合各 regime 的 LinUCB 参数（<code>A_mix=Σ p_k·A[k]</code>）选臂 + 加权信用分配</td>
+        <td><strong>无泄漏</strong>：手写前向算法（forward filtering）算 <code>P(z_t|x_1:t)</code>，<strong>不用 hmmlearn 的 <code>predict_proba</code></strong>（那是 forward-backward 平滑，会偷看未来）；<code>hmmlearn</code> 缺失时 graceful 回退 GMM；单测验证篡改未来不改过去概率（drift=0）</td>
+      </tr>
+    </tbody>
+  </table>
+  <p><strong>RegimeRulePolicy 软切换口径</strong>：涨势（<code>mean[ret]</code> 最大的状态）持仓→HOLD（不卖赢家）、空仓→L_hat 买入；下行持仓→H_hat 卖出（借势减仓）、空仓→HOLD（不接飞刀）；不确定（dom 概率 &lt; 0.5）→ 走原 RulePolicy 震荡口径（低买高卖）。</p>
+
+  <h3>区间收窄（与建议 2 配套）</h3>
+  <ul>
+    <li><strong>收窄区间的唯一有效杠杆是 <code>target_coverage</code></strong>：base 分位（<code>ALPHA_BY_CODE</code>）收窄会被 CQR 自适应补偿——CQR 永远把区间扩到目标覆盖率，所以调 base 不改最终宽度，只调 <code>COVERAGE_BY_CODE</code> 才能真正收窄。这点写进 <code>config.py</code> 注释。</li>
+    <li>0.80 → 0.70 实测：宽度 7-13% → 6-11%（收窄 11-15%），命中率 ~82% → ~72-75%（仍守目标 70%）。</li>
+    <li>按股调档示例：<code>COVERAGE_BY_CODE = {"HK.00700": 0.65, "US.PDD": 0.65}</code>（低波动股更激进），无需改代码。</li>
+  </ul>
+
   <h3>进度与结论（诚实记录）</h3>
   <ul>
-    <li><strong>P1 撮合校准吻合率 88–90%</strong>（真实 orders 回放）→ 撮合可信。</li>
-    <li><strong>P2 预测层成立</strong>：次日区间命中 ~50%（按股自适应分位收窄后宽度↓25-30%）。</li>
-    <li><strong>P3.1 bandit 涨势局部有效</strong>：NVDA 超 buy&hold；TSLA 改善仍输；PDD 退化。regime 依赖。</li>
-    <li><strong>P4 离线 RL（CQL）无效（负结果）</strong>：三支全退化为"全程不动"，conservative_loss &gt; td_loss。符合方案预判 —— 小样本是硬天花板。</li>
-    <li><strong>go/no-go</strong>：停在 S1+S2 交付（预测层 + 规则/超额-bandit + 每日报告）。RL 记为已验证的负结果。</li>
+    <li><strong>P1 撮合校准吻合率 88–93%</strong>（真实 orders 回放）→ 撮合可信。</li>
+    <li><strong>P2 预测层成立</strong>：base 分位命中 ~50%；<strong>CQR 校准后</strong>命中达目标覆盖率（0.70→~72-75%、0.80→~82%），宽度可控（&lt;15%）。</li>
+    <li><strong>P3.1 bandit + 第一档三建议 A/B（Tier1 全开 vs 保守口径）</strong>：4/6 标的改善，含 <strong>PDD +34%（净值 16215→21801，Sharpe −0.28→+0.16）</strong>、NVDA +40%、HK.09988 +38%、HK.01810 +50%；TSLA / HK.00700 回退（原 flat-bandit 已表现尚可，DD 惩罚 + regime 过校正）。<strong>一支打 ✓ 不代表普适</strong>。</li>
+    <li><strong>P4 离线 RL（CQL）无效（负结果）</strong>：三支全退化为"全程不动"，conservative_loss &gt; td_loss。符合方案预判 —— 小样本是硬天花板。RL 升级（IQL/Cal-QL）记为第二档。</li>
+    <li><strong>go/no-go</strong>：S1+S2 交付（预测层 + CQR + 规则/超额-bandit + regime 软切换 + 每日报告）。第一档三建议已默认开。</li>
   </ul>
 
   <h3>关键洞见</h3>
   <ol>
     <li>拆两层的设计被验证是对的 —— 预测层稳、可独立交付；避免端到端 RL 黑箱。</li>
-    <li><strong>奖励对齐比换更复杂的模型更管用</strong> —— 仅把奖励改成"相对 buy&hold 超额"，NVDA 就从输变赢。</li>
+    <li><strong>奖励对齐比换更复杂的模型更管用</strong> —— 仅把奖励改成"相对 buy&hold 超额"，NVDA 就从输变赢；进一步加 DD 惩罚/Sharpe 化继续提升稳定性。</li>
     <li>小样本是硬天花板，RL 学不出有效策略不是调参问题，是数据量问题。</li>
-    <li>没有单一策略通吃：涨势 buy&hold 难超越；震荡/下行择时才有价值。下一步 = regime 感知 &gt; 扩样本 &gt; RL。</li>
+    <li>没有单一策略通吃：涨势 buy&hold 难超越；震荡/下行择时才有价值。<strong>regime 感知已落地</strong>（HMM 软切换），下一步 = 按股调 regime 参数 / 扩样本 / IQL。</li>
+    <li><strong>防泄漏是 regime 的命门</strong>：HMM 必须只在训练段 fit，推理必须用前向算法（forward filtering），不能用 forward-backward 平滑——否则回测偷看未来会给出虚高收益。</li>
   </ol>
 
+  <h3>测试</h3>
+  <p>ML 子包纯函数单测（不依赖 GPU / 可在 <code>mk</code> 跑）：<code>test_ml_calibrator</code>（CQR 符号/有限样本分位/覆盖率按股）、<code>test_ml_regime</code>（特征 warmup / forward 行和=1 / <strong>无泄漏验证</strong> / bull-down 识别）、<code>test_ml_reward</code>（4 reward 模式 + RegimeLinUCB/RegimeRulePolicy 软切换）、<code>test_ml_policy</code> / <code>test_ml_simulator</code> / <code>test_ml_nan_guard</code> / <code>test_ml_offline_rl</code>。全套 115 测试。</p>
+
   <h3>产物</h3>
-  <p>每日生成自包含 HTML 报告，归档 <code>data/ml/reports/&lt;date&gt;/</code>，红涨绿跌、不碰 web。cron 每工作日早 8 点（北京时间）跑 <code>ml.sh all</code>。</p>
+  <p>每日生成自包含 HTML 报告，归档 <code>data/ml/reports/&lt;date&gt;/</code>，红涨绿跌、不碰 web。cron 每工作日早 8 点（北京时间）跑 <code>ml.sh all</code>。报告头部口径行透明化当前 reward / CQR / regime 模式。</p>
 </section>
 
 <!-- ============ 17. 运维 ============ -->
@@ -944,6 +999,9 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
     <li>☐ <code>mystock/pipelines/init_load.py</code> + <code>update_load.py</code>（增量起点逻辑）</li>
     <li>☐ <code>mystock/pnl.py</code>（移动平均 vs FIFO，兜底）</li>
     <li>☐ <code>mystock/web/app.py</code> + <code>templates/index.html</code> + <code>static/app.js</code></li>
+    <li>☐ <code>mystock/ml/predictor.py</code> + <code>calibrator.py</code>（S1 分位 + CQR）</li>
+    <li>☐ <code>mystock/ml/regime.py</code> + <code>policy.py</code>（HMM 无泄漏 forward + regime 软切换）</li>
+    <li>☐ <code>mystock/ml/backtest.py</code>（<code>compute_reward</code> 四模式 + 三开关 <code>BTConfig</code>）</li>
   </ul>
 
   <h3>动手验证（加深理解）</h3>
@@ -952,6 +1010,9 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
     <li>☐ 在持仓 Tab 点表头排序、切市场筛选、点代码下钻看 K 线与复盘浮窗</li>
     <li>☐ <code>python -m mystock.pipelines.maintenance skiplist</code> 看跳过名单</li>
     <li>☐ 跑一次 <code>bash scripts/update.sh</code>，观察 <code>sync_log</code> 新增记录</li>
+    <li>☐ <code>conda activate mk && python -m pytest tests/ -q</code>（115 测试全过）</li>
+    <li>☐ <code>bash scripts/ml.sh train</code> 跑一次回测 + 报告，看 <code>data/ml/reports/latest.html</code> 头部口径行（reward/CQR/regime）</li>
+    <li>☐ <code>MYSTOCK_ML_TIER1=1 python -m mystock.ml.backtest</code> 看 Tier1 vs 保守口径 A/B（验收门槛）</li>
   </ul>
 
   <h3>改动时的检查清单</h3>
@@ -962,6 +1023,7 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
     <li>☐ 涨跌配色：红涨绿跌</li>
     <li>☐ 改后端 → 重启 <code>server.sh</code>；改前端 → <code>node --check app.js</code> + 刷新浏览器</li>
     <li>☐ 提交前确认 diff 无密钥 / 无 <code>data/</code> / 无 <code>*.db</code></li>
+    <li>☐ ML：regime 推理必须用前向算法（forward filtering），<strong>禁止</strong>用 <code>hmmlearn.predict_proba</code>（forward-backward 会偷看未来）；CQR 改覆盖率走 <code>COVERAGE_BY_CODE</code>，别动 base 分位</li>
   </ul>
 
   <div class="callout ok">

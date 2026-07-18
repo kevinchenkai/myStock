@@ -1,0 +1,897 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>myStock ML × Qlib · 深度调研评估报告</title>
+<style>
+  :root {
+    --bg: #fafafa; --surface: #fff; --surface-2: #f4f4f6; --border: #e3e3e8;
+    --text: #1f2330; --muted: #6b7280; --primary: #c0392b; --primary-dark: #8e2a20;
+    --accent: #2c6fbb; --up: #d23a35; --down: #2e8b57; --code-bg: #f5f3ee;
+    --code-text: #2a2a2a; --warn: #b8770b; --ok: #2e8b57; --qlib: #0078d4;
+  }
+  html[data-theme="dark"] {
+    --bg: #15171d; --surface: #1d2028; --surface-2: #242833; --border: #33384a;
+    --text: #e4e6ee; --muted: #9aa0b0; --primary: #e57368; --primary-dark: #c0392b;
+    --accent: #6ea3d6; --code-bg: #1b1e26; --code-text: #e4e6ee;
+    --warn: #e0a93b; --ok: #4cae7a; --qlib: #4da3e8;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) {
+      --bg: #15171d; --surface: #1d2028; --surface-2: #242833; --border: #33384a;
+      --text: #e4e6ee; --muted: #9aa0b0; --primary: #e57368; --accent: #6ea3d6;
+      --code-bg: #1b1e26; --code-text: #e4e6ee; --warn: #e0a93b; --ok: #4cae7a; --qlib: #4da3e8;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7; font-size: 15px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .layout { display: flex; min-height: 100vh; }
+  nav.toc {
+    width: 280px; flex-shrink: 0; background: var(--surface);
+    border-right: 1px solid var(--border); padding: 24px 18px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  nav.toc h2 {
+    font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); margin: 22px 0 8px;
+  }
+  nav.toc h2:first-child { margin-top: 0; }
+  nav.toc a {
+    display: block; color: var(--text); padding: 4px 10px;
+    border-radius: 6px; font-size: 13.5px;
+  }
+  nav.toc a:hover { background: var(--surface-2); text-decoration: none; }
+  main { flex: 1; max-width: 980px; padding: 40px 48px 120px; margin: 0 auto; }
+  header.hero {
+    border-bottom: 2px solid var(--primary); padding-bottom: 18px; margin-bottom: 32px;
+  }
+  header.hero .badge {
+    display: inline-block; background: var(--primary); color: #fff;
+    font-size: 12px; padding: 2px 10px; border-radius: 999px; letter-spacing: 1px; margin-bottom: 12px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 28px; }
+  header.hero p { margin: 0; color: var(--muted); }
+  section { margin-bottom: 52px; scroll-margin-top: 24px; }
+  h2 {
+    font-size: 22px; border-left: 4px solid var(--primary);
+    padding-left: 12px; margin: 0 0 16px;
+  }
+  h3 { font-size: 17px; margin: 26px 0 10px; }
+  h4 { font-size: 15px; margin: 16px 0 8px; color: var(--accent); }
+  p { margin: 10px 0; }
+  ul, ol { margin: 10px 0; padding-left: 24px; }
+  li { margin: 4px 0; }
+  .lead {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; margin: 16px 0;
+  }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    background: var(--code-bg); color: var(--code-text);
+    padding: 1px 6px; border-radius: 4px; font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-text);
+    padding: 14px 16px; border-radius: 8px; overflow-x: auto;
+    border: 1px solid var(--border); font-size: 12.5px; line-height: 1.55;
+  }
+  pre code { background: transparent; padding: 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 14px 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; font-size: 13.5px;
+  }
+  th, td { padding: 8px 11px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .callout {
+    border-left: 4px solid var(--accent); background: var(--surface);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 14px 0;
+  }
+  .callout.warn { border-color: var(--warn); }
+  .callout.danger { border-color: var(--up); }
+  .callout.ok { border-color: var(--ok); }
+  .callout.qlib { border-color: var(--qlib); }
+  .callout .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;
+  }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.danger .tag { color: var(--up); }
+  .callout.ok .tag { color: var(--ok); }
+  .callout.qlib .tag { color: var(--qlib); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.toc { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 24px 18px 80px; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+  .ascii {
+    font-family: "SF Mono", Menlo, Consolas, monospace; white-space: pre;
+    font-size: 12px; line-height: 1.45; background: var(--code-bg); color: var(--code-text);
+    padding: 14px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border);
+  }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); margin: 2px;
+  }
+  .pill.ok { color: var(--ok); border-color: var(--ok); }
+  .pill.bad { color: var(--up); border-color: var(--up); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .card h4 { margin: 0 0 6px; }
+  .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+  .prio {
+    display: inline-block; min-width: 52px; text-align: center;
+    font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; color: #fff;
+  }
+  .prio.p0 { background: var(--up); }
+  .prio.p1 { background: var(--warn); }
+  .prio.p2 { background: var(--accent); }
+  .prio.p3 { background: var(--muted); }
+  .theme-toggle {
+    position: fixed; right: 20px; bottom: 20px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px;
+    cursor: pointer; color: var(--text); font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 100;
+  }
+  footer.note {
+    margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 13px;
+  }
+  .score-bar {
+    display: flex; align-items: center; gap: 10px; margin: 6px 0;
+  }
+  .score-bar .label { width: 140px; font-size: 13px; color: var(--muted); }
+  .score-bar .track {
+    flex: 1; height: 10px; background: var(--surface-2); border-radius: 999px; overflow: hidden;
+  }
+  .score-bar .fill { height: 100%; border-radius: 999px; }
+  .score-bar .val { width: 36px; font-size: 13px; font-weight: 600; text-align: right; }
+</style>
+</head>
+<body>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("mystock-doc-theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+
+<div class="layout">
+<nav class="toc">
+  <h2>结论</h2>
+  <a href="#tldr">0. TL;DR 裁决</a>
+  <a href="#verdict">1. 一句话 + 决策矩阵</a>
+
+  <h2>现状审计</h2>
+  <a href="#audit">2. myStock ML 现状审计</a>
+  <a href="#latest">3. 最新实盘回测证据</a>
+  <a href="#gap">4. 瓶颈与能力缺口</a>
+
+  <h2>对照</h2>
+  <a href="#qlib-fit">5. Qlib 能力地图</a>
+  <a href="#mismatch">6. 问题形式匹配度</a>
+  <a href="#compare">7. 逐层深度对照</a>
+
+  <h2>方案</h2>
+  <a href="#strategy">8. 借鉴策略总纲</a>
+  <a href="#roadmap">9. 分阶段路线图</a>
+  <a href="#anti">10. 明确不该做的</a>
+  <a href="#arch">11. 推荐集成架构</a>
+  <a href="#kpi">12. 验收 KPI</a>
+  <a href="#refs">13. 参考</a>
+</nav>
+
+<main>
+
+<header class="hero">
+  <span class="badge">RESEARCH · EVALUATION</span>
+  <h1>myStock ML × Qlib<br>深度调研评估报告</h1>
+  <p>基于 <code>mystock/ml/</code> 源码、docs 方案与 2026-07-17 例行报告，对照 Microsoft Qlib 的可借鉴边界与落地路线</p>
+  <div style="margin-top:12px">
+    <span class="pill">调研日：2026-07-18</span>
+    <span class="pill">ML 代码 ~2560 行</span>
+    <span class="pill">标的 6 支 · 本币独立账户</span>
+    <span class="pill">Qlib 只读外部参考</span>
+  </div>
+</header>
+
+<!-- 0 -->
+<section id="tldr">
+  <h2>0. TL;DR 裁决</h2>
+  <div class="lead">
+    <strong>不要把 myStock ML 整体迁到 Qlib，也不要用 Qlib 的组合选股管线替换现有两层架构。</strong>
+    问题定义不同：myStock 是「单标的次日高低区间 → 限价挂单」，Qlib 默认是「截面 Alpha → TopK 组合」。
+    <br><br>
+    <strong>正确用法</strong>：把 Qlib 当<strong>只读的方法库 / 实验沙箱</strong>，分组件借鉴——
+    优先<strong>特征与预测评估</strong>，其次<strong>滚动适应与实验纪律</strong>，
+    最后才考虑<strong>订单执行 RL 思想</strong>。现有预测层、1h 撮合、CQR、regime、三基线纪律应保留并强化。
+  </div>
+
+  <div class="grid-3">
+    <div class="card">
+      <h4>立刻可做（P0）</h4>
+      <p>Alpha 特征扩容 + IC/ICIR 评估；预测层多模型对照（LGBM 已有，可加线性/MLP 基线）；多种子方差入报告。</p>
+    </div>
+    <div class="card">
+      <h4>中期可做（P1）</h4>
+      <p>滚动重训 / 概念漂移适应；可选把日线 dump 成 qlib bin 做离线实验；OPE 闸门。</p>
+    </div>
+    <div class="card">
+      <h4>明确不做</h4>
+      <p>端到端 qrun 替换决策层；TopkDropout 组合策略；跨股共享资金池；把 pyqlib 塞进 cron 主链路（除非独立 opt-in）。</p>
+    </div>
+  </div>
+</section>
+
+<!-- 1 -->
+<section id="verdict">
+  <h2>1. 决策矩阵：借鉴 vs 弃用</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Qlib 能力</th>
+        <th>对 myStock 匹配度</th>
+        <th>建议</th>
+        <th>理由</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Alpha158 / 公式化特征引擎</td>
+        <td><span class="pill ok">高</span></td>
+        <td><strong>移植特征思想</strong></td>
+        <td>现仅 16 维手写特征；Alpha 集可直接扩预测力，不必整库依赖</td>
+      </tr>
+      <tr>
+        <td>IC / ICIR / Rank IC 信号评估</td>
+        <td><span class="pill ok">高</span></td>
+        <td><strong>并入报告</strong></td>
+        <td>现只看区间命中率；IC 可诊断「预测方向是否有信息量」</td>
+      </tr>
+      <tr>
+        <td>LightGBM / 树模型 workflow</td>
+        <td><span class="pill ok">已部分重叠</span></td>
+        <td>保持现有，补对照模型</td>
+        <td>预测层已是 LGBM quantile；可借鉴 benchmark 对照方法</td>
+      </tr>
+      <tr>
+        <td>Rolling / DDG-DA 动态适应</td>
+        <td><span class="pill ok">高</span></td>
+        <td><strong>中期实现</strong></td>
+        <td>项目已点名 regime 依赖；滚动重训比堆 RL 更贴小样本</td>
+      </tr>
+      <tr>
+        <td>Nested 决策 / 订单执行 RL</td>
+        <td><span class="pill warn">中低</span></td>
+        <td>思想借鉴，不迁代码</td>
+        <td>问题相近但样本与动作空间不同；CQL 已负结果</td>
+      </tr>
+      <tr>
+        <td>TopkDropout 组合策略</td>
+        <td><span class="pill bad">低</span></td>
+        <td><strong>不做</strong></td>
+        <td>跨股选股 ≠ 单股限价；与「本币独立账户」锁定冲突</td>
+      </tr>
+      <tr>
+        <td>qrun 全自动 YAML 流水线</td>
+        <td><span class="pill warn">中</span></td>
+        <td>借鉴实验管理，不替换 ml.sh</td>
+        <td>现有 cron + HTML 报告已够用；可学 Recorder 思路</td>
+      </tr>
+      <tr>
+        <td>1min / 高频数据管线</td>
+        <td><span class="pill warn">中</span></td>
+        <td>与「15m 撮合升级」对齐</td>
+        <td>yfinance 窗口短；可作为撮合保真度增量</td>
+      </tr>
+      <tr>
+        <td>RD-Agent 自动挖因子</td>
+        <td><span class="pill warn">中（远期）</span></td>
+        <td>样本扩后再看</td>
+        <td>需更多标的与稳定评估闸；当前 6 股小宇宙性价比低</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 2 -->
+<section id="audit">
+  <h2>2. myStock ML 现状审计</h2>
+
+  <h3>2.1 问题定义（必须先钉死）</h3>
+  <p>人类动作复刻：<strong>看趋势 → 估次日 [L, H] → 限价低买高卖 + 数量</strong>。
+    目标函数 = <strong>最大化达成交易净值（卖出额 − 买入额）</strong>，移动平均成本口径。</p>
+  <div class="ascii">预测层 (S1)                     决策层 (S0→S2→S3)
+┌──────────────────┐            ┌──────────────────────────┐
+│ 日线特征 (16维)    │            │ 规则 / LinUCB / Regime    │
+│ 分位回归 LGBM     │──[L̂,Ĥ]──▶│ 13 臂：不动/买×6/卖×6     │
+│ + CQR 校准(可选)  │            │ reward: excess/sharpe/dd  │
+└──────────────────┘            └────────────┬─────────────┘
+                                             │ 限价单
+                                             ▼
+                                    1h 撮合模拟器 (P1)
+                                    校准吻合 88–90%</div>
+
+  <h3>2.2 已交付模块（代码事实）</h3>
+  <table>
+    <thead><tr><th>阶段</th><th>模块</th><th>状态</th><th>关键结论</th></tr></thead>
+    <tbody>
+      <tr><td>P0</td><td><code>fetch/db/schema</code></td><td><span class="pill ok">交付</span></td><td>独立库 <code>mystock_ml.db</code>，5y 日线 + 2y 1h</td></tr>
+      <tr><td>P1</td><td><code>simulator/calibrate</code></td><td><span class="pill ok">交付</span></td><td>1h 限价撮合，orders 回放 88–93%</td></tr>
+      <tr><td>P2</td><td><code>features/predictor/calibrator</code></td><td><span class="pill ok">交付</span></td><td>分位回归 + CQR；walk-forward</td></tr>
+      <tr><td>P3</td><td><code>policy/backtest</code></td><td><span class="pill warn">部分达标</span></td><td>bandit 涨势难赢 B&amp;H；震荡股局部有效</td></tr>
+      <tr><td>P3+</td><td>风险 reward / regime</td><td><span class="pill ok">已实现 opt-in</span></td><td><code>drawdown_penalized</code> + HMM 软切换已进例行</td></tr>
+      <tr><td>P4</td><td><code>offline_rl</code> CQL</td><td><span class="pill bad">负结果</span></td><td>退化为「全程不动」</td></tr>
+      <tr><td>P5</td><td><code>report</code> + <code>ml.sh</code></td><td><span class="pill ok">交付</span></td><td>cron 日更 HTML，公网发布</td></tr>
+      <tr><td>P6</td><td>写 web</td><td><span class="pill">未做</span></td><td>达标稳定后才做</td></tr>
+    </tbody>
+  </table>
+
+  <h3>2.3 工程纪律（强项，必须保留）</h3>
+  <ul>
+    <li><strong>两层拆分</strong>：预测可独立验证，决策风险隔离 —— 已被实验验证正确。</li>
+    <li><strong>防未来函数</strong>：特征只用 T 收盘；HMM 用前向算法而非 forward-backward。</li>
+    <li><strong>三基线门槛</strong>：B&amp;H / 人类回放 / S0 规则永远对照。</li>
+    <li><strong>工程解耦</strong>：ML 库与 web 生产库物理分离；采集不进 <code>update.sh</code>。</li>
+    <li><strong>脏数据三层防护</strong>：采集 / 回测 / 报告防 NaN 污染。</li>
+    <li><strong>能停则停</strong>：RL 负结果如实记录，不粉饰。</li>
+  </ul>
+
+  <h3>2.4 特征与模型体量（相对 Qlib 的差距）</h3>
+  <table>
+    <thead><tr><th>维度</th><th>myStock ML</th><th>Qlib 典型</th></tr></thead>
+    <tbody>
+      <tr><td>特征数</td><td>16（手写技术指标）</td><td>Alpha158 ~158 / Alpha360 价量窗</td></tr>
+      <tr><td>标签</td><td>次日 high/low 相对 close 收益</td><td>多日超额收益 / 排序标签</td></tr>
+      <tr><td>预测输出</td><td>区间 [L̂, Ĥ] + 覆盖率</td><td>单点 score / 收益预测</td></tr>
+      <tr><td>样本宇宙</td><td>6 标的 × ~1230 日</td><td>CSI300/500 × 多年截面</td></tr>
+      <tr><td>决策</td><td>单股限价 13 臂</td><td>截面 TopK 调仓</td></tr>
+      <tr><td>撮合</td><td>自建 1h 限价路径</td><td>日频成交价 + 费率/涨跌停</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 3 -->
+<section id="latest">
+  <h2>3. 最新实盘回测证据（2026-07-17）</h2>
+  <p>例行配置（已上线）：
+    <code>reward=drawdown_penalized · CQR=on(目标70%) · regime=on(3态)</code>
+  </p>
+
+  <table>
+    <thead>
+      <tr>
+        <th>标的</th>
+        <th>Bandit 期末</th>
+        <th>买入持有</th>
+        <th>超越 B&amp;H</th>
+        <th>区间宽</th>
+        <th>命中率(CQR)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>US.NVDA</td><td>23,905</td><td>34,377</td><td><span class="pill bad">✗</span></td><td>7.23%</td><td>77%</td></tr>
+      <tr><td>US.TSLA</td><td>25,926</td><td>30,651</td><td><span class="pill bad">✗</span></td><td>8.30%</td><td>65%</td></tr>
+      <tr><td>US.PDD</td><td>20,791</td><td>12,766</td><td><span class="pill ok">✓</span></td><td>5.10%</td><td>72%</td></tr>
+      <tr><td>HK.00700</td><td>21,440</td><td>23,254</td><td><span class="pill bad">✗</span></td><td>8.16%</td><td>75%</td></tr>
+      <tr><td>HK.09988</td><td>19,633</td><td>29,380</td><td><span class="pill bad">✗</span></td><td>9.87%</td><td>61%</td></tr>
+      <tr><td>HK.01810</td><td>17,327</td><td>32,661</td><td><span class="pill bad">✗</span></td><td>9.50%</td><td>69%</td></tr>
+    </tbody>
+  </table>
+
+  <div class="callout ok">
+    <span class="tag">预测层进展</span>
+    CQR 开启后命中率升至 <strong>61–77%</strong>（对照早期手调窄分位 ~50%），宽度约 5–10%。
+    <strong>预测层作为「复刻人类估高低点」已可独立交付。</strong>
+  </div>
+  <div class="callout warn">
+    <span class="tag">决策层现实</span>
+    6 标的仅 PDD 稳定超越 B&amp;H；强单边（NVDA/TSLA/小米/阿里）主动交易仍输「躺平」。
+    与 OVERVIEW 原结论一致：<strong>regime 依赖未根除</strong>——即便 HMM 软切换已开。
+  </div>
+  <div class="callout">
+    <span class="tag">相对 P3.1 的变化</span>
+    早期 P3.1 在 NVDA 曾超 B&amp;H（超额奖励 + 旧口径）；现配置下 NVDA Bandit 23.9k vs B&amp;H 34.4k。
+    说明：<strong>配置/测试窗/CQR 宽度变化会显著改决策结果</strong>，需要多种子 + 配置 A/B 并列报告，避免「单次回测神话」。
+  </div>
+</section>
+
+<!-- 4 -->
+<section id="gap">
+  <h2>4. 瓶颈与能力缺口（相对「继续优化效果」）</h2>
+
+  <h3>4.1 能力评分（主观，用于排优先级）</h3>
+  <div class="score-bar"><span class="label">预测层可用度</span><div class="track"><div class="fill" style="width:78%;background:var(--ok)"></div></div><span class="val">78</span></div>
+  <div class="score-bar"><span class="label">撮合可信度</span><div class="track"><div class="fill" style="width:85%;background:var(--ok)"></div></div><span class="val">85</span></div>
+  <div class="score-bar"><span class="label">决策层稳健性</span><div class="track"><div class="fill" style="width:40%;background:var(--warn)"></div></div><span class="val">40</span></div>
+  <div class="score-bar"><span class="label">特征表达力</span><div class="track"><div class="fill" style="width:35%;background:var(--warn)"></div></div><span class="val">35</span></div>
+  <div class="score-bar"><span class="label">评估完备度</span><div class="track"><div class="fill" style="width:55%;background:var(--warn)"></div></div><span class="val">55</span></div>
+  <div class="score-bar"><span class="label">样本/宇宙规模</span><div class="track"><div class="fill" style="width:25%;background:var(--up)"></div></div><span class="val">25</span></div>
+  <div class="score-bar"><span class="label">实验可复现/追踪</span><div class="track"><div class="fill" style="width:50%;background:var(--warn)"></div></div><span class="val">50</span></div>
+
+  <h3>4.2 根因清单（按影响排序）</h3>
+  <ol>
+    <li><strong>决策问题比预测难一个量级</strong>：单边牛市 B&amp;H 极难击败；限价策略本质是「少交易、等波动」——与「天天可决策」的 bandit 设定存在张力。</li>
+    <li><strong>特征偏薄</strong>：16 维多是短中期动量/波动，缺少截面相对强度、更长记忆、形态/量价交互；限制了预测与上下文 bandit 的上界。</li>
+    <li><strong>评估指标偏结果、偏单次</strong>：期末净值是必要的，但缺少 IC 序列、分 regime 拆账、多种子 std、配置敏感性表。</li>
+    <li><strong>小样本硬天花板</strong>：真实成交 40–110 笔/股；离线 RL 已实证失败；继续堆深度模型期望为负。</li>
+    <li><strong>测试窗与行情 regime 绑定</strong>：2024–2026 强趋势主导，策略排序会随窗移动。</li>
+  </ol>
+</section>
+
+<!-- 5 -->
+<section id="qlib-fit">
+  <h2>5. Qlib 能力地图（与 myStock 相关切片）</h2>
+  <p>Qlib 是微软开源的 AI 量化平台：数据层 → 学习框架 → 工作流 → 分析。完整中文介绍见
+    <a href="Qlib中文详细介绍.html">Qlib中文详细介绍.html</a>。此处只列<strong>可对齐 myStock 的切片</strong>：</p>
+
+  <div class="grid-2">
+    <div class="card">
+      <h4 style="color:var(--qlib)">数据与特征</h4>
+      <p><code>.bin</code> 存储、表达式引擎、Alpha158/360、Processor 标准化、PIT 防未来财报。</p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--qlib)">预测与模型 Zoo</h4>
+      <p>LGBM/XGB/LSTM/Transformer/HIST… + CSI300 上 IC/IR 对照表；<code>qrun</code> 一键 workflow。</p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--qlib)">动态适应</h4>
+      <p>Rolling retrain、DDG-DA 元学习；针对非平稳市场。</p>
+    </div>
+    <div class="card">
+      <h4 style="color:var(--qlib)">决策与 RL</h4>
+      <p>TopK 组合、Nested 日度+日内、订单执行 PPO/OPDS；分析层 IC/回撤图。</p>
+    </div>
+  </div>
+
+  <div class="callout qlib">
+    <span class="tag">Qlib 最强项对 myStock 的含义</span>
+    Qlib 最成熟的是<strong>截面 Alpha 研究工厂</strong>（特征 + 多模型 + 标准化评估）。
+    myStock 最缺的正是「特征上界」与「评估标准化」——这是最大交集。
+    Qlib 的组合回测与 myStock 的限价决策<strong>不是同一产品</strong>，交集反而小。
+  </div>
+</section>
+
+<!-- 6 -->
+<section id="mismatch">
+  <h2>6. 问题形式匹配度（决定能不能「直接用」）</h2>
+  <table>
+    <thead><tr><th>维度</th><th>myStock ML</th><th>Qlib 默认范式</th><th>匹配?</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>任务</td><td>单股次日区间 + 限价</td><td>多股排序打分 + 调仓</td>
+        <td><span class="pill bad">不匹配</span></td>
+      </tr>
+      <tr>
+        <td>样本结构</td><td>时间序列（每股一条）</td><td>截面 × 时间面板</td>
+        <td><span class="pill warn">可转化</span></td>
+      </tr>
+      <tr>
+        <td>动作</td><td>挂价档 × 数量档</td><td>持仓权重 / TopK 名单</td>
+        <td><span class="pill bad">不匹配</span></td>
+      </tr>
+      <tr>
+        <td>奖励</td><td>回合净值 / 超额 / 回撤惩罚</td><td>组合超额收益</td>
+        <td><span class="pill warn">思想可借</span></td>
+      </tr>
+      <tr>
+        <td>数据源</td><td>yfinance 6 股 + 真实委托</td><td>A 股全市场公开 bin</td>
+        <td><span class="pill warn">需自建 dump</span></td>
+      </tr>
+      <tr>
+        <td>工程边界</td><td>独立 ML 库、不碰 web</td><td>研究平台，无你的账户语义</td>
+        <td><span class="pill ok">可外挂</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="callout danger">
+    <span class="tag">关键判断</span>
+    若把 6 股硬塞进 Qlib TopK 回测，会得到<strong>看起来科学、实际答错题</strong>的结果：
+    优化的是「今天买哪几只」，而不是「这只明天挂什么限价」。
+    <strong>评估口径错位比模型差更危险。</strong>
+  </div>
+</section>
+
+<!-- 7 -->
+<section id="compare">
+  <h2>7. 逐层深度对照</h2>
+
+  <h3>7.1 预测层</h3>
+  <table>
+    <thead><tr><th>点</th><th>myStock</th><th>Qlib</th><th>建议动作</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>标签设计</td>
+        <td>y_high_ret / y_low_ret 分位</td>
+        <td>通常单点收益 / 排序</td>
+        <td>保留区间标签（贴业务）；可<strong>额外</strong>训一个「中位收益」头用于 IC 诊断</td>
+      </tr>
+      <tr>
+        <td>特征</td>
+        <td>16 维</td>
+        <td>Alpha158 级</td>
+        <td><strong>P0：移植 30–80 个公式化因子</strong>（不必 158 全上，防小样本过拟合）</td>
+      </tr>
+      <tr>
+        <td>不确定性</td>
+        <td>CQR 有限样本覆盖</td>
+        <td>默认点估计 + 信号分析</td>
+        <td>CQR 是 myStock 优势，Qlib 无直接对等物 → <strong>保留</strong></td>
+      </tr>
+      <tr>
+        <td>评估</td>
+        <td>命中率 / pinball / MAE</td>
+        <td>IC / ICIR / Rank IC</td>
+        <td><strong>双轨报告</strong>：覆盖率 + IC（对 high/low ret 分别算）</td>
+      </tr>
+      <tr>
+        <td>模型</td>
+        <td>LGBM quantile</td>
+        <td>Zoo 丰富</td>
+        <td>小样本下 <strong>LGBM 仍是主模型</strong>；加 Linear/简单 MLP 作下界对照即可，不上 TFT</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>7.2 决策层</h3>
+  <table>
+    <thead><tr><th>点</th><th>myStock</th><th>Qlib</th><th>建议动作</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>策略形态</td>
+        <td>限价 13 臂 bandit</td>
+        <td>TopK 持仓</td>
+        <td>不替换；可从 Qlib Nested 学「先判 regime 再行动」的分层</td>
+      </tr>
+      <tr>
+        <td>成本模型</td>
+        <td>毛额、无佣金（目标函数设定）</td>
+        <td>开平仓费率、涨跌停</td>
+        <td>可选加「摩擦惩罚」对照列，非必须改主目标</td>
+      </tr>
+      <tr>
+        <td>RL</td>
+        <td>CQL 负结果</td>
+        <td>订单执行 PPO 等</td>
+        <td>不迁 PPO；若再试 RL，优先 IQL/Cal-QL（方案已写）+ 更大行为覆盖</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>7.3 数据与撮合</h3>
+  <table>
+    <thead><tr><th>点</th><th>myStock</th><th>Qlib</th><th>建议动作</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>日线</td>
+        <td>5y yfinance，独立 SQLite</td>
+        <td>.bin 高性能</td>
+        <td>6 股体量 SQLite 足够；仅当特征爆炸或扩宇宙时考虑 bin</td>
+      </tr>
+      <tr>
+        <td>日内</td>
+        <td>1h 撮合，校准 88–90%</td>
+        <td>1min 示例、orderbook 示例</td>
+        <td>沿 <code>ML_ALGORITHM_PROPOSAL</code> 建议 10：试 15m 提校准</td>
+      </tr>
+      <tr>
+        <td>真实委托</td>
+        <td>富途 orders/deals 快照</td>
+        <td>无个人账户语义</td>
+        <td><strong>独特资产</strong>，继续用校准与 human 回放，Qlib 替代不了</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>7.4 实验工程</h3>
+  <ul>
+    <li>Qlib Recorder/MLflow：可借鉴「每次 run 落 config+metrics+artifact」；myStock 现以 HTML 日期归档为主，建议补 <code>ml_runs</code> 表（schema 草案早已在 PLAN 中）。</li>
+    <li>Qlib 多种子 benchmark 脚本：直接对应「报告加均值±std」。</li>
+    <li><code>ml.sh</code> 已覆盖 data/train/publish，不必换成 qrun 主入口。</li>
+  </ul>
+</section>
+
+<!-- 8 -->
+<section id="strategy">
+  <h2>8. 借鉴策略总纲：三种集成模式</h2>
+
+  <h3>模式 A — 思想移植（推荐默认）</h3>
+  <p>不引入 <code>pyqlib</code> 依赖。把 Alpha 公式、IC 指标、滚动重训伪代码<strong>用现有 pandas/lightgbm 重写</strong>进 <code>mystock/ml/</code>。
+    优点：零耦合、cron 不破、测试可控。缺点：要手写表达式。</p>
+
+  <h3>模式 B — 离线实验沙箱（推荐中期）</h3>
+  <p>把 <code>ml_quotes_1d</code> dump 成 Qlib <code>.bin</code>（仅研究机），用 qrun / notebook 做：
+    特征筛选、模型对照、IC 曲线。结论再<strong>回写</strong>进 myStock 特征列表与超参。
+    Qlib 永不进入 <code>ml.sh all</code> 主链路。</p>
+
+  <h3>模式 C — 运行时硬依赖（不推荐现阶段）</h3>
+  <p><code>import qlib</code> 进预测器/回测。问题：依赖重、版本钉死难、与「小而稳的 CPU 例行」冲突，且问题形式仍要大量定制 adapter。</p>
+
+  <div class="callout ok">
+    <span class="tag">本报告推荐</span>
+    <strong>A 为主、B 为辅、C 不做</strong>。
+    Qlib 仓库保持只读；myStock 继续拥有数据与决策主权。
+  </div>
+</section>
+
+<!-- 9 -->
+<section id="roadmap">
+  <h2>9. 分阶段路线图（按「提升效果」排序）</h2>
+
+  <h3>阶段 0 · 立刻（1 周内）— 低风险高杠杆</h3>
+  <table>
+    <thead><tr><th></th><th>项</th><th>借鉴自</th><th>落地</th><th>验收</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="prio p0">P0</span></td>
+        <td><strong>特征扩容 v1</strong>（+动量/波动/形态 30–50 因子）</td>
+        <td>Alpha158 子集思想</td>
+        <td><code>features.py</code> 扩展 + 单测；防泄漏 rolling 只用 past</td>
+        <td>walk-forward 命中率不降；pinball 或 MAE 至少 3/6 股改善</td>
+      </tr>
+      <tr>
+        <td><span class="prio p0">P0</span></td>
+        <td><strong>IC / Rank IC 报告列</strong></td>
+        <td>Qlib report 指标</td>
+        <td><code>predictor</code> 评估 + <code>report.py</code></td>
+        <td>对 y_high_ret / y_low_ret 输出 IC、ICIR；与净值并列</td>
+      </tr>
+      <tr>
+        <td><span class="prio p0">P0</span></td>
+        <td><strong>多种子方差</strong>（seeds=5）</td>
+        <td>Qlib multi-run 纪律</td>
+        <td><code>backtest</code> / <code>report</code></td>
+        <td>Bandit 期末 mean±std；std/mean&gt;0.3 标记不可上线</td>
+      </tr>
+      <tr>
+        <td><span class="prio p0">P0</span></td>
+        <td><strong>分 regime 拆账</strong></td>
+        <td>自身 regime + Qlib 动态评估思路</td>
+        <td>报告按 bull/side/down 分段净值</td>
+        <td>解释「为何只赢 PDD」；指导策略开关</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>阶段 1 · 2–4 周 — 攻决策瓶颈</h3>
+  <table>
+    <thead><tr><th></th><th>项</th><th>借鉴自</th><th>落地</th><th>验收</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="prio p1">P1</span></td>
+        <td><strong>滚动重训预测器</strong>（非一次 fit）</td>
+        <td>Qlib Rolling</td>
+        <td>测试窗内每 N 日 refit 或 expanding</td>
+        <td>vs 单次 fit：≥4/6 股净值或命中率不差</td>
+      </tr>
+      <tr>
+        <td><span class="prio p1">P1</span></td>
+        <td><strong>「该不该交易」门控</strong></td>
+        <td>Nested decision 思想</td>
+        <td>regime 后验 + 预测宽度阈值：过窄/强趋势 → 强制不动或仅 S0</td>
+        <td>牛市股接近 B&amp;H；震荡股保持超额</td>
+      </tr>
+      <tr>
+        <td><span class="prio p1">P1</span></td>
+        <td><strong>特征筛选（IC 过滤）</strong></td>
+        <td>Qlib alpha 研究流程</td>
+        <td>训练集算单因子 IC，剔噪声维</td>
+        <td>特征维 ↓ 但指标不降（小样本正则）</td>
+      </tr>
+      <tr>
+        <td><span class="prio p1">P1</span></td>
+        <td>可选：Qlib 沙箱 dump</td>
+        <td>模式 B</td>
+        <td>脚本 <code>ml_to_qlib_bin.py</code>（研究用）</td>
+        <td>能在 qlib 里画出 6 股 IC 曲线即可</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>阶段 2 · 1–2 月 — 扩样本与保真</h3>
+  <table>
+    <thead><tr><th></th><th>项</th><th>借鉴自</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><span class="prio p2">P2</span></td>
+        <td>扩标的到 12–20（仍本币独立）</td>
+        <td>Qlib 大宇宙但缩水版</td>
+        <td>破小样本；每市场分层抽样，避免全是科技 beta</td>
+      </tr>
+      <tr>
+        <td><span class="prio p2">P2</span></td>
+        <td>15m 撮合校准</td>
+        <td>Qlib 高频示例精神</td>
+        <td>吻合率目标 ≥90%；见 ALGORITHM 建议 10</td>
+      </tr>
+      <tr>
+        <td><span class="prio p2">P2</span></td>
+        <td>IQL/Cal-QL 一次机会</td>
+        <td>自身方案 + 非 Qlib 必须</td>
+        <td>不达「至少 1 股真交易且超 B&amp;H」则永久停 RL</td>
+      </tr>
+      <tr>
+        <td><span class="prio p2">P2</span></td>
+        <td>OPE 评估闸</td>
+        <td>离线 RL 生态 / d3rlpy FQE</td>
+        <td>与模拟器净值相关 ≥0.6 才当闸</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>阶段 3 · 远期</h3>
+  <ul>
+    <li>RD-Agent 式自动因子搜索：需先有稳定 IC 评估闸 + 更大股票池。</li>
+    <li>多步区间预测（T+1..T+3）服务挂单有效期 —— 仍用 LGBM multi-output，不上 TFT。</li>
+    <li>P6 写 web：仅当预测层稳定且决策层在「该交易的 regime」可解释地加分时。</li>
+  </ul>
+</section>
+
+<!-- 10 -->
+<section id="anti">
+  <h2>10. 明确不该做的（踩坑清单）</h2>
+  <table>
+    <thead><tr><th>做法</th><th>为何不该</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>用 Qlib TopkDropout 替换 bandit</td>
+        <td>答错题；破坏单标的独立账户语义</td>
+      </tr>
+      <tr>
+        <td>把 6 股拼成假 CSI 做 qrun 年化 IR 吹牛</td>
+        <td>样本宇宙太小，指标噪声极大，易自我欺骗</td>
+      </tr>
+      <tr>
+        <td>引入全量 Alpha360 + 深度序列模型</td>
+        <td>~1230 样本/股，TFT/Transformer 过拟合期望高（Qlib 自家小数据也常输 LGBM）</td>
+      </tr>
+      <tr>
+        <td>端到端在线 PPO 挂真实账户</td>
+        <td>已有 CQL 负结果 + 项目纪律禁止</td>
+      </tr>
+      <tr>
+        <td><code>ml.sh</code> 强依赖 pyqlib / GPU</td>
+        <td>破坏「本机 CPU 例行」与解耦边界</td>
+      </tr>
+      <tr>
+        <td>丢掉 CQR / 三基线 / human 回放</td>
+        <td>这是 myStock 相对通用量化框架的差异化与诚信底座</td>
+      </tr>
+      <tr>
+        <td>跨币种强行 USD 归一训练</td>
+        <td>与「本币闭环」锁定冲突；且 6 股账户独立无必要</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 11 -->
+<section id="arch">
+  <h2>11. 推荐集成架构（目标态）</h2>
+  <div class="ascii">                    ┌─────────────────────────────┐
+                    │  Qlib 只读沙箱（可选，研究机）  │
+                    │  dump bin · IC 实验 · 模型对照  │
+                    └──────────────┬──────────────┘
+                                   │ 仅「结论/因子名单」回写
+                                   ▼
+┌──────────┐   ┌──────────────────────────────────────────────┐
+│ yfinance │──▶│  mystock/ml 主链路（cron / ml.sh）              │
+│ 富途快照  │   │  features⁺ → Interval+CQR → Policy/Regime    │
+└──────────┘   │       │                    │                 │
+               │       ▼                    ▼                 │
+               │  IC/命中率报告         1h 撮合 + 三基线        │
+               │  多种子 / 分regime      HTML → publish         │
+               └──────────────────────────────────────────────┘
+                                   │
+                                   ▼ 达标后才 P6
+                            web 只读展示（点位/区间）</div>
+
+  <h3>11.1 代码落点建议（不实现，仅地图）</h3>
+  <table>
+    <thead><tr><th>新增/改</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td><code>features.py</code></td><td>Alpha 子集因子；FEATURE_COLS 可配置分组</td></tr>
+      <tr><td><code>metrics.py</code>（新）</td><td>IC / ICIR / Rank IC / 分 regime 净值纯函数</td></tr>
+      <tr><td><code>predictor.py</code></td><td>滚动 fit 接口；输出诊断 dict</td></tr>
+      <tr><td><code>backtest.py</code></td><td>多种子；交易门控；配置矩阵</td></tr>
+      <tr><td><code>report.py</code></td><td>IC 列、方差、regime 拆账</td></tr>
+      <tr><td><code>scripts/ml_qlib_sandbox.sh</code>（可选）</td><td>dump + 调 qlib notebook，默认不进 all</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 12 -->
+<section id="kpi">
+  <h2>12. 验收 KPI（「优化有效」的可操作定义）</h2>
+  <p>避免「换了个酷模型但不可复现」。建议把成功定义成下面<strong>可同时满足</strong>的集合：</p>
+
+  <h3>预测层 KPI</h3>
+  <ul>
+    <li>CQR 测试窗覆盖率 ≥ 目标覆盖率（现 70%）± 合理松弛（≥65%）。</li>
+    <li>平均区间宽度不比当前配置恶化超过 +15%（相对 close）。</li>
+    <li>新增：|IC| 对 high 或 low ret 在 ≥4/6 股显著异于 0（时间序列 t 检验或简单符号稳定）。</li>
+  </ul>
+
+  <h3>决策层 KPI</h3>
+  <ul>
+    <li><strong>条件达标</strong>：在「非强单边」regime 子集上，Bandit 期末 ≥ max(S0, B&amp;H) 的标的数 ↑。</li>
+    <li><strong>不伤牛市</strong>：强趋势段 Bandit 相对 B&amp;H 的落后幅度收窄（门控生效）。</li>
+    <li>多种子：5 seed 下「超越 B&amp;H」结论一致，或明确标为不稳定。</li>
+    <li>永远对照 S0 / human / B&amp;H；不允许只报最优曲线。</li>
+  </ul>
+
+  <h3>工程 KPI</h3>
+  <ul>
+    <li><code>pytest</code> 全绿；新增因子/指标有纯函数单测。</li>
+    <li><code>ml.sh all</code> 本机 CPU 可跑完；Qlib 不进入默认路径。</li>
+    <li>报告自解释：配置行写清 reward / CQR / regime / 特征版本。</li>
+  </ul>
+</section>
+
+<!-- 13 -->
+<section id="refs">
+  <h2>13. 参考与材料</h2>
+  <table>
+    <thead><tr><th>材料</th><th>路径 / 链接</th></tr></thead>
+    <tbody>
+      <tr><td>ML 速览与实验结论</td><td><a href="ML_OVERVIEW.md">docs/ML_OVERVIEW.md</a></td></tr>
+      <tr><td>完整方案</td><td><a href="ML_PLAN.md">docs/ML_PLAN.md</a></td></tr>
+      <tr><td>算法建议清单</td><td><a href="ML_ALGORITHM_PROPOSAL.md">docs/ML_ALGORITHM_PROPOSAL.md</a></td></tr>
+      <tr><td>Qlib 中文介绍</td><td><a href="Qlib中文详细介绍.html">docs/Qlib中文详细介绍.html</a></td></tr>
+      <tr><td>ML 源码</td><td><code>mystock/ml/</code></td></tr>
+      <tr><td>最新例行报告</td><td><code>data/ml/reports/latest.html</code>（2026-07-17）</td></tr>
+      <tr><td>Qlib 上游</td><td><a href="https://github.com/microsoft/qlib" target="_blank" rel="noopener">microsoft/qlib</a>（本地只读 clone）</td></tr>
+      <tr><td>Qlib 论文</td><td><a href="https://arxiv.org/abs/2009.11189" target="_blank" rel="noopener">arXiv:2009.11189</a></td></tr>
+    </tbody>
+  </table>
+
+  <h3>本报告信息边界</h3>
+  <ul>
+    <li>已读：ML 全套 docs、核心 py 模块（config/features/predictor/calibrator/regime/policy/backtest/simulator/offline_rl/report/schema）、最新 HTML 报告口径与总览数字。</li>
+    <li>未重新训练模型；数字以 2026-07-17 产物与 OVERVIEW 历史实验为准。</li>
+    <li>Qlib 侧基于官方文档/README 与先前中文介绍，不修改 qlib 仓库。</li>
+  </ul>
+</section>
+
+<footer class="note">
+  <p>
+    <strong>最终裁决再强调一次：</strong>
+    myStock ML 应继续做「个人限价交易的可验证两层系统」；
+    Qlib 应作为「特征、评估、滚动适应」的方法来源与可选沙箱，
+    而不是替换撮合、账户与决策语义的宿主。
+    下一刀最该砍在 <strong>特征上界 + IC 诊断 + 交易门控 + 多种子诚实报告</strong>，
+    而不是再引入一个端到端黑箱。
+  </p>
+  <p>生成：2026-07-18 · 存放：<code>docs/myStock-ML与Qlib深度调研评估.html</code></p>
+</footer>
+
+</main>
+</div>
+
+<button class="theme-toggle" type="button" onclick="(function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : (cur === 'light' ? 'dark' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'));
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('mystock-doc-theme', next); } catch(e) {}
+})()">切换主题</button>
+
+</body>
+</html>

@@ -1,0 +1,1070 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Microsoft Qlib · 中文详细介绍</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f6;
+    --border: #e3e3e8;
+    --text: #1f2330;
+    --muted: #6b7280;
+    --primary: #0078d4;
+    --primary-dark: #005a9e;
+    --accent: #2c6fbb;
+    --up: #d23a35;
+    --down: #2e8b57;
+    --code-bg: #f5f3ee;
+    --code-text: #2a2a2a;
+    --warn: #b8770b;
+    --ok: #2e8b57;
+  }
+  html[data-theme="dark"] {
+    --bg: #15171d;
+    --surface: #1d2028;
+    --surface-2: #242833;
+    --border: #33384a;
+    --text: #e4e6ee;
+    --muted: #9aa0b0;
+    --primary: #4da3e8;
+    --primary-dark: #0078d4;
+    --accent: #6ea3d6;
+    --code-bg: #1b1e26;
+    --code-text: #e4e6ee;
+    --warn: #e0a93b;
+    --ok: #4cae7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) {
+      --bg: #15171d;
+      --surface: #1d2028;
+      --surface-2: #242833;
+      --border: #33384a;
+      --text: #e4e6ee;
+      --muted: #9aa0b0;
+      --primary: #4da3e8;
+      --primary-dark: #0078d4;
+      --accent: #6ea3d6;
+      --code-bg: #1b1e26;
+      --code-text: #e4e6ee;
+      --warn: #e0a93b;
+      --ok: #4cae7a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7;
+    font-size: 15px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .layout { display: flex; min-height: 100vh; }
+  nav.toc {
+    width: 280px;
+    flex-shrink: 0;
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    padding: 24px 18px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  nav.toc h2 {
+    font-size: 13px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); margin: 24px 0 8px;
+  }
+  nav.toc h2:first-child { margin-top: 0; }
+  nav.toc a {
+    display: block; color: var(--text); padding: 4px 10px;
+    border-radius: 6px; font-size: 14px;
+  }
+  nav.toc a:hover { background: var(--surface-2); text-decoration: none; }
+  nav.toc a.sub { padding-left: 22px; font-size: 13px; color: var(--muted); }
+
+  main {
+    flex: 1; max-width: 980px; padding: 40px 48px 120px; margin: 0 auto;
+  }
+
+  header.hero {
+    border-bottom: 2px solid var(--primary);
+    padding-bottom: 18px; margin-bottom: 32px;
+  }
+  header.hero .badge {
+    display: inline-block; background: var(--primary); color: #fff;
+    font-size: 12px; padding: 2px 10px; border-radius: 999px;
+    letter-spacing: 1px; margin-bottom: 12px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 32px; }
+  header.hero p { margin: 0; color: var(--muted); }
+
+  section { margin-bottom: 56px; scroll-margin-top: 24px; }
+  h2 {
+    font-size: 24px; border-left: 4px solid var(--primary);
+    padding-left: 12px; margin: 0 0 18px;
+  }
+  h3 { font-size: 18px; margin: 28px 0 10px; color: var(--text); }
+  h4 { font-size: 15px; margin: 18px 0 8px; color: var(--accent); }
+
+  p { margin: 10px 0; }
+  ul, ol { margin: 10px 0; padding-left: 24px; }
+  li { margin: 4px 0; }
+
+  .lead {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; margin: 16px 0;
+  }
+
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "JetBrains Mono", monospace;
+    background: var(--code-bg); color: var(--code-text);
+    padding: 1px 6px; border-radius: 4px; font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-text);
+    padding: 14px 16px; border-radius: 8px; overflow-x: auto;
+    border: 1px solid var(--border); font-size: 13px; line-height: 1.55;
+  }
+  pre code { background: transparent; padding: 0; }
+
+  table {
+    width: 100%; border-collapse: collapse; margin: 14px 0;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    overflow: hidden; font-size: 14px;
+  }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td code, th code { white-space: nowrap; }
+
+  .callout {
+    border-left: 4px solid var(--accent); background: var(--surface);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 14px 0;
+  }
+  .callout.warn { border-color: var(--warn); }
+  .callout.danger { border-color: var(--up); }
+  .callout.ok { border-color: var(--ok); }
+  .callout .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px;
+    text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px;
+  }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.danger .tag { color: var(--up); }
+  .callout.ok .tag { color: var(--ok); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.toc { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 24px 18px 80px; }
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  }
+
+  .ascii {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    white-space: pre; font-size: 12.5px; line-height: 1.5;
+    background: var(--code-bg); color: var(--code-text);
+    padding: 14px; border-radius: 8px; overflow-x: auto;
+    border: 1px solid var(--border);
+  }
+
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 12px; background: var(--surface-2); border: 1px solid var(--border);
+    color: var(--muted); margin: 2px 2px;
+  }
+
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 16px;
+  }
+  .card h4 { margin: 0 0 6px; }
+  .card p { margin: 0; color: var(--muted); font-size: 13.5px; }
+
+  .theme-toggle {
+    position: fixed; right: 20px; bottom: 20px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 14px; cursor: pointer;
+    color: var(--text); font-size: 13px; box-shadow: 0 2px 8px rgba(0,0,0,.08);
+    z-index: 100;
+  }
+  .theme-toggle:hover { background: var(--surface-2); }
+
+  .file-block {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 14px 16px; margin: 10px 0;
+  }
+  .file-block .path {
+    font-family: "SF Mono", Menlo, monospace; font-weight: 600;
+    color: var(--primary); font-size: 13px;
+  }
+  .file-block .desc { color: var(--muted); font-size: 13px; margin-top: 2px; }
+
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px;
+  }
+  footer.note {
+    margin-top: 48px; padding-top: 18px; border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 13px;
+  }
+</style>
+</head>
+<body>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("qlib-doc-theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+
+<div class="layout">
+
+<nav class="toc">
+  <h2>总览</h2>
+  <a href="#overview">1. 项目是什么</a>
+  <a href="#why">2. 为什么用 Qlib</a>
+  <a href="#challenges">3. 量化研究核心难题</a>
+
+  <h2>架构</h2>
+  <a href="#framework">4. 整体架构</a>
+  <a href="#layers">5. 四层结构详解</a>
+  <a href="#repo">6. 源码目录结构</a>
+
+  <h2>上手</h2>
+  <a href="#install">7. 安装与环境</a>
+  <a href="#data">8. 数据准备</a>
+  <a href="#quickstart">9. 快速开始</a>
+  <a href="#workflow">10. Workflow 与 qrun</a>
+
+  <h2>核心模块</h2>
+  <a href="#data-layer">11. 数据层</a>
+  <a href="#model">12. 模型与基准</a>
+  <a href="#strategy">13. 策略与回测</a>
+  <a href="#rl">14. 强化学习</a>
+  <a href="#online">15. 在线服务</a>
+  <a href="#analysis">16. 分析与指标</a>
+
+  <h2>扩展</h2>
+  <a href="#dataset-zoo">17. 数据集 Zoo</a>
+  <a href="#dynamic">18. 市场动态适应</a>
+  <a href="#rdagent">19. RD-Agent 联动</a>
+  <a href="#faq">20. 注意与 FAQ</a>
+  <a href="#refs">21. 参考链接</a>
+</nav>
+
+<main>
+
+<header class="hero">
+  <span class="badge">MICROSOFT · OPEN SOURCE</span>
+  <h1>Qlib 中文详细介绍</h1>
+  <p>AI-oriented Quantitative Investment Platform · 面向 AI 的量化投资平台</p>
+  <div class="meta-row">
+    <span class="pill">本地路径：/Users/kk/Work/Workpace/GitHub/qlib</span>
+    <span class="pill">PyPI：pyqlib</span>
+    <span class="pill">Python 3.8–3.12</span>
+    <span class="pill">License：MIT</span>
+  </div>
+</header>
+
+<!-- 1 -->
+<section id="overview">
+  <h2>1. 项目是什么</h2>
+  <div class="lead">
+    <strong>Qlib</strong> 是微软亚洲研究院开源的<strong>面向 AI 的量化投资平台</strong>。
+    它把「从想法探索到生产落地」整条量化投研链路封装成可组合的模块：数据处理、特征工程、
+    模型训练、策略生成、回测执行、结果分析、在线滚动更新与订单执行，一站式覆盖。
+  </div>
+  <p>官方定位（摘要）：</p>
+  <ul>
+    <li>用 AI 技术挖掘量化投资的潜力，赋能研究，创造价值；</li>
+    <li>支持多种机器学习范式：<strong>监督学习</strong>、<strong>市场动态建模</strong>、<strong>强化学习</strong>；</li>
+    <li>覆盖完整 ML Pipeline：数据处理 → 模型训练 → 回测评估；</li>
+    <li>覆盖完整量化链路：Alpha 挖掘 → 风险建模 → 组合优化 → 订单执行。</li>
+  </ul>
+  <p>学术论文：
+    <a href="https://arxiv.org/abs/2009.11189" target="_blank" rel="noopener">Qlib: An AI-oriented Quantitative Investment Platform</a>（arXiv:2009.11189）。
+  </p>
+  <p>安装包名是 <code>pyqlib</code>（不是 <code>qlib</code>），导入时仍写 <code>import qlib</code>。</p>
+</section>
+
+<!-- 2 -->
+<section id="why">
+  <h2>2. 为什么用 Qlib</h2>
+  <div class="grid-2">
+    <div class="card">
+      <h4>研究友好</h4>
+      <p>用 YAML 配置 + <code>qrun</code> 就能跑通「特征 → 训练 → 回测 → 分析」全流程；也可用代码自由拼装。</p>
+    </div>
+    <div class="card">
+      <h4>高性能数据层</h4>
+      <p>自研 <code>.bin</code> 二进制存储 + 表达式引擎，适合海量股票截面/时序计算；支持日频与 1 分钟高频。</p>
+    </div>
+    <div class="card">
+      <h4>模型 Zoo 丰富</h4>
+      <p>内置 LightGBM / XGBoost / LSTM / Transformer / HIST 等 20+ 量化模型实现与可复现 benchmark。</p>
+    </div>
+    <div class="card">
+      <h4>生产链路</h4>
+      <p>支持实验记录（Recorder/MLflow）、在线 serving、模型自动滚动更新、RL 订单执行等生产向能力。</p>
+    </div>
+  </div>
+  <div class="callout ok" style="margin-top:16px">
+    <span class="tag">适合场景</span>
+    个人/团队量化研究、Alpha 因子挖掘与对比、组合回测、高频与订单执行 RL、
+    需要可复现论文实验的学术/工程团队。
+  </div>
+  <div class="callout warn">
+    <span class="tag">不适合 / 需注意</span>
+    官方公开数据来自 Yahoo 等公开源，质量有限；严肃交易请换自有高质量数据。
+    本平台是研究框架，不是券商交易终端，也不提供投资建议。
+  </div>
+</section>
+
+<!-- 3 -->
+<section id="challenges">
+  <h2>3. 量化研究核心难题与 Qlib 的解法</h2>
+  <p>金融场景与普通 ML 任务差异很大。Qlib 针对几类关键挑战给出了可运行方案：</p>
+  <table>
+    <thead>
+      <tr><th>挑战</th><th>问题本质</th><th>Qlib 中的解法</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>预测 / Alpha 挖掘</strong></td>
+        <td>金融数据量大、异构、非线性，信号难挖</td>
+        <td>Quant Model Zoo（树模型 / 深度学习 / 图模型等）+ Alpha158/360 特征集</td>
+      </tr>
+      <tr>
+        <td><strong>市场非平稳</strong></td>
+        <td>训练分布与未来测试分布漂移（concept drift）</td>
+        <td>Rolling 重训、DDG-DA 等动态适应方案（<code>examples/benchmarks_dynamic</code>）</td>
+      </tr>
+      <tr>
+        <td><strong>连续决策</strong></td>
+        <td>交易是序列决策，不是单次预测</td>
+        <td>RL 框架 + 订单执行（TWAP / PPO / OPDS 等）</td>
+      </tr>
+      <tr>
+        <td><strong>多层决策嵌套</strong></td>
+        <td>日度组合管理 + 日内订单执行需协同</td>
+        <td>Nested Decision / NestedExecutor 框架</td>
+      </tr>
+      <tr>
+        <td><strong>可复现与追踪</strong></td>
+        <td>实验难复现、难对比</td>
+        <td>Workflow + Recorder（MLflow）统一记录模型、预测、回测产物</td>
+      </tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- 4 -->
+<section id="framework">
+  <h2>4. 整体架构</h2>
+  <p>Qlib 采用<strong>松耦合模块</strong>设计：每一层、每个组件都可以单独使用，也可以拼成完整投研流水线。</p>
+  <div class="ascii">┌─────────────────────────────────────────────────────────────┐
+│                    Interface 层（界面 / 分析）                 │
+│         Analyser · 图形报告 · CLI(qrun) · Notebook           │
+├─────────────────────────────────────────────────────────────┤
+│                    Workflow 层（投研全流程）                   │
+│  Information Extractor → Forecast Model → Decision Generator │
+│           → Execution Env（可嵌套 Strategy / Executor）        │
+├─────────────────────────────────────────────────────────────┤
+│                 Learning Framework 层（学习范式）              │
+│        监督学习（Forecast Model） · 强化学习（Trading Agent）   │
+├─────────────────────────────────────────────────────────────┤
+│                   Infrastructure 层（基础设施）                │
+│          DataServer（.bin / 表达式） · Trainer · Cache        │
+└─────────────────────────────────────────────────────────────┘</div>
+  <p>高层抽象图见仓库：<code>docs/_static/img/framework-abstract.jpg</code>；
+    更细的框架图：<code>docs/_static/img/framework.svg</code>。</p>
+</section>
+
+<!-- 5 -->
+<section id="layers">
+  <h2>5. 四层结构详解</h2>
+
+  <h3>5.1 Infrastructure（基础设施）</h3>
+  <ul>
+    <li><strong>DataServer</strong>：高性能读写原始行情/因子，表达式引擎支持 <code>$close</code>、<code>Ref($close, 1)</code>、<code>Mean($close, 3)</code> 等公式化 Alpha。</li>
+    <li><strong>Trainer</strong>：灵活控制训练过程，便于算法自定义训练循环。</li>
+    <li>底层滚动/扩展窗口算子用 Cython 加速（<code>qlib/data/_libs/*.pyx</code>）。</li>
+  </ul>
+
+  <h3>5.2 Learning Framework（学习框架）</h3>
+  <ul>
+    <li><strong>监督学习</strong>：训练 Forecast Model，输出 Alpha / 风险等信号。</li>
+    <li><strong>强化学习</strong>：训练 Trading Agent / Policy，端到端生成交易决策。</li>
+    <li>可与 Workflow 共享 Information Extractor、Execution Env；支持 NestedExecutor 做多层策略联合优化。</li>
+  </ul>
+
+  <h3>5.3 Workflow（工作流）</h3>
+  <ol>
+    <li><strong>Information Extractor</strong>：抽特征 / 标签；</li>
+    <li><strong>Forecast Model</strong>：产生预测信号；</li>
+    <li><strong>Decision Generator</strong>：根据信号生成组合/订单（或 RL Policy 直接决策）；</li>
+    <li><strong>Execution Env</strong>：模拟/对接市场执行；</li>
+    <li>多层 Strategy + Executor 可嵌套（例如：日度组合策略里嵌套日内订单执行策略）。</li>
+  </ol>
+
+  <h3>5.4 Interface（接口）</h3>
+  <ul>
+    <li><code>qrun</code> 配置驱动自动执行；</li>
+    <li>Python API 代码驱动自定义流程；</li>
+    <li>Analyser 输出 IC、累计收益、回撤、多空组合等分析报告。</li>
+  </ul>
+</section>
+
+<!-- 6 -->
+<section id="repo">
+  <h2>6. 源码目录结构</h2>
+  <p>基于本地克隆路径 <code>/Users/kk/Work/Workpace/GitHub/qlib</code>：</p>
+
+  <div class="file-block">
+    <div class="path">qlib/</div>
+    <div class="desc">核心 Python 包</div>
+  </div>
+  <table>
+    <thead><tr><th>路径</th><th>职责</th></tr></thead>
+    <tbody>
+      <tr><td><code>qlib/data/</code></td><td>数据 API、表达式引擎、Dataset/Handler/Loader、PIT、存储后端</td></tr>
+      <tr><td><code>qlib/model/</code></td><td>模型基类、Trainer、风险模型、集成、可解释性、元学习</td></tr>
+      <tr><td><code>qlib/contrib/model/</code></td><td>社区/官方贡献的具体模型实现（LGBM、LSTM、Transformer…）</td></tr>
+      <tr><td><code>qlib/contrib/strategy/</code></td><td>TopkDropout 等常用策略</td></tr>
+      <tr><td><code>qlib/contrib/data/</code></td><td>Alpha158 / Alpha360 等 DataHandler</td></tr>
+      <tr><td><code>qlib/backtest/</code></td><td>账户、持仓、交易所模拟、执行器、收益归因</td></tr>
+      <tr><td><code>qlib/workflow/</code></td><td>实验管理、Recorder、Online 更新、Task</td></tr>
+      <tr><td><code>qlib/rl/</code></td><td>强化学习框架与订单执行相关模块</td></tr>
+      <tr><td><code>qlib/cli/</code></td><td>命令行入口：<code>qrun</code>、数据下载等</td></tr>
+      <tr><td><code>qlib/strategy/</code></td><td>策略基类</td></tr>
+    </tbody>
+  </table>
+
+  <div class="file-block">
+    <div class="path">examples/</div>
+    <div class="desc">可运行示例与 benchmark</div>
+  </div>
+  <ul>
+    <li><code>examples/benchmarks/</code> — 各模型配置与性能对照</li>
+    <li><code>examples/benchmarks_dynamic/</code> — 市场动态适应</li>
+    <li><code>examples/workflow_by_code.py</code> / <code>.ipynb</code> — 代码驱动工作流</li>
+    <li><code>examples/highfreq/</code> — 高频数据处理</li>
+    <li><code>examples/rl_order_execution/</code> — RL 订单执行</li>
+    <li><code>examples/online_srv/</code> — 在线服务与滚动</li>
+    <li><code>examples/tutorial/</code> — Notebook 教程</li>
+  </ul>
+
+  <div class="file-block">
+    <div class="path">scripts/</div>
+    <div class="desc">数据下载、CSV→bin 转换、健康检查、各市场采集器</div>
+  </div>
+  <ul>
+    <li><code>scripts/get_data.py</code> / <code>dump_bin.py</code> — 获取与转换数据</li>
+    <li><code>scripts/data_collector/</code> — Yahoo、A 股指数、美股、基金、加密货币等采集脚本</li>
+    <li><code>scripts/check_data_health.py</code> — 数据健康检查</li>
+  </ul>
+
+  <div class="file-block">
+    <div class="path">docs/</div>
+    <div class="desc">Sphinx 英文文档源（本文件为中文 HTML 补充介绍）</div>
+  </div>
+</section>
+
+<!-- 7 -->
+<section id="install">
+  <h2>7. 安装与环境</h2>
+
+  <h3>7.1 支持的 Python 版本</h3>
+  <table>
+    <thead>
+      <tr><th>Python</th><th>pip 安装</th><th>源码安装</th><th>绘图分析</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>3.8 – 3.12</td><td>✔</td><td>✔</td><td>✔</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <span class="tag">建议</span>
+    使用 <strong>Conda</strong> 管理环境。部分机器上系统 Python 缺少头文件会导致源码编译失败。
+  </div>
+
+  <h3>7.2 pip 安装稳定版</h3>
+  <pre><code>pip install pyqlib</code></pre>
+  <p>这会安装 PyPI 上最新<strong>稳定版</strong>。若要跟 main 分支最新功能，请从源码安装。</p>
+
+  <h3>7.3 从源码安装（推荐研究 / 跟仓库）</h3>
+  <pre><code># 依赖
+pip install numpy
+pip install --upgrade cython
+
+# 克隆（你本地已完成）
+# git clone https://github.com/microsoft/qlib.git && cd qlib
+
+cd /Users/kk/Work/Workpace/GitHub/qlib
+pip install .                 # 普通安装
+# 或开发模式（推荐改代码时用）
+pip install -e ".[dev]"</code></pre>
+
+  <h3>7.4 分析依赖（图形报告）</h3>
+  <pre><code>python -m pip install ".[analysis]"</code></pre>
+
+  <h3>7.5 macOS Apple Silicon 提示</h3>
+  <p>M 系列芯片编译 LightGBM 可能缺 OpenMP：</p>
+  <pre><code>brew install libomp
+pip install .</code></pre>
+
+  <h3>7.6 Docker</h3>
+  <pre><code>docker pull pyqlib/qlib_image_stable:stable
+docker run -it --name qlib_dev -v /path/to/work:/app pyqlib/qlib_image_stable:stable</code></pre>
+</section>
+
+<!-- 8 -->
+<section id="data">
+  <h2>8. 数据准备</h2>
+
+  <div class="callout warn">
+    <span class="tag">重要</span>
+    官方数据集因数据安全策略曾暂时下线。社区可替代源示例：
+    <a href="https://github.com/chenditc/investment_data/releases" target="_blank" rel="noopener">chenditc/investment_data</a>。
+    公开 Yahoo 数据质量有限，生产请换自有数据。
+  </div>
+
+  <h3>8.1 社区打包数据（示例）</h3>
+  <pre><code>wget https://github.com/chenditc/investment_data/releases/latest/download/qlib_bin.tar.gz
+mkdir -p ~/.qlib/qlib_data/cn_data
+tar -zxvf qlib_bin.tar.gz -C ~/.qlib/qlib_data/cn_data --strip-components=1
+rm -f qlib_bin.tar.gz</code></pre>
+
+  <h3>8.2 官方 CLI 下载（恢复后可用）</h3>
+  <pre><code># 日频 A 股
+python -m qlib.cli.data qlib_data --target_dir ~/.qlib/qlib_data/cn_data --region cn
+
+# 1 分钟 A 股
+python -m qlib.cli.data qlib_data --target_dir ~/.qlib/qlib_data/cn_data_1min --region cn --interval 1min
+
+# 美股
+python scripts/get_data.py qlib_data --target_dir ~/.qlib/qlib_data/us_data --region us</code></pre>
+
+  <h3>8.3 数据格式要点</h3>
+  <ul>
+    <li>Qlib 使用专用 <code>.bin</code> 二进制格式（科学计算友好，按字段/标的组织）。</li>
+    <li>价格一般为<strong>复权价</strong>；Qlib 会把每只股票首个交易日价格归一到 1。</li>
+    <li>可用 <code>$close / $factor</code> 还原近似原始成交价。</li>
+    <li>自有 CSV 可用 <code>scripts/dump_bin.py</code> 转为 Qlib 格式。</li>
+  </ul>
+
+  <h3>8.4 健康检查</h3>
+  <pre><code>python scripts/check_data_health.py check_data --qlib_dir ~/.qlib/qlib_data/cn_data</code></pre>
+
+  <h3>8.5 日频数据自动更新（Yahoo 采集器）</h3>
+  <pre><code># 手动补一段日期
+python scripts/data_collector/yahoo/collector.py update_data_to_bin \
+  --qlib_data_1d_dir ~/.qlib/qlib_data/cn_data \
+  --trading_date 2021-05-25 --end_date 2021-06-01</code></pre>
+  <p class="callout warn" style="margin-top:12px">
+    <span class="tag">注意</span>
+    不能在官方已裁剪的离线包上直接增量更新。若要增量，需用 Yahoo collector 从零拉全量再更新。
+  </p>
+</section>
+
+<!-- 9 -->
+<section id="quickstart">
+  <h2>9. 快速开始</h2>
+
+  <h3>9.1 初始化并读取数据</h3>
+  <pre><code>import qlib
+from qlib.data import D
+from qlib.constant import REG_CN
+
+qlib.init(provider_uri="~/.qlib/qlib_data/cn_data", region=REG_CN)
+
+# 交易日历
+print(D.calendar(start_time="2010-01-01", end_time="2017-12-31", freq="day")[:2])
+
+# 股票池
+instruments = D.instruments("csi500")
+print(D.list_instruments(instruments=instruments,
+                         start_time="2010-01-01",
+                         end_time="2017-12-31",
+                         as_list=True)[:6])
+
+# 特征 / 表达式
+fields = ["$close", "$volume", "Ref($close, 1)", "Mean($close, 3)", "$high-$low"]
+print(D.features(["SH600000"], fields,
+                 start_time="2010-01-01", end_time="2017-12-31", freq="day").head())</code></pre>
+
+  <h3>9.2 一条命令跑通 LightGBM 全流程</h3>
+  <pre><code>cd /Users/kk/Work/Workpace/GitHub/qlib/examples
+# 注意：不要在包含顶层包名冲突的目录下乱跑；官方建议在 examples 下执行
+qrun benchmarks/LightGBM/workflow_config_lightgbm_Alpha158.yaml</code></pre>
+
+  <p>典型输出（示意，数值随数据版本变化）：</p>
+  <pre><code>'The following are analysis results of the excess return without cost.'
+                       risk
+mean               0.000708
+std                0.005626
+annualized_return  0.178316
+information_ratio  1.996555
+max_drawdown      -0.081806</code></pre>
+
+  <h3>9.3 代码驱动工作流</h3>
+  <pre><code># Notebook
+jupyter notebook examples/workflow_by_code.ipynb
+
+# 或纯 Python
+python examples/workflow_by_code.py</code></pre>
+</section>
+
+<!-- 10 -->
+<section id="workflow">
+  <h2>10. Workflow 与 qrun</h2>
+  <p><code>qrun</code> 根据 YAML 自动执行一次完整 <strong>execution</strong>：</p>
+  <ol>
+    <li><strong>Data</strong>：加载 → 处理 → 按时间切分 train/valid/test</li>
+    <li><strong>Model</strong>：训练、推理、保存/加载</li>
+    <li><strong>Evaluation</strong>：信号分析 + 组合回测</li>
+  </ol>
+  <p>全程产物由 <strong>Recorder</strong>（常对接 MLflow）记录，便于对比实验。</p>
+
+  <h3>10.1 典型配置结构（LightGBM + Alpha158）</h3>
+  <pre><code>qlib_init:
+    provider_uri: "~/.qlib/qlib_data/cn_data"
+    region: cn
+market: &amp;market csi300
+benchmark: &amp;benchmark SH000300
+
+data_handler_config: &amp;data_handler_config
+    start_time: 2008-01-01
+    end_time: 2020-08-01
+    fit_start_time: 2008-01-01
+    fit_end_time: 2014-12-31
+    instruments: *market
+
+task:
+    model:
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs: { loss: mse, learning_rate: 0.2, ... }
+    dataset:
+        class: DatasetH
+        module_path: qlib.data.dataset
+        kwargs:
+            handler:
+                class: Alpha158
+                module_path: qlib.contrib.data.handler
+                kwargs: *data_handler_config
+            segments:
+                train: [2008-01-01, 2014-12-31]
+                valid: [2015-01-01, 2016-12-31]
+                test:  [2017-01-01, 2020-08-01]
+    record:
+        - class: SignalRecord      # 保存预测
+        - class: SigAnaRecord      # IC 等信号分析
+        - class: PortAnaRecord     # 组合回测分析</code></pre>
+
+  <h3>10.2 调试模式</h3>
+  <pre><code>python -m pdb qlib/cli/run.py examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158.yaml</code></pre>
+
+  <h3>10.3 自定义模型接入</h3>
+  <p>实现 Qlib 模型接口（通常继承 <code>qlib.model.base.Model</code>，实现 <code>fit</code> / <code>predict</code>），
+    在 YAML 里把 <code>class</code> / <code>module_path</code> 指到你的模块即可。详见文档
+    <em>Custom Model Integration</em>。</p>
+</section>
+
+<!-- 11 -->
+<section id="data-layer">
+  <h2>11. 数据层深入</h2>
+  <p>典型数据流水线：</p>
+  <div class="ascii">原始 CSV / 采集源
+      │  dump_bin / collector
+      ▼
+  .bin 存储（OHLCV 等基础字段）
+      │  表达式引擎（Data Loader）
+      ▼
+  公式化特征（如 Ref($close,60)/$close）
+      │  Processor（Data Handler）
+      ▼
+  清洗 / 标准化 / 去极值
+      │  Dataset
+      ▼
+  模型可用的 train/valid/test 张量或 DataFrame</div>
+
+  <h3>11.1 核心抽象</h3>
+  <table>
+    <thead><tr><th>组件</th><th>作用</th></tr></thead>
+    <tbody>
+      <tr><td><code>D</code>（Data API）</td><td>日历、股票池、特征查询的统一入口</td></tr>
+      <tr><td><strong>Expression Engine</strong></td><td>用类公式 DSL 写 Alpha；算子见 <code>qlib/data/ops.py</code></td></tr>
+      <tr><td><strong>Data Loader</strong></td><td>按表达式从存储取数</td></tr>
+      <tr><td><strong>Data Handler</strong></td><td>组织特征/标签，挂 Processor 做复杂预处理</td></tr>
+      <tr><td><strong>Processor</strong></td><td>归一化、缺失值、截面 rank 等（表达式不好表达的逻辑）</td></tr>
+      <tr><td><strong>Dataset</strong></td><td>按模型需要切分、采样、构造输入</td></tr>
+      <tr><td><strong>Cache</strong></td><td>表达式与处理结果缓存，加速反复实验</td></tr>
+      <tr><td><strong>PIT</strong></td><td>Point-in-Time 数据库，避免财报等未来函数</td></tr>
+    </tbody>
+  </table>
+
+  <h3>11.2 离线模式 vs 在线模式</h3>
+  <ul>
+    <li><strong>Offline（默认）</strong>：本地读 <code>.bin</code>，适合单机研究。</li>
+    <li><strong>Online</strong>：可部署数据服务，多客户端共享；适合团队/生产。</li>
+  </ul>
+</section>
+
+<!-- 12 -->
+<section id="model">
+  <h2>12. 模型与 Benchmark Zoo</h2>
+  <p>预测目标通常是：每天给全市场（或股票池）每只股票打分，作为 Alpha；
+    再按分数构建组合评估收益。</p>
+
+  <h3>12.1 已收录模型（节选）</h3>
+  <div class="meta-row">
+    <span class="pill">LightGBM</span>
+    <span class="pill">XGBoost</span>
+    <span class="pill">CatBoost</span>
+    <span class="pill">Linear / MLP</span>
+    <span class="pill">LSTM / GRU / ALSTM</span>
+    <span class="pill">Transformer / Localformer</span>
+    <span class="pill">GATs</span>
+    <span class="pill">TabNet / TFT / TCN</span>
+    <span class="pill">TRA / TCTS</span>
+    <span class="pill">DoubleEnsemble</span>
+    <span class="pill">HIST / IGMTF</span>
+    <span class="pill">ADARNN / ADD</span>
+    <span class="pill">SFM / KRNN / Sandwich</span>
+  </div>
+
+  <h3>12.2 如何跑单个模型</h3>
+  <pre><code># 方式 1：qrun + 配置
+cd examples
+qrun benchmarks/LightGBM/workflow_config_lightgbm_Alpha158.yaml
+
+# 方式 2：批量脚本
+python examples/run_all_model.py run --models=lightgbm
+
+# 方式 3：跑全部模型 N 次（目前主要支持 Linux）
+python examples/run_all_model.py run 10</code></pre>
+
+  <h3>12.3 CSI300 · Alpha158 上部分结果（官方 benchmark，约 20 次随机种子均值）</h3>
+  <table>
+    <thead>
+      <tr>
+        <th>模型</th><th>IC</th><th>ICIR</th>
+        <th>年化收益</th><th>IR</th><th>最大回撤</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>DoubleEnsemble</td><td>0.0521</td><td>0.4223</td><td>0.1158</td><td>1.3432</td><td>-0.0920</td></tr>
+      <tr><td>LightGBM</td><td>0.0448</td><td>0.3660</td><td>0.0901</td><td>1.0164</td><td>-0.1038</td></tr>
+      <tr><td>XGBoost</td><td>0.0498</td><td>0.3779</td><td>0.0780</td><td>0.9070</td><td>-0.1168</td></tr>
+      <tr><td>TRA</td><td>0.0440</td><td>0.3535</td><td>0.0718</td><td>1.0835</td><td>-0.0760</td></tr>
+      <tr><td>MLP</td><td>0.0376</td><td>0.2846</td><td>0.0895</td><td>1.1408</td><td>-0.1103</td></tr>
+      <tr><td>Localformer</td><td>0.0356</td><td>0.2756</td><td>0.0438</td><td>0.6600</td><td>-0.0952</td></tr>
+    </tbody>
+  </table>
+  <div class="callout">
+    <span class="tag">解读</span>
+    表格展示的是「整条 workflow」的表现，不是裸模型。不同数据版本（v1/v2）、回测引擎版本会导致数字变化。
+    完整表见 <code>examples/benchmarks/README.md</code>。
+  </div>
+</section>
+
+<!-- 13 -->
+<section id="strategy">
+  <h2>13. 策略与回测</h2>
+
+  <h3>13.1 常用策略：TopkDropoutStrategy</h3>
+  <p>每日根据预测分数选 Top-K 股票持有；同时强制换掉得分最低的 N 只（n_drop），控制换手。</p>
+  <pre><code>strategy:
+    class: TopkDropoutStrategy
+    module_path: qlib.contrib.strategy
+    kwargs:
+        signal: &lt;PRED&gt;
+        topk: 50
+        n_drop: 5</code></pre>
+
+  <h3>13.2 回测关键参数</h3>
+  <table>
+    <thead><tr><th>参数</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td><code>account</code></td><td>初始资金</td></tr>
+      <tr><td><code>benchmark</code></td><td>基准（如 SH000300）</td></tr>
+      <tr><td><code>limit_threshold</code></td><td>涨跌停阈值（A 股常 0.095）</td></tr>
+      <tr><td><code>deal_price</code></td><td>成交价字段（如 close）</td></tr>
+      <tr><td><code>open_cost</code> / <code>close_cost</code></td><td>买卖费率</td></tr>
+      <tr><td><code>min_cost</code></td><td>最低交易成本</td></tr>
+    </tbody>
+  </table>
+
+  <h3>13.3 回测引擎模块</h3>
+  <ul>
+    <li><code>qlib/backtest/exchange.py</code> — 交易所约束（涨跌停、停牌、成本）</li>
+    <li><code>qlib/backtest/account.py</code> / <code>position.py</code> — 账户与持仓</li>
+    <li><code>qlib/backtest/executor.py</code> — 执行循环</li>
+    <li><code>qlib/backtest/report.py</code> — 报告</li>
+  </ul>
+
+  <h3>13.4 组合优化</h3>
+  <p><code>examples/portfolio/</code> 提供增强指数等 planning-based 组合优化示例；
+    另有风险模型相关模块在 <code>qlib/model/riskmodel/</code>。</p>
+</section>
+
+<!-- 14 -->
+<section id="rl">
+  <h2>14. 强化学习</h2>
+  <p>Qlib 的 RL 用于建模<strong>连续投资决策</strong>，尤其是<strong>订单执行（Order Execution）</strong>场景：
+    在给定母单下，学习如何拆单、择时，以最小化冲击成本 / 跟踪误差等。</p>
+
+  <h3>14.1 场景与基线</h3>
+  <table>
+    <thead><tr><th>方法</th><th>说明</th></tr></thead>
+    <tbody>
+      <tr><td>TWAP</td><td>时间加权平均基准</td></tr>
+      <tr><td>PPO</td><td>IJCAI 2020 端到端最优交易执行框架</td></tr>
+      <tr><td>OPDS</td><td>AAAI 2021 Oracle Policy Distillation</td></tr>
+    </tbody>
+  </table>
+  <p>示例目录：<code>examples/rl_order_execution/</code>；文档：
+    <a href="https://qlib.readthedocs.io/en/latest/component/rl.html" target="_blank" rel="noopener">RL Component</a>。</p>
+
+  <h3>14.2 框架特点</h3>
+  <ul>
+    <li>用 Workflow 的 Execution Env 构造 RL 环境；</li>
+    <li>支持 NestedExecutor，可把「订单执行策略」嵌进「组合管理策略」联合优化；</li>
+    <li>核心代码：<code>qlib/rl/</code>（simulator、trainer、reward、order_execution…）。</li>
+  </ul>
+</section>
+
+<!-- 15 -->
+<section id="online">
+  <h2>15. 在线服务与模型滚动</h2>
+  <p>研究模型最终要面对「每天新数据到来」的生产场景。Qlib 提供：</p>
+  <ul>
+    <li><strong>Online Serving</strong>：在线预测更新；</li>
+    <li><strong>Automatic Model Rolling</strong>：按时间窗口滚动重训 / 更新；</li>
+    <li>示例：<code>examples/online_srv/</code>（<code>update_online_pred.py</code>、<code>rolling_online_management.py</code> 等）。</li>
+  </ul>
+  <p>相关模块：<code>qlib/workflow/online/</code>、<code>qlib/contrib/online/</code>、<code>qlib/contrib/rolling/</code>。</p>
+</section>
+
+<!-- 16 -->
+<section id="analysis">
+  <h2>16. 分析与评价指标</h2>
+
+  <h3>16.1 信号类指标（预测好不好）</h3>
+  <table>
+    <thead><tr><th>指标</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td><strong>IC</strong></td><td>预测值与未来收益的截面相关系数（Pearson）</td></tr>
+      <tr><td><strong>ICIR</strong></td><td>IC 均值 / IC 标准差，衡量信号稳定性</td></tr>
+      <tr><td><strong>Rank IC</strong></td><td>用排序相关（Spearman 思想），对异常值更稳健</td></tr>
+      <tr><td><strong>Rank ICIR</strong></td><td>Rank IC 的信息比率</td></tr>
+    </tbody>
+  </table>
+
+  <h3>16.2 组合类指标（策略赚不赚钱）</h3>
+  <table>
+    <thead><tr><th>指标</th><th>含义</th></tr></thead>
+    <tbody>
+      <tr><td><strong>Annualized Return</strong></td><td>年化超额/策略收益</td></tr>
+      <tr><td><strong>Information Ratio (IR)</strong></td><td>超额收益均值 / 波动，类似夏普但相对基准</td></tr>
+      <tr><td><strong>Max Drawdown</strong></td><td>最大回撤</td></tr>
+      <tr><td>with / without cost</td><td>是否计入交易成本的两套结果</td></tr>
+    </tbody>
+  </table>
+
+  <h3>16.3 常见分析图</h3>
+  <ul>
+    <li>分组累计收益、多空收益分布</li>
+    <li>IC 时序 / 月度 IC / IC 分布</li>
+    <li>预测自相关（换手与信号衰减）</li>
+    <li>组合净值、回撤、风险分解</li>
+  </ul>
+  <p>图表示例位于 <code>docs/_static/img/analysis/</code>；交互分析可跑
+    <code>examples/workflow_by_code.ipynb</code>（需安装 <code>[analysis]</code> 依赖）。</p>
+</section>
+
+<!-- 17 -->
+<section id="dataset-zoo">
+  <h2>17. 数据集 Zoo</h2>
+  <table>
+    <thead>
+      <tr><th>数据集</th><th>美股</th><th>A 股</th><th>特点</th></tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Alpha158</strong></td><td>✔</td><td>✔</td>
+        <td>表格型；约 158 维人工/半自动特征；特征间空间关系弱，偏特征工程</td>
+      </tr>
+      <tr>
+        <td><strong>Alpha360</strong></td><td>✔</td><td>✔</td>
+        <td>原始价量为主；时间维空间关系强，更适合序列/深度模型</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>实现位置：<code>qlib/contrib/data/handler.py</code>。自定义数据集教程见文档
+    <em>Building Formulaic Alphas</em>。</p>
+  <p>另有高频（1min）、orderbook、基金、加密货币等示例，见 <code>examples/</code> 与
+    <code>scripts/data_collector/</code>。</p>
+</section>
+
+<!-- 18 -->
+<section id="dynamic">
+  <h2>18. 市场动态适应</h2>
+  <p>金融市场非平稳：训练集上学到的模式可能在未来失效。Qlib 提供：</p>
+  <ul>
+    <li><strong>Rolling Retraining</strong>：滚动窗口重训基线（<code>examples/benchmarks_dynamic/baseline/</code>）</li>
+    <li><strong>DDG-DA</strong>：AAAI 2022，基于元学习/分布自适应的方法
+      （<code>examples/benchmarks_dynamic/DDG-DA/</code>）</li>
+  </ul>
+  <p>元学习相关代码：<code>qlib/model/meta/</code>、<code>qlib/contrib/meta/</code>。</p>
+</section>
+
+<!-- 19 -->
+<section id="rdagent">
+  <h2>19. RD-Agent 联动（最新方向）</h2>
+  <div class="lead">
+    <strong>RD-Agent</strong> 是微软开源的 LLM 驱动自主研发 Agent，可与 Qlib 结合做
+    <strong>自动化因子挖掘</strong>与<strong>模型优化</strong>，朝「自动量化工厂」演进。
+  </div>
+  <ul>
+    <li>仓库：<a href="https://github.com/microsoft/RD-Agent" target="_blank" rel="noopener">microsoft/RD-Agent</a></li>
+    <li>论文：<a href="https://arxiv.org/abs/2505.15155" target="_blank" rel="noopener">R&amp;D-Agent-Quant</a>（arXiv:2505.15155）</li>
+    <li>能力：从研报挖因子、量化因子搜索、模型超参/结构优化等</li>
+  </ul>
+  <p>若你的目标是「让 AI 帮写因子 / 调模型」，应同时关注 Qlib（执行与回测底座）+ RD-Agent（研发 Agent 层）。</p>
+</section>
+
+<!-- 20 -->
+<section id="faq">
+  <h2>20. 注意与 FAQ</h2>
+
+  <h3>20.1 常见坑</h3>
+  <div class="callout danger">
+    <span class="tag">包名</span>
+    pip 安装用 <code>pyqlib</code>，代码里 <code>import qlib</code>。不要 <code>pip install qlib</code>（可能装到错误包）。
+  </div>
+  <div class="callout warn">
+    <span class="tag">运行目录</span>
+    执行 <code>qrun</code> 时建议 <code>cd examples</code>，避免工作目录下本地 <code>qlib</code> 包导入冲突。
+  </div>
+  <div class="callout warn">
+    <span class="tag">未来函数</span>
+    使用财报、一致预期等低频基本面时务必考虑 PIT；回测成交价、涨跌停、停牌假设要符合目标市场。
+  </div>
+  <div class="callout warn">
+    <span class="tag">pandas 兼容</span>
+    pandas 1.5→2.0 的 <code>groupby(group_key=...)</code> 默认值变化曾影响部分脚本；
+    个别示例（如部分 RL / TRA / TFT）需关注版本约束。
+  </div>
+  <div class="callout">
+    <span class="tag">模型环境</span>
+    不同 benchmark 依赖不同（如旧 TFT 依赖 TF 1.15）。批量脚本会为模型建独立虚拟环境（Linux）。
+  </div>
+
+  <h3>20.2 离线 / 在线数据模式怎么选？</h3>
+  <ul>
+    <li>个人笔记本研究 → Offline + 本地 <code>~/.qlib/qlib_data/</code></li>
+    <li>多人共享同一份干净数据 → Online Data Server</li>
+  </ul>
+
+  <h3>20.3 如何换成自己的股票池 / 市场？</h3>
+  <ol>
+    <li>把行情转为 Qlib <code>.bin</code>（<code>dump_bin.py</code>）；</li>
+    <li><code>qlib.init(provider_uri=..., region=...)</code>；</li>
+    <li>在 Handler 配置里改 <code>instruments</code>、时间段、benchmark；</li>
+    <li>调整回测费率与涨跌停规则以匹配市场（港股/美股与 A 股不同）。</li>
+  </ol>
+
+  <h3>20.4 与「本地持仓系统」的边界</h3>
+  <p>Qlib 擅长<strong>研究与回测</strong>；真实成交、券商接口、本地账本通常由你自己的系统
+    （例如个人持仓库）负责。常见集成方式：用 Qlib 产出信号/权重，再由交易执行层下单，
+    持仓与成交回写到自有数据库做复盘。</p>
+</section>
+
+<!-- 21 -->
+<section id="refs">
+  <h2>21. 参考链接</h2>
+  <table>
+    <thead><tr><th>资源</th><th>链接</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>GitHub 仓库</td>
+        <td><a href="https://github.com/microsoft/qlib" target="_blank" rel="noopener">microsoft/qlib</a></td>
+      </tr>
+      <tr>
+        <td>在线文档</td>
+        <td><a href="https://qlib.readthedocs.io/" target="_blank" rel="noopener">qlib.readthedocs.io</a></td>
+      </tr>
+      <tr>
+        <td>PyPI</td>
+        <td><a href="https://pypi.org/project/pyqlib/" target="_blank" rel="noopener">pyqlib</a></td>
+      </tr>
+      <tr>
+        <td>平台论文</td>
+        <td><a href="https://arxiv.org/abs/2009.11189" target="_blank" rel="noopener">arXiv:2009.11189</a></td>
+      </tr>
+      <tr>
+        <td>RD-Agent</td>
+        <td><a href="https://github.com/microsoft/RD-Agent" target="_blank" rel="noopener">microsoft/RD-Agent</a></td>
+      </tr>
+      <tr>
+        <td>RD-Agent-Quant 论文</td>
+        <td><a href="https://arxiv.org/abs/2505.15155" target="_blank" rel="noopener">arXiv:2505.15155</a></td>
+      </tr>
+      <tr>
+        <td>社区数据（示例）</td>
+        <td><a href="https://github.com/chenditc/investment_data/releases" target="_blank" rel="noopener">investment_data releases</a></td>
+      </tr>
+      <tr>
+        <td>Roadmap</td>
+        <td><a href="https://github.com/microsoft/qlib/projects/1" target="_blank" rel="noopener">GitHub Projects</a></td>
+      </tr>
+      <tr>
+        <td>本地克隆</td>
+        <td><code>/Users/kk/Work/Workpace/GitHub/qlib</code></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>推荐阅读顺序（新手）</h3>
+  <ol>
+    <li>本文 §1–§5 建立全局图景</li>
+    <li>完成 §7 安装 + §8 数据 + §9 <code>qrun</code> LightGBM</li>
+    <li>阅读 <code>examples/workflow_by_code.ipynb</code>，理解每一步 API</li>
+    <li>换模型：改 YAML 指向 <code>examples/benchmarks/*</code></li>
+    <li>深入 <code>docs/component/data.rst</code> 与表达式 Alpha</li>
+    <li>按需进入 RL / Online / Dynamic 高级主题</li>
+  </ol>
+</section>
+
+<footer class="note">
+  <p>
+    本文根据 Microsoft Qlib 官方 README、Sphinx 文档与仓库源码结构整理，面向中文读者的详细介绍。
+    数值型 benchmark 以官方 <code>examples/benchmarks/README.md</code> 为准，随版本与数据源可能变化。
+    生成日期：2026-07-18 · 非官方译文，内容如有出入以
+    <a href="https://qlib.readthedocs.io/" target="_blank" rel="noopener">官方文档</a> 为准。
+  </p>
+</footer>
+
+</main>
+</div>
+
+<button class="theme-toggle" type="button" onclick="(function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : (cur === 'light' ? 'dark' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'));
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('qlib-doc-theme', next); } catch(e) {}
+})()">切换主题</button>
+
+</body>
+</html>

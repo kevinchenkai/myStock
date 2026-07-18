@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>myStock ML 借鉴 Qlib 深度评估 · Claude</title>
+<style>
+  :root {
+    --bg: #fafafa; --surface: #ffffff; --surface-2: #f4f4f6; --border: #e3e3e8;
+    --text: #1f2330; --muted: #6b7280; --primary: #c0392b; --primary-dark: #8e2a20;
+    --accent: #2c6fbb; --up: #d23a35; --down: #2e8b57;
+    --code-bg: #f5f3ee; --code-text: #2a2a2a; --warn: #b8770b; --ok: #2e8b57;
+  }
+  html[data-theme="dark"] {
+    --bg: #15171d; --surface: #1d2028; --surface-2: #242833; --border: #33384a;
+    --text: #e4e6ee; --muted: #9aa0b0; --primary: #e57368; --primary-dark: #c0392b;
+    --accent: #6ea3d6; --code-bg: #1b1e26; --code-text: #e4e6ee; --warn: #e0a93b; --ok: #4cae7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) {
+      --bg: #15171d; --surface: #1d2028; --surface-2: #242833; --border: #33384a;
+      --text: #e4e6ee; --muted: #9aa0b0; --primary: #e57368; --primary-dark: #c0392b;
+      --accent: #6ea3d6; --code-bg: #1b1e26; --code-text: #e4e6ee; --warn: #e0a93b; --ok: #4cae7a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.75; font-size: 15px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .layout { display: flex; min-height: 100vh; }
+  nav.toc {
+    width: 300px; flex-shrink: 0; background: var(--surface);
+    border-right: 1px solid var(--border); padding: 24px 18px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  nav.toc h2 { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 22px 0 8px; }
+  nav.toc h2:first-child { margin-top: 0; }
+  nav.toc a { display: block; color: var(--text); padding: 4px 10px; border-radius: 6px; font-size: 13.5px; }
+  nav.toc a:hover { background: var(--surface-2); text-decoration: none; }
+  main { flex: 1; max-width: 1000px; padding: 40px 52px 140px; margin: 0 auto; }
+  header.hero { border-bottom: 2px solid var(--primary); padding-bottom: 20px; margin-bottom: 36px; }
+  header.hero .badge {
+    display: inline-block; background: var(--primary); color: #fff; font-size: 12px;
+    padding: 2px 10px; border-radius: 999px; letter-spacing: 1px; margin-bottom: 12px;
+  }
+  header.hero h1 { margin: 0 0 8px; font-size: 31px; }
+  header.hero p { margin: 0; color: var(--muted); }
+  section { margin-bottom: 60px; scroll-margin-top: 24px; }
+  h2 { font-size: 23px; border-left: 4px solid var(--primary); padding-left: 12px; margin: 0 0 18px; }
+  h3 { font-size: 18px; margin: 30px 0 10px; }
+  h4 { font-size: 15px; margin: 18px 0 8px; color: var(--accent); }
+  p { margin: 11px 0; }
+  ul, ol { margin: 11px 0; padding-left: 24px; }
+  li { margin: 5px 0; }
+  .lead {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; margin: 18px 0; font-size: 15.5px;
+  }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "JetBrains Mono", monospace;
+    background: var(--code-bg); color: var(--code-text); padding: 1px 6px; border-radius: 4px; font-size: 12.8px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-text); padding: 14px 16px; border-radius: 8px;
+    overflow-x: auto; border: 1px solid var(--border); font-size: 12.6px; line-height: 1.6;
+  }
+  pre code { background: transparent; padding: 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 14px 0; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 13.6px;
+  }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  .callout { border-left: 4px solid var(--accent); background: var(--surface); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+  .callout.warn { border-color: var(--warn); }
+  .callout.danger { border-color: var(--up); }
+  .callout.ok { border-color: var(--ok); }
+  .callout .tag { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.danger .tag { color: var(--up); }
+  .callout.ok .tag { color: var(--ok); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.toc { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 24px 18px 80px; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+  .ascii {
+    font-family: "SF Mono", Menlo, Consolas, monospace; white-space: pre; font-size: 12px; line-height: 1.45;
+    background: var(--code-bg); color: var(--code-text); padding: 16px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border);
+  }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
+  .v-borrow { color: var(--ok); font-weight: 700; }
+  .v-vendor { color: var(--accent); font-weight: 700; }
+  .v-skip { color: var(--muted); font-weight: 700; }
+  .v-watch { color: var(--warn); font-weight: 700; }
+  .up { color: var(--up); font-weight: 600; }
+  .down { color: var(--down); font-weight: 600; }
+  .theme-toggle {
+    position: fixed; right: 20px; bottom: 20px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 14px; cursor: pointer; color: var(--text); font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 100;
+  }
+  .theme-toggle:hover { background: var(--surface-2); }
+</style>
+</head>
+<body>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("mystock-doc-theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+
+<div class="layout">
+<nav class="toc">
+  <h2>结论</h2>
+  <a href="#tldr">0 · 裁决（一句话）</a>
+  <a href="#thesis">1 · 核心论点：错位与真瓶颈</a>
+
+  <h2>现状</h2>
+  <a href="#audit">2 · ml 代码逐文件审计</a>
+  <a href="#evidence">3 · 回测证据与它在说什么</a>
+  <a href="#bottleneck">4 · 真正的瓶颈在哪</a>
+
+  <h2>对照</h2>
+  <a href="#map">5 · 概念对照：ml ↔ qlib</a>
+  <a href="#verdict">6 · 逐组件裁决表</a>
+
+  <h2>怎么做</h2>
+  <a href="#borrow">7 · 该借鉴的四件事</a>
+  <a href="#vendor">8 · 该"抄代码"的两件事</a>
+  <a href="#skip">9 · 该拒绝 qlib 的地方</a>
+  <a href="#roadmap">10 · 落地顺序与验收</a>
+  <a href="#coda">11 · 收尾：一个反直觉结论</a>
+  <a href="#refs">12 · 参考</a>
+</nav>
+
+<main>
+<header class="hero">
+  <span class="badge">CLAUDE 独立评估</span>
+  <h1>myStock ML 如何借鉴 / 使用 Qlib</h1>
+  <p>基于逐文件读 <code>mystock/ml/</code>（15 文件 / 2561 行）+ 三份 ML 文档 + qlib 源码的深度调研 · 2026-07-18</p>
+</header>
+
+<div class="lead">
+  这份报告有一个明确的立场，而不是"qlib 很强，接入它吧"。我读完 <code>mystock/ml/</code> 全部代码和
+  <code>ML_PLAN / ML_OVERVIEW / ML_ALGORITHM_PROPOSAL</code> 三份文档后，判断是：
+  <strong>myStock ML 与 qlib 存在结构性错位，整体接入是错的；但 qlib 有 3–4 个"点"值得精确借鉴，
+  其中 2 个值得直接把代码抄过来。</strong> 报告的价值在于把这些"点"逐个拆开，给出
+  <span class="v-borrow">借思想</span> / <span class="v-vendor">抄代码</span> / <span class="v-skip">拒绝</span>
+  三档裁决，并说清每一档背后的理由。
+</div>
+
+<!-- ===== 0 ===== -->
+<section id="tldr">
+  <h2>0 · 裁决（一句话）</h2>
+  <div class="callout danger">
+    <span class="tag">Verdict</span>
+    <b>不要接入 qlib 框架。</b> myStock ML 已经是一套自洽、防泄漏做得比很多人扎实的小系统；
+    qlib 是为"全市场截面选股"设计的重型框架，与 myStock"单标的、独立账户、区间预测"的问题形态不匹配。
+    <br><br>
+    <b>但要精确借鉴 qlib 的三样东西：①</b> 表达式化的特征库思路（把 <code>features.py</code> 升级成可组合、可缓存的因子集）；
+    <b>②</b> 直接抄 <code>Purged/Embargo + 滚动</code> 的评估纪律（这是当前<u>最痛的缺口</u>）；
+    <b>③</b> 抄它的"信号 IC 分析 vs 组合绩效"两级评估拆分。
+    <b>其余（模型园、TopkDropout、嵌套执行器、RL 订单执行）对本项目无用或有害。</b>
+  </div>
+  <p class="muted">
+    这个结论与 myStock 团队自己文档里的保守姿态<strong>一致但更进一步</strong>：团队已经在 <code>ML_ALGORITHM_PROPOSAL §8</code>
+    明确否掉了 TFT/Transformer、跨币种归一、跨标的现金池、在线 RL——这些恰好也是"整体 qlib 化"会带来的东西。
+    本报告的增量是：把"该拒绝什么"讲清楚之外，把"该拿什么"精确到<u>文件级</u>。
+  </p>
+</section>
+
+<!-- ===== 1 ===== -->
+<section id="thesis">
+  <h2>1 · 核心论点：错位与真瓶颈</h2>
+  <p>整份评估建立在两个判断上，后面所有裁决都从这里推出来：</p>
+
+  <h3>判断一：问题形态错位</h3>
+  <table>
+    <tr><th>维度</th><th>qlib 假设的问题</th><th>myStock ML 的问题</th></tr>
+    <tr><td>横向宽度</td><td>全市场数千标的<b>截面</b>排序选股</td><td><b>6 支</b>固定标的，各自独立</td></tr>
+    <tr><td>预测目标</td><td>单值 alpha 分数（谁涨得多）</td><td>次日 <b>[L_hat, H_hat] 区间</b>（波动到哪）</td></tr>
+    <tr><td>决策形态</td><td>Topk 组合权重 + 再平衡</td><td>单标的<b>限价挂价档 + 数量档</b></td></tr>
+    <tr><td>资金</td><td>共享现金池、组合级风险</td><td><b>单标的独立账户</b>、本币闭环</td></tr>
+    <tr><td>样本量</td><td>数千标的 × 十余年（百万级样本）</td><td>每股 ~1255 日线（合计几千行）</td></tr>
+  </table>
+  <div class="callout warn">
+    <span class="tag">为什么这决定了一切</span>
+    qlib 的三大王牌——<b>截面归一化（CSRankNorm）、TopkDropout 组合策略、嵌套多频执行器</b>——
+    全部以"多标的截面"为前提。myStock 是 6 条<u>各自独立的时间序列</u>，截面维度退化成 1，
+    这些王牌<b>要么无从施展、要么退化成空操作</b>。这不是"qlib 不够好"，是<u>用错工具</u>。
+  </div>
+
+  <h3>判断二：真瓶颈不是模型，是"可信度"</h3>
+  <p>
+    读回测结果（第 3 节）后，一个反直觉但清晰的事实浮现：<strong>myStock ML 现在缺的不是更强的模型，
+    而是"我怎么知道这个结论不是运气"的能力。</strong> 6 个标的、单一 regime（2024–2026 强相关）、
+    walk-forward 只有 4 折——任何"bandit 赢了 1 个标的"的结论都在噪声量级内。
+    qlib 对本项目最大的价值，恰恰不在它的模型园，<b>而在它把评估纪律工程化的那部分</b>。
+  </p>
+</section>
+
+<!-- ===== 2 ===== -->
+<section id="audit">
+  <h2>2 · ml 代码逐文件审计</h2>
+  <p>先说清楚现状，评估才有据。<code>mystock/ml/</code> 的实现质量<strong>高于预期</strong>——尤其防泄漏这一关做得比多数量化教程扎实：</p>
+  <table>
+    <tr><th>文件</th><th>职责</th><th>我的评价</th></tr>
+    <tr><td><code>features.py</code></td><td>16 个技术特征 + 次日 high/low 标签</td><td>用 <code>adj_close</code> 算收益、标签用 <code>shift(-1)</code>、最后一行留 NaN 作推理——口径干净。<span class="v-watch">但特征是硬编码函数，不可组合</span></td></tr>
+    <tr><td><code>predictor.py</code></td><td>分位数回归（LGBM/sklearn）+ walk-forward</td><td>high 取上分位、low 取下分位张区间；pinball loss + 区间命中率评估；<b>切分严格按时间</b>。扎实</td></tr>
+    <tr><td><code>calibrator.py</code></td><td>CQR 保形校准（Romano 2019）</td><td>纯函数、<code>(n+1)</code> 分位有限样本保证；已经是"建议 2"的完整实现。<b>教科书级</b></td></tr>
+    <tr><td><code>regime.py</code></td><td>HMM 市场状态 + 无泄漏前向滤波</td><td><b>亮点</b>：显式避开 hmmlearn 的 forward-backward（会偷看未来），手写 log 空间 forward filtering。自带无泄漏自检</td></tr>
+    <tr><td><code>policy.py</code></td><td>S0 规则 / LinUCB / Regime 软切换</td><td>13 臂离散动作、regime 按后验概率软混合。刻意不用深度 RL——<b>对小样本是正确取舍</b></td></tr>
+    <tr><td><code>simulator.py</code></td><td>1h 盘中限价撮合 + 独立账户</td><td>逐根 1h bar 判"先到 low 还是先到 high"，移动平均成本。残余近似（bar 内顺序/部分成交/滑点）如实标注</td></tr>
+    <tr><td><code>backtest.py</code></td><td>逐日回放 + 三基线对照 + 风险调整 reward</td><td>预测向量化、NaN 兜底、reward 4 模式（raw/excess/sharpe/dd）。<b>基线对照是灵魂</b></td></tr>
+    <tr><td><code>offline_rl.py</code></td><td>离线 RL（Discrete CQL）</td><td>行为策略 rollout → CQL → 同口径回测。定位为"研究性、跑不赢就记录"，克制</td></tr>
+    <tr><td><code>fetch.py / data.py / db.py / config.py</code></td><td>独立库采集 / 只读对齐 / schema</td><td>训练库 <code>data/ml/mystock_ml.db</code> 与生产库<b>物理隔离</b>，只读快照 deals/orders。边界干净</td></tr>
+  </table>
+  <div class="callout ok">
+    <span class="tag">一句话总评</span>
+    这套代码的"防泄漏 + 严基线 + 能停则停"的工程纪律，<b>本身就是 qlib 设计哲学的一次独立实现</b>。
+    换句话说，myStock ML 已经"内生"了 qlib 里最值钱的那部分理念——所以它需要 qlib 的地方，比想象中少。
+  </div>
+</section>
+
+<!-- ===== 3 ===== -->
+<section id="evidence">
+  <h2>3 · 回测证据与它在说什么</h2>
+  <p>这是 <code>ML_PLAN.md §10 (P3)</code> 如实记录的关键 go/no-go 证据（494 测试日，单标的独立账户，初始 2 万）：</p>
+  <table>
+    <tr><th>标的</th><th>rule (S0)</th><th>bandit (S2)</th><th>human 回放</th><th>buy&amp;hold</th><th>行情</th></tr>
+    <tr><td>NVDA</td><td>25040</td><td><b>28858</b></td><td>24206</td><td class="up">33638</td><td>单边强涨</td></tr>
+    <tr><td>TSLA</td><td>28244</td><td>18606</td><td>25420</td><td class="up">38750</td><td>单边强涨</td></tr>
+    <tr><td>PDD</td><td class="down">19767</td><td>18974</td><td>20109</td><td>11840</td><td>震荡下行</td></tr>
+  </table>
+  <p>把这张表读透，能得到三个层层递进的结论，它们直接决定"该向 qlib 要什么"：</p>
+  <ol>
+    <li><strong>单边牛市里 buy&amp;hold 几乎不可战胜</strong>（NVDA/TSLA）。这不是模型弱——是<u>任何择时在强趋势里都在做负和的事</u>。qlib 换再强的模型也改不了这条物理规律。</li>
+    <li><strong>震荡/下行里择时有真实价值</strong>（PDD：所有交易策略都赢了 buy&hold 的 11840）。这说明系统的<u>信号本身是有效的</u>，只是被 2 只趋势股的行情掩盖。</li>
+    <li><strong>bandit 尚未稳定打过 S0 规则</strong>（只赢 NVDA）。这才是决策层的真问题——而它<u>大概率是样本/方差问题，不是算法容量问题</u>。</li>
+  </ol>
+  <div class="callout danger">
+    <span class="tag">关键推论</span>
+    结论 ①②③ 全都指向同一件事：<b>在 6 标的 × 单一 regime × 4 折的评估强度下，我们分不清"bandit 输了"是算法差还是运气差。</b>
+    这就是为什么第 4 节说真瓶颈是"可信度"。<u>先把评估做扎实，再谈换模型，否则换了也不知道有没有用。</u>
+  </div>
+</section>
+
+<!-- ===== 4 ===== -->
+<section id="bottleneck">
+  <h2>4 · 真正的瓶颈在哪</h2>
+  <p>把当前系统的"缺口"按"对结果的影响 × 修复成本"排序，答案很不像直觉——排在最前的都不是模型：</p>
+  <table>
+    <tr><th>缺口</th><th>影响</th><th>qlib 能帮上忙吗</th></tr>
+    <tr><td><b>评估方差不可控</b>：4 折、无 embargo、种子少</td><td class="up">致命</td><td>✅ 直接抄它的 <code>Purged/Embargo</code> 思路 + 滚动多折</td></tr>
+    <tr><td><b>信号质量与策略绩效未分离</b>：只看净值，不看 IC</td><td class="up">高</td><td>✅ 抄 <code>SignalRecord / SigAnaRecord</code> 的两级评估</td></tr>
+    <tr><td><b>特征不可组合、难扩展</b>：16 个硬编码函数</td><td>中</td><td>◐ 借它表达式引擎的<u>思路</u>（不必抄库）</td></tr>
+    <tr><td>模型容量（LGBM 分位数回归）</td><td class="down">低</td><td>✗ qlib 的深度模型在此数据量下大概率更差</td></tr>
+    <tr><td>决策算法（LinUCB → ？）</td><td class="down">低</td><td>✗ qlib 无对应组件；且不是当前瓶颈</td></tr>
+    <tr><td>撮合保真（1h → 15m）</td><td>中</td><td>✗ 与 qlib 无关（qlib 的 Exchange 是日频/组合级）</td></tr>
+  </table>
+  <div class="callout ok">
+    <span class="tag">这张表就是全文的地图</span>
+    影响"致命/高"的两行，qlib 都能帮上——但帮的方式是<b>抄它验证/评估层的代码与纪律</b>，不是用它的模型。
+    影响"低"的三行，恰好是外行最容易想"上 qlib 换个 SOTA 模型"的地方——而它们对本项目<u>基本无用甚至有害</u>。
+    <b>这个反差，是本报告最想传达的东西。</b>
+  </div>
+</section>
+
+<!-- ===== 5 ===== -->
+<section id="map">
+  <h2>5 · 概念对照：ml ↔ qlib</h2>
+  <p>把 myStock ML 的每个模块，对到 qlib 的等价物，能一眼看出哪里"已经有了"、哪里"qlib 更成熟"、哪里"根本对不上"：</p>
+  <div class="ascii">
+  myStock/ml                        Qlib 等价物                    关系
+  ──────────────────────────────────────────────────────────────────────────
+  features.py (硬编码 16 特征)  →   data/ops.py 表达式引擎          qlib 更强（可组合/缓存）→ 借思路
+  predictor.py (分位数回归)     →   contrib/model/gbdt.py (LGBM)    等价，ml 已直接用 LGBM → 无需借
+  calibrator.py (CQR)           →   (qlib 无原生 CQR)               ml 反而更前沿 → 无可借
+  regime.py (HMM 无泄漏前向)    →   contrib/meta/ (DDG-DA 漂移)     思路同源，实现各异 → 参考不照搬
+  policy.py (LinUCB/规则)       →   contrib/strategy/signal_*.py    形态不同（区间挂价 vs 组合权重）→ 对不上
+  simulator.py (1h 限价撮合)    →   backtest/executor.py (嵌套)     qlib 是组合/日频 → 对不上
+  backtest.py (三基线净值)      →   workflow/record_temp.py (记录链) qlib 的两级评估更成熟 → 抄纪律
+  offline_rl.py (CQL)           →   rl/ (订单执行 RL)               目标不同（择价 vs 拆大单）→ 对不上
+  (无)                          →   Purged/Embargo CV               ml 缺，qlib/学界成熟 → 抄
+  (无)                          →   SignalRecord IC 分析            ml 缺 → 抄
+  </div>
+  <p>
+    这张图揭示一个有意思的结构：<strong>myStock ML 在"预测层"甚至比 qlib 更前沿（CQR、区间预测），
+    在"决策层"与 qlib 形态完全不同（对不上），真正落后的只有"评估层"</strong>。
+    所以借鉴的重心应压在评估层，而不是散射到各处。
+  </p>
+</section>
+
+<!-- ===== 6 ===== -->
+<section id="verdict">
+  <h2>6 · 逐组件裁决表</h2>
+  <p>对 qlib 的每个主要能力，给出明确裁决。图例：
+    <span class="v-borrow">借思想</span>（读其设计，自己实现）·
+    <span class="v-vendor">抄代码</span>（直接移植/vendored 其实现或算法）·
+    <span class="v-watch">观望</span>（扩样本后再议）·
+    <span class="v-skip">拒绝</span>（对本项目无用/有害）。</p>
+  <table>
+    <tr><th>qlib 能力</th><th>裁决</th><th>理由</th></tr>
+    <tr><td>表达式因子引擎（<code>data/ops.py</code>）</td><td><span class="v-borrow">借思想</span></td><td>把 <code>features.py</code> 重构成可组合/可缓存的"因子表"，利于批量试因子；但不必引入 qlib 的 bin 数据服务，本地 SQLite 上自建轻量版即可</td></tr>
+    <tr><td>Purged/Embargo + 滚动 CV</td><td><span class="v-vendor">抄代码</span></td><td><b>当前最痛缺口</b>。算法几十行可自实现，直接补进 <code>predictor.walk_forward_eval</code> 与 <code>backtest</code></td></tr>
+    <tr><td>信号 IC 分析（<code>SigAnaRecord</code>）</td><td><span class="v-vendor">抄代码</span></td><td>把"只看净值"升级为"IC/RankIC 看信号 + 净值看策略"两级评估，能定位 bandit 到底是信号问题还是执行问题</td></tr>
+    <tr><td>市场漂移/元学习（<code>contrib/meta</code> DDG-DA）</td><td><span class="v-borrow">借思想</span></td><td><code>regime.py</code> 已是同源思路；可参考 DDG-DA 把"预测分布会怎么漂"也建模，但当前 6 标的样本量不足以支撑，列为储备</td></tr>
+    <tr><td>模型园（LSTM/GATs/HIST/TFT…）</td><td><span class="v-skip">拒绝</span></td><td>团队文档已否 TFT/Transformer；几千行样本上深度模型输给 LGBM 是常态。<u>换模型不是当前瓶颈</u></td></tr>
+    <tr><td>TopkDropout / 组合策略</td><td><span class="v-skip">拒绝</span></td><td>以截面选股为前提，单标的独立账户下无意义</td></tr>
+    <tr><td>嵌套执行器 / Exchange</td><td><span class="v-skip">拒绝</span></td><td>qlib 是日频/组合撮合；ml 的 1h 盘中限价撮合更贴合其"复刻人类挂限价单"的目标，自建的反而更对</td></tr>
+    <tr><td>RL 订单执行（<code>qlib/rl</code>）</td><td><span class="v-skip">拒绝</span></td><td>目标不同：qlib RL 拆大单择时，ml 是择<u>价</u>；且团队已把 RL 定位研究性、不强推</td></tr>
+    <tr><td>RD-Agent（LLM 自动因子）</td><td><span class="v-watch">观望</span></td><td>需先有可组合的表达式因子层（见第 1 条）+ 足够回测吞吐；是"因子层做好后"的远期放大器，非现在</td></tr>
+    <tr><td>qlib 数据服务 / bin 格式</td><td><span class="v-skip">拒绝</span></td><td>会与 myStock"独立 SQLite + web 只读"边界冲突；引入成本远超收益</td></tr>
+  </table>
+</section>
+
+<!-- ===== 7 ===== -->
+<section id="borrow">
+  <h2>7 · 该借鉴的四件事（借思想）</h2>
+
+  <h3>① 把 features.py 升级成"可组合因子表"</h3>
+  <p>
+    现在的特征是 16 个写死在函数里的列。qlib 的洞见是<strong>因子 = 声明式表达式</strong>，好处是可批量生成、可版本化、可缓存。
+    不必引入 qlib 的库，只需在本地把因子登记成一张<u>名字 → 计算函数</u>的注册表：
+  </p>
+  <pre><code># 借 qlib 思想的轻量因子注册表（自实现，不依赖 qlib）
+FACTORS = {
+    "ma5_dev":   lambda d: d.adj/d.adj.rolling(5).mean() - 1,
+    "vol_20d":   lambda d: d.ret1.rolling(20).std(),
+    "corr_pv20": lambda d: d.ret1.rolling(20).corr(np.log(d.volume+1)),  # 新因子零成本加入
+    ...
+}
+# 试新因子 = 往表里加一行 + 重跑 walk-forward，不改建模代码</code></pre>
+  <p class="muted">收益：把"加因子"从改代码降为改配置，为后续 A/B 试因子、乃至远期 RD-Agent 式自动挖因子铺路。成本：半天重构。</p>
+
+  <h3>② 两级评估：IC 看信号，净值看策略</h3>
+  <p>
+    qlib 的 <code>SignalRecord → SigAnaRecord → PortAnaRecord</code> 把"信号好不好"和"策略赚不赚"拆成两级。
+    myStock 现在只有第二级（净值）。补上第一级（对区间中点或方向算 IC / RankIC），
+    就能回答第 3 节那个悬案：<u>bandit 输，是信号没预测力，还是执行没把信号用好？</u>
+  </p>
+
+  <h3>③ 参考 DDG-DA 的漂移建模（储备，不落地）</h3>
+  <p>
+    <code>regime.py</code> 已经在做"识别当前状态"。qlib 的 DDG-DA 更进一步——建模"分布<u>将要</u>怎么漂"。
+    当前 6 标的样本撑不起，但作为<strong>方法储备</strong>值得知道：扩标的后，这是 regime 之上的下一步。
+  </p>
+
+  <h3>④ 借它"配置即实验"的可复现纪律</h3>
+  <p>
+    qlib 一份 YAML = 一次可复现实验。myStock 的 <code>BTConfig</code> 已经很接近（dataclass 全参数化）。
+    值得补的是把<u>每次回测的完整配置 + 数据窗口 + 种子 + git commit 落进报告头部</u>，
+    让 <code>data/ml/reports/&lt;date&gt;/</code> 的每份快照都能被精确重跑。这是 qlib Recorder 的平民版。
+  </p>
+</section>
+
+<!-- ===== 8 ===== -->
+<section id="vendor">
+  <h2>8 · 该"抄代码"的两件事（最高优先级）</h2>
+  <div class="callout danger">
+    <span class="tag">这是本报告最可操作的部分</span>
+    下面两件事修复的是第 4 节里"影响=致命/高"的两行。它们<b>不引入 qlib 依赖</b>——算法都只有几十行，
+    自实现即可，但"抄 qlib/学界成熟做法"能避免踩坑。<b>建议在换任何模型之前先做这两件。</b>
+  </div>
+
+  <h3>① Purged K-Fold + Embargo（防泄漏评估的地基）</h3>
+  <p>
+    当前 <code>walk_forward_eval</code> 是标准滚动切分，但<strong>训练段末尾和测试段开头之间没有"隔离带"</strong>。
+    由于特征用了 20 日滚动窗口、标签用次日收益，训练/测试边界处存在信息重叠——评估会<u>系统性偏乐观</u>。
+    López de Prado 的 Purged CV + Embargo 正是修这个（qlib 生态也采用）：
+  </p>
+  <pre><code># 在切分边界"清洗"掉与测试段特征窗口重叠的训练样本，并留 embargo 隔离带
+def purged_splits(n, n_folds, embargo, feat_window):
+    # test 段前后各剔除 feat_window + embargo 根，防止 rolling 特征/次日标签跨界泄漏
+    ...  # ~40 行，纯 index 运算，可单测
+# 验收门槛（团队建议 9）：5 种子 std/mean ≤ 0.3</code></pre>
+  <p class="muted">
+    收益：让"bandit 赢没赢"的结论第一次<u>可信</u>。这直接把第 3 节的悬案变成可判定的问题。成本：1–2 天。
+    这也正是团队 <code>ML_ALGORITHM_PROPOSAL 建议 9</code> 已排进"第 1 周"的事——本报告把它标为<b>头号优先级</b>。
+  </p>
+
+  <h3>② 信号 IC / RankIC 分析器</h3>
+  <p>
+    抄 <code>SigAnaRecord</code> 的口径：对每日预测（区间中点收益、或"次日会不会突破区间中点"的方向）
+    与真实次日收益算<strong>截面/时序 IC、RankIC、ICIR</strong>。虽然 myStock 是单标的（截面退化），
+    但可在<u>时间维</u>算滚动 IC，回答"预测信号随时间是否稳定有效"。约 30 行纯函数，天然可单测，
+    与现有 <code>calibrator.py</code> 的风格完全一致。
+  </p>
+</section>
+
+<!-- ===== 9 ===== -->
+<section id="skip">
+  <h2>9 · 该拒绝 qlib 的地方（同样重要）</h2>
+  <p>"不做什么"和"做什么"一样是决策。以下 qlib 能力，对本项目<strong>无用或有害</strong>，明确不采纳——这与团队 <code>ML_ALGORITHM_PROPOSAL §8</code> 的"不推荐清单"互相印证：</p>
+  <table>
+    <tr><th>拒绝</th><th>为什么对 myStock 是错的</th></tr>
+    <tr><td>整体接入 qlib 框架</td><td>问题形态错位（第 1 节）；且违反"独立 ML 库 + web 只读"边界，工程成本远超收益</td></tr>
+    <tr><td>qlib 深度模型（TFT/LSTM/GATs）</td><td>几千行样本上噪声 &gt; 信号，SOTA 深度模型输给 LGBM 是常态；换模型不是瓶颈</td></tr>
+    <tr><td>截面归一化（CSRankNorm）</td><td>单标的下截面维度=1，归一化退化成空操作</td></tr>
+    <tr><td>TopkDropout / 组合优化器</td><td>无"选哪些股"的问题（6 支全持），无组合权重可优化</td></tr>
+    <tr><td>把 qlib 塞进 web 请求路径</td><td>qlib 重计算 + 缓存，绝不能进 Flask 只读路由（违反 CLAUDE.md 边界）</td></tr>
+    <tr><td>为用 qlib 而跨币种归一成 USD</td><td>违反"各股本币闭环、不换汇"锁定；港美股必须分开</td></tr>
+  </table>
+  <div class="callout warn">
+    <span class="tag">一条容易犯的错</span>
+    最诱人的错误是"既然回测打不过基线，那上个 qlib SOTA 模型试试"。第 3、4 节已论证：<b>打不过 buy&hold 是趋势物理规律，
+    打不过 S0 大概率是评估方差</b>——两者都不是模型容量问题。先上 qlib 模型 = <u>在没修好尺子之前先换砝码</u>，
+    结果依然读不出真信号。
+  </div>
+</section>
+
+<!-- ===== 10 ===== -->
+<section id="roadmap">
+  <h2>10 · 落地顺序与验收</h2>
+  <p>把上面所有裁决压成一条可执行、带 go/no-go 的顺序。刻意与团队现有路线图对齐（不另起炉灶）：</p>
+  <div class="ascii">
+  第 0 步（先修尺子，最高优先，~2 天）
+    ├─ 抄 Purged+Embargo CV      → 门槛：5 种子 std/mean ≤ 0.3   [对应团队建议 9]
+    └─ 抄 IC/RankIC 信号分析器    → 门槛：能区分"信号无效" vs "执行无效"
+
+  第 1 步（重估现有结论，~1 天）
+    └─ 用新尺子重跑 P3 回测       → 判定 bandit 到底有没有真的输给 S0
+                                    （很可能结论会变：噪声被压下来后）
+
+  第 2 步（借因子思想，~半天）
+    └─ features.py → 因子注册表    → 门槛：加一个新因子 = 改一行配置
+
+  第 3 步（团队既定路线，qlib 不介入）
+    └─ 继续 建议1/2/3（reward/CQR/regime）已在做，按团队门槛推进
+
+  储备（扩标的后再议）
+    └─ DDG-DA 漂移建模 / RD-Agent 自动因子 / 15m 撮合
+  </div>
+  <div class="callout ok">
+    <span class="tag">与团队路线图的关系</span>
+    本报告<b>不新增算法负担</b>。它做的是给团队既有的"建议 9（多种子+embargo）"<u>提级为头号优先</u>，
+    并明确它应<b>先于</b>建议 1/2/3 的效果评估——因为没有可信的尺子，建议 1/2/3 的"提升"也读不准。
+    其余全部沿用团队既定门槛：<span class="pill">独立 ML 库</span> <span class="pill">永留 S0+三基线</span>
+    <span class="pill">打不过就停</span> <span class="pill">红涨绿跌</span> <span class="pill">web 只读</span>。
+  </div>
+</section>
+
+<!-- ===== 11 ===== -->
+<section id="coda">
+  <h2>11 · 收尾：一个反直觉结论</h2>
+  <p>
+    大多数"要不要用 qlib"的评估，会花大篇幅比较模型园、羡慕 SOTA。这份报告的结论正相反：
+  </p>
+  <div class="callout danger">
+    <span class="tag">The Takeaway</span>
+    <b>myStock ML 不需要 qlib 的"力量"，只需要 qlib 的"纪律"。</b><br><br>
+    它的预测层（CQR 区间预测）已经比 qlib 更前沿；决策层与 qlib 形态不同、无从借；模型层换 qlib 也不会更好。
+    唯一真实的缺口在<u>评估的可信度</u>——而这恰好是几十行代码、零框架依赖就能补上的。
+    <b>把 qlib 当"评估纪律的参考实现"，而不是"模型工厂"，才是对这个项目正确的用法。</b>
+  </div>
+  <p class="muted">
+    这也解释了为什么团队自己的文档已经走到了很保守的位置——他们在正确的方向上。本报告只是把"该借什么"
+    从"读读 qlib 找灵感"收敛到<u>两个文件级的、可立刻动手的改动</u>，并给出为什么其余的都该放下。
+  </p>
+</section>
+
+<!-- ===== 12 ===== -->
+<section id="refs">
+  <h2>12 · 参考</h2>
+  <ul>
+    <li>myStock ML 代码：<code>mystock/ml/</code>（<code>features / predictor / calibrator / regime / policy / simulator / backtest / offline_rl</code> 等 15 文件 2561 行，逐一读过）</li>
+    <li>myStock ML 文档：<code>docs/ML_PLAN.md</code>、<code>docs/ML_OVERVIEW.md</code>、<code>docs/ML_ALGORITHM_PROPOSAL.md</code></li>
+    <li>Qlib 源码：<code>qlib/data/ops.py</code>（表达式）、<code>qlib/data/dataset/{handler,processor}.py</code>、<code>qlib/workflow/record_temp.py</code>（记录链/IC）、<code>qlib/backtest/executor.py</code>、<code>qlib/contrib/meta/</code>（DDG-DA）</li>
+    <li>配套：<a href="Qlib深入解读-Claude.html">Qlib 深入解读（Claude 版）</a> — 本报告引用的 qlib 机制细节详见该文</li>
+    <li>方法参考：CQR（Romano et al. 2019）、Purged K-Fold + Embargo（López de Prado, <em>Advances in Financial Machine Learning</em>）</li>
+  </ul>
+  <div class="callout">
+    <span class="tag">关于本文</span>
+    由 Claude 基于逐文件阅读 myStock ML 全部源码 + 三份 ML 文档 + qlib 源码后独立撰写，与同目录 Grok 版报告各自独立成文、结论可对照。
+    观点为工程判断，非投资建议。生成日期 2026-07-18。
+  </div>
+</section>
+
+</main>
+</div>
+
+<button class="theme-toggle" type="button" onclick="(function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : (cur === 'light' ? 'dark' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'));
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('mystock-doc-theme', next); } catch(e) {}
+})()">切换主题</button>
+
+</body>
+</html>

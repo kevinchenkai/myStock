@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qlib 深入解读 · myStock</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f6;
+    --border: #e3e3e8;
+    --text: #1f2330;
+    --muted: #6b7280;
+    --primary: #c0392b;
+    --primary-dark: #8e2a20;
+    --accent: #2c6fbb;
+    --up: #d23a35;
+    --down: #2e8b57;
+    --code-bg: #f5f3ee;
+    --code-text: #2a2a2a;
+    --warn: #b8770b;
+    --ok: #2e8b57;
+  }
+  html[data-theme="dark"] {
+    --bg: #15171d; --surface: #1d2028; --surface-2: #242833; --border: #33384a;
+    --text: #e4e6ee; --muted: #9aa0b0; --primary: #e57368; --primary-dark: #c0392b;
+    --accent: #6ea3d6; --code-bg: #1b1e26; --code-text: #e4e6ee; --warn: #e0a93b; --ok: #4cae7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) {
+      --bg: #15171d; --surface: #1d2028; --surface-2: #242833; --border: #33384a;
+      --text: #e4e6ee; --muted: #9aa0b0; --primary: #e57368; --primary-dark: #c0392b;
+      --accent: #6ea3d6; --code-bg: #1b1e26; --code-text: #e4e6ee; --warn: #e0a93b; --ok: #4cae7a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.75; font-size: 15px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  .layout { display: flex; min-height: 100vh; }
+  nav.toc {
+    width: 288px; flex-shrink: 0; background: var(--surface);
+    border-right: 1px solid var(--border); padding: 24px 18px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  nav.toc h2 {
+    font-size: 12px; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); margin: 22px 0 8px;
+  }
+  nav.toc h2:first-child { margin-top: 0; }
+  nav.toc a {
+    display: block; color: var(--text); padding: 4px 10px;
+    border-radius: 6px; font-size: 13.5px;
+  }
+  nav.toc a:hover { background: var(--surface-2); text-decoration: none; }
+
+  main { flex: 1; max-width: 1000px; padding: 40px 52px 140px; margin: 0 auto; }
+
+  header.hero {
+    border-bottom: 2px solid var(--primary); padding-bottom: 20px; margin-bottom: 36px;
+  }
+  header.hero .badge {
+    display: inline-block; background: var(--primary); color: #fff;
+    font-size: 12px; padding: 2px 10px; border-radius: 999px;
+    letter-spacing: 1px; margin-bottom: 12px;
+  }
+  header.hero h1 { margin: 0 0 8px; font-size: 32px; }
+  header.hero p { margin: 0; color: var(--muted); }
+
+  section { margin-bottom: 60px; scroll-margin-top: 24px; }
+  h2 { font-size: 24px; border-left: 4px solid var(--primary); padding-left: 12px; margin: 0 0 18px; }
+  h3 { font-size: 18px; margin: 30px 0 10px; }
+  h4 { font-size: 15px; margin: 18px 0 8px; color: var(--accent); }
+
+  p { margin: 11px 0; }
+  ul, ol { margin: 11px 0; padding-left: 24px; }
+  li { margin: 5px 0; }
+
+  .lead {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 20px; margin: 18px 0; font-size: 15.5px;
+  }
+
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "JetBrains Mono", monospace;
+    background: var(--code-bg); color: var(--code-text);
+    padding: 1px 6px; border-radius: 4px; font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-text);
+    padding: 14px 16px; border-radius: 8px; overflow-x: auto;
+    border: 1px solid var(--border); font-size: 12.8px; line-height: 1.6;
+  }
+  pre code { background: transparent; padding: 0; }
+
+  table {
+    width: 100%; border-collapse: collapse; margin: 14px 0;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; overflow: hidden; font-size: 13.8px;
+  }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+
+  .callout {
+    border-left: 4px solid var(--accent); background: var(--surface);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;
+  }
+  .callout.warn { border-color: var(--warn); }
+  .callout.danger { border-color: var(--up); }
+  .callout.ok { border-color: var(--ok); }
+  .callout .tag {
+    font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+    color: var(--muted); display: block; margin-bottom: 4px;
+  }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.danger .tag { color: var(--up); }
+  .callout.ok .tag { color: var(--ok); }
+
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.toc { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 24px 18px 80px; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+
+  .ascii {
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    white-space: pre; font-size: 12px; line-height: 1.45;
+    background: var(--code-bg); color: var(--code-text);
+    padding: 16px; border-radius: 8px; overflow-x: auto; border: 1px solid var(--border);
+  }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px;
+    background: var(--surface-2); border: 1px solid var(--border); color: var(--muted);
+  }
+  .theme-toggle {
+    position: fixed; right: 20px; bottom: 20px; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 999px; padding: 8px 14px;
+    cursor: pointer; color: var(--text); font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 100;
+  }
+  .theme-toggle:hover { background: var(--surface-2); }
+  .k { color: var(--primary); font-weight: 600; }
+  .muted { color: var(--muted); }
+</style>
+</head>
+<body>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("mystock-doc-theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+
+<div class="layout">
+<nav class="toc">
+  <h2>总览</h2>
+  <a href="#tldr">0 · 一句话看懂</a>
+  <a href="#what">1 · Qlib 是什么</a>
+  <a href="#mental">2 · 心智模型：一条流水线</a>
+  <a href="#arch">3 · 四层架构</a>
+
+  <h2>核心机制</h2>
+  <a href="#expr">4 · 表达式引擎（灵魂）</a>
+  <a href="#data">5 · Handler / Dataset 数据管线</a>
+  <a href="#model">6 · 模型抽象与模型园</a>
+  <a href="#record">7 · Workflow 与记录链</a>
+  <a href="#backtest">8 · 回测：嵌套执行器</a>
+  <a href="#strategy">9 · 策略：TopkDropout 解剖</a>
+
+  <h2>进阶范式</h2>
+  <a href="#rl">10 · 强化学习与订单执行</a>
+  <a href="#dynamic">11 · 市场漂移与在线滚动</a>
+  <a href="#rdagent">12 · RD-Agent：自动因子工厂</a>
+
+  <h2>落地</h2>
+  <a href="#config">13 · 一份 YAML 全景</a>
+  <a href="#mystock">14 · 对 myStock 的启示</a>
+  <a href="#pitfalls">15 · 坑与边界</a>
+  <a href="#refs">16 · 参考</a>
+</nav>
+
+<main>
+<header class="hero">
+  <span class="badge">CLAUDE 独立解读</span>
+  <h1>Qlib 深入解读</h1>
+  <p>Microsoft 开源 AI 量化平台 · 面向 myStock 的源码级中文分析 · 2026-07-18</p>
+</header>
+
+<div class="lead">
+  这份文档不是 README 的翻译。它是我逐层读过 <code>qlib/data/ops.py</code>、
+  <code>qlib/data/dataset/</code>、<code>qlib/backtest/executor.py</code>、
+  <code>qlib/workflow/record_temp.py</code> 之后，用自己的理解重写的一份「为什么这样设计」的解读——
+  重点讲清楚 Qlib 每个抽象<strong>解决了量化研究里哪个具体的痛</strong>，以及它对我们这个
+  港股/美股本地持仓系统 myStock 意味着什么。
+</div>
+
+<!-- ============ 0 ============ -->
+<section id="tldr">
+  <h2>0 · 一句话看懂</h2>
+  <p>
+    <strong>Qlib 把「一个想法 → 一个可回测的量化策略」这条链路，拆成了一串可插拔、可复现、可缓存的标准化组件。</strong>
+    你换模型不用碰数据，换数据不用碰回测，换策略不用碰模型——每一段都通过一个统一的配置（YAML 或 Python 对象）拼起来。
+  </p>
+  <div class="callout ok">
+    <span class="tag">本质</span>
+    Qlib = <b>金融数据的表达式计算引擎</b> + <b>ML 全流程的解耦框架</b> + <b>一个可复现的实验记录系统</b>。
+    三者缺一，它就只是「又一个回测库」。
+  </div>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="what">
+  <h2>1 · Qlib 是什么</h2>
+  <p>
+    Qlib（发音 /kju:-lib/）是微软亚洲研究院开源的 <strong>面向 AI 的量化投资平台</strong>，
+    Python 库名 <code>pyqlib</code>。它覆盖量化投资的完整链条：
+    <em>因子挖掘（alpha）→ 风险建模 → 组合优化 → 订单执行</em>，
+    并同时支持三种建模范式：<strong>监督学习</strong>（从行情里挖非线性规律）、
+    <strong>市场动态建模</strong>（应对概念漂移 / concept drift）、
+    <strong>强化学习</strong>（把连续交易决策建模成策略）。
+  </p>
+  <table>
+    <tr><th>它是</th><th>它不是</th></tr>
+    <tr><td>研究到生产的 ML 量化流水线框架</td><td>一个「买入信号提醒」App</td></tr>
+    <tr><td>金融时序数据的高性能存取 + 表达式计算引擎</td><td>一个数据供应商（数据要自己灌）</td></tr>
+    <tr><td>一堆 SOTA 论文模型的统一复现基座（20+ 模型）</td><td>一个开箱即用的实盘交易系统</td></tr>
+    <tr><td>可复现实验的记录/追踪系统（类 MLflow）</td><td>持牌投顾 / 荐股工具</td></tr>
+  </table>
+  <p class="muted">
+    授权 MIT；主战场是 A 股（<code>region: cn</code>）与美股（<code>region: us</code>），
+    但数据层是 region 无关的——港股/美股只要按格式灌进去就能用，这点对 myStock 很关键（见第 14 节）。
+  </p>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="mental">
+  <h2>2 · 心智模型：一条流水线</h2>
+  <p>理解 Qlib 最快的方式，是记住这条从原始数据到绩效报告的单向流水线。框架里几乎每个类都能对号入座：</p>
+  <div class="ascii">
+原始行情           表达式引擎            数据管线                 模型             信号→决策           执行→绩效
+(csv/bin)   ──►   Expression   ──►   DataHandler ─► Dataset ─► Model ──► Strategy ──► Executor ──► Report
+  日线/分钟         $close/Ref/       特征工程+标签    train/valid   fit/predict   Topk等    嵌套撮合    IC/年化/
+  复权/停牌         Mean/Corr...      +Processor      /test 切分    → 预测分数     选股权重   限价滑点    回撤/夏普
+                   (算子DAG)          (Learn/Infer)                (pred score)  (order)   (account)
+     │                 │                  │              │            │            │           │
+     └── data ─────────┴── contrib.data ──┴── dataset ───┴── model ───┴─ strategy ─┴─ backtest ┴─ workflow.record
+  </div>
+  <p>
+    这条线的每一节都是「输入一个标准对象、输出一个标准对象」，所以任意一节都能被替换或单独跑。
+    Qlib 官方管这叫 <em>loose-coupled modules</em>——松耦合，每个组件都能 stand-alone。
+    下面我们把这条线拆开逐节看，重点是<strong>每一节到底在解决什么问题</strong>。
+  </p>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="arch">
+  <h2>3 · 四层架构</h2>
+  <p>官方把上面那条流水线在纵向上分成四层。这个分层的意义在于：<strong>越往下越通用、越稳定，越往上越贴近具体策略。</strong></p>
+  <table>
+    <tr><th>层</th><th>职责</th><th>关键组件</th></tr>
+    <tr><td><span class="k">Infrastructure</span> 基础设施</td>
+        <td>底层支撑：高性能数据存取、训练过程控制</td>
+        <td><code>DataServer</code>（数据服务）、<code>Trainer</code>（训练器）</td></tr>
+    <tr><td><span class="k">Learning Framework</span> 学习框架</td>
+        <td>让「预测模型」和「交易智能体」可训练；统一监督学习与 RL 两种范式</td>
+        <td>Forecast Model、Trading Agent</td></tr>
+    <tr><td><span class="k">Workflow</span> 工作流</td>
+        <td>串起完整量化流程：抽数→预测→决策→执行</td>
+        <td>Information Extractor、Decision Generator、Execution Env</td></tr>
+    <tr><td><span class="k">Interface</span> 接口</td>
+        <td>面向用户的分析与报告</td>
+        <td>Graphical Reports、Analyser</td></tr>
+  </table>
+  <div class="callout">
+    <span class="tag">读源码的抓手</span>
+    分层是概念图，落到目录是：<code>qlib/data/</code>（基础设施）、<code>qlib/model/</code>+<code>qlib/rl/</code>（学习框架）、
+    <code>qlib/workflow/</code>+<code>qlib/backtest/</code>+<code>qlib/strategy/</code>（工作流）、
+    <code>qlib/contrib/report/</code>（接口）。<code>qlib/contrib/</code> 是「社区/官方贡献的具体实现」，
+    模型、策略、数据 Handler 的现成货都在这里。
+  </div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="expr">
+  <h2>4 · 表达式引擎（灵魂）</h2>
+  <p>
+    如果只能记住 Qlib 的一个设计，就记这个。<code>qlib/data/ops.py</code>（1600+ 行）实现了一套
+    <strong>金融时序的表达式计算引擎</strong>：因子不是硬编码出来的，而是用字符串表达式<em>声明</em>出来的。
+  </p>
+  <pre><code># 一个「5日均线相对当前价的偏离」因子，直接写成字符串：
+"Mean($close, 5) / $close - 1"
+
+# 「过去20日 成交量与收益的相关性」：
+"Corr($close/Ref($close,1)-1, Log($volume+1), 20)"
+
+# 取数：给一批标的、一段时间、一列表达式，引擎自动求值
+D.features(["SH600000"], ["$close", "Ref($close, 1)", "Mean($close, 5)"],
+           start_time="2020-01-01", end_time="2020-12-31")</code></pre>
+  <p>引擎里的算子分几大族，全是可组合的算子 DAG：</p>
+  <table>
+    <tr><th>族</th><th>代表算子</th><th>语义</th></tr>
+    <tr><td>逐元素</td><td><code>Abs Log Sign Power</code></td><td>对单列逐点运算</td></tr>
+    <tr><td>二元/逻辑</td><td><code>Add Sub Mul Div Gt Lt If And Or</code></td><td>两列或列与常数运算、条件选择</td></tr>
+    <tr><td>时序 <b>Rolling</b></td><td><code>Ref Mean Sum Std Max Min Rank Quantile Skew Kurt</code></td><td>沿时间轴滚动窗口聚合</td></tr>
+    <tr><td>时序回归类</td><td><code>Delta Slope Rsquare Resi WMA EMA</code></td><td>滚动线性回归斜率/残差、加权均线</td></tr>
+    <tr><td>成对 Rolling</td><td><code>Corr Cov</code></td><td>两列滚动相关/协方差</td></tr>
+    <tr><td>横截面/重采样</td><td><code>Rank(截面) TResample</code></td><td>同一时刻跨标的排序、频率重采样</td></tr>
+  </table>
+  <div class="callout ok">
+    <span class="tag">为什么这是灵魂</span>
+    <ul style="margin:6px 0">
+      <li><b>因子即代码即数据</b>：一个字符串就是一个可复现的因子，天然可版本管理、可批量生成。</li>
+      <li><b>底层可加速</b>：<code>qlib/data/_libs/</code> 有 Cython 实现的 rolling/expanding，慢算子下沉到 C。</li>
+      <li><b>可缓存</b>：表达式求值结果按（表达式 × 标的 × 区间）缓存（<code>qlib/data/cache.py</code>），
+          重复实验不重算。这就是 Qlib「跑第二遍飞快」的原因。</li>
+      <li><b>RD-Agent 的地基</b>：因为因子是文本表达式，LLM 才能自动「写因子」（见第 12 节）。</li>
+    </ul>
+  </div>
+  <p>
+    两套现成因子库建在这个引擎上：<strong>Alpha158</strong>（158 个技术因子，价量衍生）和
+    <strong>Alpha360</strong>（360 维，近 60 日 OHLCV 原始序列展开）。它们就是
+    <code>qlib/contrib/data/handler.py</code> 里一组预定义表达式的集合。
+  </p>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="data">
+  <h2>5 · Handler / Dataset 数据管线</h2>
+  <p>表达式引擎产出「特征矩阵」后，还有两个关键抽象把它变成「模型能直接吃的训练数据」。这两个抽象是 Qlib 里最容易搞混、但最值得理解的：</p>
+
+  <h3>DataHandler：特征工程的容器</h3>
+  <p>
+    <code>DataHandler</code> 负责「从表达式 → 一张带特征列和标签列的大表」，并挂上一串 <code>Processor</code> 做预处理。
+    真正常用的是它的子类 <code>DataHandlerLP</code>（LP = Learn/Process），它的精髓是<strong>把预处理拆成两组</strong>：
+  </p>
+  <table>
+    <tr><th>处理器组</th><th>作用</th><th>典型算子</th></tr>
+    <tr><td><code>infer_processors</code></td><td>推理期也要做的、无状态或用训练期参数的变换</td><td><code>RobustZScoreNorm</code>、<code>Fillna</code>、<code>CSRankNorm</code></td></tr>
+    <tr><td><code>learn_processors</code></td><td>只在训练期做的（可能会丢样本）</td><td><code>DropnaLabel</code>、样本过滤</td></tr>
+  </table>
+  <p>
+    于是同一份数据有两个「视图」：<code>DK_I</code>（infer，给预测用）和 <code>DK_L</code>（learn，给训练用）。
+    <strong>这解决了量化里一个隐蔽的 bug 源</strong>——训练时随手 dropna 掉的样本，推理时不能也丢（否则某天没预测）；
+    而归一化参数必须只用训练段拟合、推理段复用（否则未来信息泄漏）。Qlib 用 Learn/Infer 分离把这件事变成结构性保证。
+  </p>
+
+  <h3>常见 Processor</h3>
+  <p>源码 <code>qlib/data/dataset/processor.py</code> 里现成的一批（<code>CS</code> 前缀 = Cross-Sectional 截面）：</p>
+  <ul>
+    <li><code>ZScoreNorm / RobustZScoreNorm / MinMaxNorm</code>——按列标准化（用训练段的均值方差/分位）。</li>
+    <li><code>CSZScoreNorm / CSRankNorm</code>——<b>截面</b>标准化：同一天所有标的之间做 z-score 或排序归一，量化选股的常规操作。</li>
+    <li><code>DropnaProcessor / Fillna / ProcessInf</code>——缺失与异常值处理。</li>
+  </ul>
+
+  <h3>Dataset：负责「切分」</h3>
+  <p>
+    <code>DatasetH</code>（H = 带 Handler）在 Handler 之上做<strong>时间切分</strong>：
+    <code>segments: {train, valid, test}</code>。模型调用 <code>dataset.prepare(["train","valid"], col_set=["feature","label"], data_key=DK_L)</code>
+    就能拿到干净的 <code>(x, y)</code>。切分是 Dataset 的事、特征是 Handler 的事，两者正交——
+    所以你可以固定一份 Alpha158 Handler，滚动地换 train/test 窗口（这正是第 11 节滚动训练的基础）。
+  </p>
+  <div class="callout warn">
+    <span class="tag">关键点</span>
+    Qlib 数据是 <b>(datetime, instrument)</b> 双层 MultiIndex 的 DataFrame。列分组是
+    <code>feature</code> / <code>label</code> / <code>weight</code>。理解这个索引结构，
+    读任何 Qlib 数据代码都会顺很多。
+  </div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="model">
+  <h2>6 · 模型抽象与模型园</h2>
+  <p>模型层的抽象极简，这是它能容纳 20+ 种模型的原因。<code>qlib/model/base.py</code>：</p>
+  <pre><code>class Model(BaseModel):
+    def fit(self, dataset: Dataset, reweighter=None):   # 训练
+    def predict(self, dataset: Dataset) -> pd.Series:   # 输出每个(日期,标的)的预测分数</code></pre>
+  <p>
+    只要实现这两个方法，任何模型都能接进 Qlib 流水线——它不关心你内部是 GBDT 还是 Transformer，
+    只要 <code>predict</code> 吐出「分数」。这个「分数（score / signal）」就是连接<strong>模型层</strong>与<strong>策略层</strong>的唯一契约。
+  </p>
+  <h3>内置模型园（<code>qlib/contrib/model/</code> + <code>examples/benchmarks/</code>）</h3>
+  <table>
+    <tr><th>类别</th><th>模型</th></tr>
+    <tr><td>树模型</td><td>LightGBM、XGBoost、CatBoost、DoubleEnsemble</td></tr>
+    <tr><td>线性</td><td>Linear</td></tr>
+    <tr><td>经典时序 NN</td><td>MLP、LSTM、GRU、ALSTM、TCN、SFM</td></tr>
+    <tr><td>Transformer 系</td><td>Transformer、Localformer、TFT</td></tr>
+    <tr><td>图/关系</td><td>GATs、HIST、IGMTF（引入股票间关系/概念图）</td></tr>
+    <tr><td>自适应/前沿</td><td>ADARNN、ADD、TRA、TCTS、TabNet、KRNN、Sandwich</td></tr>
+  </table>
+  <div class="callout">
+    <span class="tag">经验之谈</span>
+    Qlib 官方 benchmark 里，<b>在 Alpha158/Alpha360 上，调好的 LightGBM 往往打得过大多数深度模型</b>，
+    且训练是分钟级。深度模型的价值更多在于能吃 Alpha360 那种原始序列、能建关系结构。
+    对 myStock 这种个人系统，<b>树模型是性价比最高的起点</b>。
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="record">
+  <h2>7 · Workflow 与记录链</h2>
+  <p>
+    Qlib 的实验以 <strong>Experiment → Recorder</strong> 组织（<code>qlib/workflow/</code>，接口类似 MLflow）。
+    <code>R</code> 是全局记录器句柄，一次 <code>with R.start(...)</code> 就是一次可复现的实验，
+    模型、参数、预测、绩效全部落盘、可回捞。
+  </p>
+  <p>真正串起「预测 → 分析 → 组合回测」的是 <code>record_temp.py</code> 里的一条<strong>记录链</strong>，它们按顺序执行、后者依赖前者的产物：</p>
+  <table>
+    <tr><th>Record</th><th>做什么</th><th>产物</th></tr>
+    <tr><td><code>SignalRecord</code></td><td>用训练好的 model 在 test 段跑 predict</td><td><code>pred.pkl</code>（预测信号）</td></tr>
+    <tr><td><code>SigAnaRecord</code></td><td>对信号本身做分析（不涉及交易）</td><td>IC、Rank IC、ICIR、多空收益</td></tr>
+    <tr><td><code>PortAnaRecord</code></td><td>把信号喂给策略 + 回测，做组合分析</td><td>年化、夏普、最大回撤、超额收益</td></tr>
+  </table>
+  <div class="callout ok">
+    <span class="tag">这套设计的价值</span>
+    <b>信号质量</b>（IC）与<b>策略绩效</b>（夏普）被拆成两级评估。一个模型 IC 高但回测差，
+    通常是策略/成本/换手的问题，不是模型的问题——这条链让你能分别定位。
+    <br>IC（信息系数）= 预测值与真实收益的截面相关；ICIR = IC 的均值/标准差，衡量稳定性。
+  </div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="backtest">
+  <h2>8 · 回测：嵌套执行器</h2>
+  <p>
+    这是 Qlib 第二个真正有设计感的地方（<code>qlib/backtest/executor.py</code>）。它把回测抽象成
+    <strong>「策略 Strategy 出决策、执行器 Executor 撮合」的循环</strong>，而且执行器可以<strong>嵌套</strong>。
+  </p>
+  <div class="ascii">
+  日频层：  Strategy(日) ──决策(目标持仓)──► NestedExecutor(日)
+                                               │  把「今天要调仓」拆成日内订单
+                                               ▼
+  分钟层：              Strategy(日内) ──订单──► SimulatorExecutor(分钟)
+                                                  │  逐分钟撮合，算滑点/手续费/涨跌停
+                                                  ▼
+                                               账户 Account（现金/持仓/成交）
+  </div>
+  <p>
+    <code>NestedExecutor</code> 里嵌一个更细粒度的「策略+执行器」子循环，
+    <code>SimulatorExecutor</code> 是最底层的真实撮合。这套结构一次性解决了两个平时很别扭的问题：
+  </p>
+  <ul>
+    <li><b>多频率协同</b>：日频选股策略 + 日内 VWAP/TWAP 执行，可以在同一个回测里嵌套跑，收益归因清清楚楚。</li>
+    <li><b>决策与执行解耦</b>：策略只管「我想持有什么」（<code>TradeDecision</code>），
+        执行器负责「在这个市场约束下怎么成交」——RL 订单执行（第 10 节）就是把最底层这个执行器换成一个学出来的智能体。</li>
+  </ul>
+  <p class="muted">
+    交易约束在 <code>Exchange</code> 里配：<code>limit_threshold</code>（涨跌停不可成交）、
+    <code>deal_price</code>（用 close/vwap）、<code>open_cost/close_cost/min_cost</code>（买卖佣金、最低费）。
+    这些直接决定回测可信度。
+  </p>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="strategy">
+  <h2>9 · 策略：TopkDropout 解剖</h2>
+  <p>
+    <code>qlib/contrib/strategy/signal_strategy.py</code> 里最经典的是 <code>TopkDropoutStrategy</code>，
+    几乎所有 benchmark 都用它。它把「预测分数」变成「实际持仓」，机制值得逐字理解：
+  </p>
+  <table>
+    <tr><th>参数</th><th>含义</th></tr>
+    <tr><td><code>topk</code></td><td>目标持仓只数（如 50 只）</td></tr>
+    <tr><td><code>n_drop</code></td><td>每期最多换掉几只（如 5 只）</td></tr>
+    <tr><td><code>signal</code></td><td>打分来源（<code>&lt;PRED&gt;</code> = 上游模型预测）</td></tr>
+  </table>
+  <p><strong>每个调仓日的逻辑：</strong></p>
+  <ol>
+    <li>按预测分数对全市场排序。</li>
+    <li>看当前持仓里，分数<b>掉出前列</b>的，最多卖掉 <code>n_drop</code> 只（<b>不是</b>全部重排）。</li>
+    <li>用排名最靠前、当前没持有的标的补上，补齐到 <code>topk</code> 只。</li>
+    <li>等权（或按 <code>WeightStrategyBase</code> / <code>EnhancedIndexingStrategy</code> 优化权重）持有。</li>
+  </ol>
+  <div class="callout warn">
+    <span class="tag">为什么是 dropout 而不是全换</span>
+    每期只换 <code>n_drop</code> 只，是为了<b>压低换手率</b>——换手直接吃交易成本，
+    也让回测的年化不至于被「理想化的天天满仓重排」虚高。这是一个「工程上很聪明」的默认策略：
+    简单、可解释、换手可控。它也解释了为什么调 <code>n_drop</code> 对回测结果影响巨大。
+  </div>
+  <p>另有 <code>EnhancedIndexingStrategy</code>（增强指数，控制相对基准的行业/风格暴露）和 <code>strategy/optimizer/</code>（组合优化器，做风险约束下的权重求解）。</p>
+</section>
+
+<!-- ============ 10 ============ -->
+<section id="rl">
+  <h2>10 · 强化学习与订单执行</h2>
+  <p>
+    <code>qlib/rl/</code> 是 Qlib 的第三种范式。它最成熟的落地场景是<strong>订单执行（order execution）</strong>：
+    给你一个「今天要买 100 万股 A」的目标，怎么在一天内切成小单、择时下单，让平均成交价尽量优于 VWAP。
+  </p>
+  <p>RL 组件与标准 Gym 范式对齐，但为金融做了拆分：</p>
+  <table>
+    <tr><th>组件</th><th>Qlib 类</th><th>金融含义</th></tr>
+    <tr><td>环境模拟</td><td><code>Simulator</code></td><td>市场撮合（复用第 8 节的执行器）</td></tr>
+    <tr><td>状态解释</td><td><code>StateInterpreter</code></td><td>把市场状态编码成观测向量</td></tr>
+    <tr><td>动作解释</td><td><code>ActionInterpreter</code></td><td>把策略动作翻译成订单</td></tr>
+    <tr><td>奖励</td><td><code>Reward</code></td><td>成交价 vs 基准的差（越省越好）</td></tr>
+    <tr><td>策略</td><td><code>Policy</code>（PPO 等）</td><td>可训练的交易智能体</td></tr>
+  </table>
+  <div class="callout">
+    <span class="tag">插一句</span>
+    这套 <code>Simulator / StateInterpreter / ActionInterpreter / Reward / Policy</code> 的拆法，
+    和我们 myStock 里 <code>mystock/ml/</code> 正在做的 <code>policy.py</code>、<code>reward.py</code>、
+    <code>regime.py</code>、<code>calibrator.py</code> 思路是同源的——都是把「决策」拆成可独立替换、可单测的纯组件。
+  </div>
+</section>
+
+<!-- ============ 11 ============ -->
+<section id="dynamic">
+  <h2>11 · 市场漂移与在线滚动</h2>
+  <p>
+    金融数据最难的地方：<strong>分布会漂移（concept drift）</strong>。去年有效的因子今年可能反向。
+    Qlib 给了两套工具应对：
+  </p>
+  <h4>① 滚动训练（Rolling）</h4>
+  <p>
+    <code>qlib/contrib/rolling/</code>：不训练「一个」模型，而是随时间滚动地不断重训——
+    每隔一段用最近数据重新 fit，模拟真实世界里「模型要定期再训」的节奏。评估更诚实。
+  </p>
+  <h4>② 元学习 / DDG-DA</h4>
+  <p>
+    更进一步，把「未来数据分布会怎么变」也建模出来（meta-learning，<code>qlib/contrib/meta/</code>），
+    在重训时主动补偿漂移，而不是被动追随。代表工作 DDG-DA。
+  </p>
+  <h4>③ 在线服务（Online Serving）</h4>
+  <p>
+    <code>qlib/workflow/online/</code>：管理「当前上线的是哪个模型」，自动滚动更新、灰度切换——
+    把研究期的滚动训练，延伸成生产期的模型生命周期管理。
+  </p>
+  <div class="callout danger">
+    <span class="tag">对个人系统的提醒</span>
+    漂移是量化里比「模型不够强」更致命的问题。任何在历史上惊艳的回测，
+    不做滚动/样本外验证都要打对折看。myStock 若引入 ML，<b>滚动回测应是默认口径，而非可选项</b>。
+  </div>
+</section>
+
+<!-- ============ 12 ============ -->
+<section id="rdagent">
+  <h2>12 · RD-Agent：自动因子工厂</h2>
+  <p>
+    Qlib README 现在头条推的是 <a href="https://github.com/microsoft/RD-Agent" target="_blank" rel="noopener">RD-Agent</a>——
+    一个用 LLM 驱动的<strong>自动因子挖掘 + 模型优化</strong>智能体框架。它能做两件事：
+  </p>
+  <ul>
+    <li><b>从想法/研报里读因子</b>：把券商研报里描述的因子逻辑，自动翻译成 Qlib 表达式并回测。</li>
+    <li><b>自动迭代</b>：提出因子 → 回测 → 看结果 → 改进 → 再回测，形成 R&D 闭环（论文 <em>R&D-Agent-Quant</em>, arXiv:2505.15155）。</li>
+  </ul>
+  <div class="callout ok">
+    <span class="tag">为什么第 4 节的表达式引擎是前提</span>
+    正因为 Qlib 的因子是<b>文本表达式</b>、且回测是<b>标准化可自动跑</b>的，LLM 才能把「写因子」变成一个可自动闭环的任务。
+    这是 Qlib 早年那个表达式设计，在 LLM 时代兑现的复利。
+  </div>
+</section>
+
+<!-- ============ 13 ============ -->
+<section id="config">
+  <h2>13 · 一份 YAML 全景</h2>
+  <p>
+    前面讲的所有组件，最终由一份 YAML 声明式地拼起来，用 <code>qrun config.yaml</code> 一键跑完
+    「初始化 → 建数据集 → 训练 → 预测 → 信号分析 → 组合回测 → 落盘」。
+    下面是官方 LightGBM×Alpha158 配置，逐块对应到前面的章节：
+  </p>
+  <pre><code>qlib_init: {provider_uri: "~/.qlib/qlib_data/cn_data", region: cn}
+market: &market csi300              # 股票池
+benchmark: &benchmark SH000300      # 对标基准
+
+data_handler_config: &dhc          # ← 第 5 节：Handler
+    start_time: 2008-01-01
+    fit_start_time: 2008-01-01      # 归一化参数只用这段拟合（防泄漏）
+    instruments: *market
+
+port_analysis_config: &pac          # ← 第 8/9 节：策略 + 回测
+    strategy:
+        class: TopkDropoutStrategy
+        kwargs: {signal: &lt;PRED&gt;, topk: 50, n_drop: 5}
+    backtest:
+        account: 100000000
+        exchange_kwargs:            # 交易成本/涨跌停
+            limit_threshold: 0.095
+            deal_price: close
+            open_cost: 0.0005
+            close_cost: 0.0015
+
+task:
+    model:                          # ← 第 6 节：模型
+        class: LGBModel
+        module_path: qlib.contrib.model.gbdt
+        kwargs: {learning_rate: 0.2, num_leaves: 210, max_depth: 8, ...}
+    dataset:                        # ← 第 5 节：Dataset 切分
+        class: DatasetH
+        kwargs:
+            handler: {class: Alpha158, kwargs: *dhc}
+            segments:               # 训练/验证/测试三段
+                train: [2008-01-01, 2014-12-31]
+                valid: [2015-01-01, 2016-12-31]
+                test:  [2017-01-01, 2020-08-01]
+    record:                         # ← 第 7 节：记录链
+        - {class: SignalRecord}     # 生成预测
+        - {class: SigAnaRecord}     # IC 分析
+        - {class: PortAnaRecord, kwargs: {config: *pac}}  # 组合回测</code></pre>
+  <p>
+    一份 YAML 就是一次完整实验。想换模型？改 <code>model.class</code>。想换股票池？改 <code>market</code>。
+    想换回测成本？改 <code>exchange_kwargs</code>。<strong>组件解耦的价值，在这份配置里最直观。</strong>
+  </p>
+  <p class="muted">纯 Python 写法见 <code>examples/workflow_by_code.py</code>，逻辑等价，适合要在流程里插自定义步骤时用。</p>
+</section>
+
+<!-- ============ 14 ============ -->
+<section id="mystock">
+  <h2>14 · 对 myStock 的启示</h2>
+  <p>Qlib 是「工业级研究框架」，myStock 是「个人本地持仓系统」，定位不同，但有几处理念可以直接借鉴：</p>
+  <div class="grid-2">
+    <div class="callout ok">
+      <span class="tag">值得借鉴</span>
+      <ul style="margin:6px 0">
+        <li><b>表达式化因子</b>：把技术指标写成可组合、可缓存的表达式，而非散落的函数——利于批量试因子。</li>
+        <li><b>Learn/Infer 分离</b>：归一化只用训练段拟合，是防未来泄漏的结构性保证。</li>
+        <li><b>信号↔策略两级评估</b>：IC 看信号、夏普看策略，分别定位问题。</li>
+        <li><b>滚动回测为默认</b>：对抗漂移，别信单段回测。</li>
+        <li><b>决策组件化</b>：正对应我们 <code>ml/policy.py</code>、<code>reward.py</code>、<code>regime.py</code> 的拆法。</li>
+      </ul>
+    </div>
+    <div class="callout warn">
+      <span class="tag">不必照搬</span>
+      <ul style="margin:6px 0">
+        <li><b>整套引入过重</b>：Qlib 假设有完整历史行情数据服务；myStock 只有富途+yfinance 的本地 SQLite 快照。</li>
+        <li><b>数据边界冲突</b>：Qlib 要 region 全市场 bin 数据，我们是「已持仓标的」的窄数据。</li>
+        <li><b>Web 只读边界</b>：myStock 的 CLAUDE.md 明确 Web 只读 SQLite；Qlib 的重计算应放在 pipeline 侧离线跑，绝不进 Web 请求路径。</li>
+        <li><b>港股/美股</b>：Qlib 主战场是 A 股；港美股要自己灌数据、自建 instruments 列表。</li>
+      </ul>
+    </div>
+  </div>
+  <div class="callout">
+    <span class="tag">务实结论</span>
+    与其整体接入 Qlib，不如<b>借其设计、造轻量版</b>：在 <code>mystock/ml/</code> 里沿用「表达式因子 + Learn/Infer 分离 + 滚动回测 + 信号/策略两级评估」的方法论，
+    用我们自己的 SQLite 数据跑。若某天需要认真做多模型 benchmark，再考虑把导出的数据喂给独立的 Qlib 环境离线研究——
+    与 myStock 的 <span class="pill">Web 只读</span> 边界不冲突。
+  </div>
+</section>
+
+<!-- ============ 15 ============ -->
+<section id="pitfalls">
+  <h2>15 · 坑与边界</h2>
+  <table>
+    <tr><th>坑</th><th>说明</th></tr>
+    <tr><td>数据要自己准备</td><td>Qlib 只给下载脚本（<code>scripts/get_data.py</code> 拉公开样例）；自有市场/私有数据要转成 Qlib bin 格式。</td></tr>
+    <tr><td>未来信息泄漏</td><td>归一化拟合区间、标签的时间对齐（<code>Ref($close, -N)</code> 用未来收益做标签）极易出错。切分与 fit 区间必须严格。</td></tr>
+    <tr><td>回测≠实盘</td><td>涨跌停不可成交、滑点、最低费、停牌、复权——<code>exchange_kwargs</code> 配错，回测会系统性偏乐观。</td></tr>
+    <tr><td>缓存陷阱</td><td>表达式缓存加速的同时，改了底层数据但没清缓存会读到旧结果。调试时留意 <code>~/.qlib</code> 缓存。</td></tr>
+    <tr><td>深度模型收益边际</td><td>多数场景 LightGBM 已够好；上深度模型前先确认数据/因子瓶颈不在别处。</td></tr>
+    <tr><td>不是投顾</td><td>Qlib 是研究工具，输出的是「研究信号」，不构成投资建议——与 myStock「不输出个性化投资建议」的定位一致。</td></tr>
+  </table>
+</section>
+
+<!-- ============ 16 ============ -->
+<section id="refs">
+  <h2>16 · 参考</h2>
+  <ul>
+    <li>GitHub：<a href="https://github.com/microsoft/qlib" target="_blank" rel="noopener">microsoft/qlib</a></li>
+    <li>官方文档：<a href="https://qlib.readthedocs.io/" target="_blank" rel="noopener">qlib.readthedocs.io</a></li>
+    <li>平台论文：<a href="https://arxiv.org/abs/2009.11189" target="_blank" rel="noopener">Qlib: An AI-oriented Quantitative Investment Platform (arXiv:2009.11189)</a></li>
+    <li>RD-Agent：<a href="https://github.com/microsoft/RD-Agent" target="_blank" rel="noopener">microsoft/RD-Agent</a> · 论文 <a href="https://arxiv.org/abs/2505.15155" target="_blank" rel="noopener">arXiv:2505.15155</a></li>
+    <li>本文源码抓手：<code>qlib/data/ops.py</code>（表达式）、<code>qlib/data/dataset/{handler,processor}.py</code>（数据管线）、
+        <code>qlib/model/base.py</code>（模型契约）、<code>qlib/workflow/record_temp.py</code>（记录链）、
+        <code>qlib/backtest/executor.py</code>（嵌套回测）、<code>qlib/contrib/strategy/signal_strategy.py</code>（策略）、
+        <code>examples/benchmarks/LightGBM/workflow_config_lightgbm_Alpha158.yaml</code>（配置全景）。</li>
+  </ul>
+  <div class="callout">
+    <span class="tag">关于本文</span>
+    由 Claude 基于本地只读仓库 <code>/Users/kk/Work/Workpace/GitHub/qlib</code> 的源码逐层阅读后独立撰写，
+    非官方译文。数值与 API 随版本变化，以官方文档与源码为准。生成日期 2026-07-18。
+  </div>
+</section>
+
+</main>
+</div>
+
+<button class="theme-toggle" type="button" onclick="(function(){
+  var cur = document.documentElement.getAttribute('data-theme');
+  var next = cur === 'dark' ? 'light' : (cur === 'light' ? 'dark' : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark'));
+  document.documentElement.setAttribute('data-theme', next);
+  try { localStorage.setItem('mystock-doc-theme', next); } catch(e) {}
+})()">切换主题</button>
+
+</body>
+</html>
