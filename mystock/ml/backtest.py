@@ -14,13 +14,14 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import numpy as np
 import pandas as pd
 
 from . import config as mlcfg
 from . import data as mldata
+from . import signal_eval as sig
 from .features import FEATURE_COLS, build_features
 from .policy import Action, LinUCB, N_ACTIONS, RulePolicy, enumerate_actions
 from .predictor import IntervalModel
@@ -36,10 +37,36 @@ class BTConfig:
     high_alpha: float = 0.9
     low_alpha: float = 0.1
     bandit_alpha: float = 0.5
-    # P3.1 改进开关
-    excess_reward: bool = True    # 奖励=相对 buy&hold 的超额（直接对齐"打赢持有"）
+    # P3.1 改进开关（超额奖励=相对 buy&hold，直接对齐"打赢持有"）
+    excess_reward: bool = True    # True→reward 用超额；False→用原始 step_pnl
     epsilon: float = 0.05         # bandit ε-探索（逃离早期坏臂）
     reward_scale: float = 50.0    # 超额奖励放大，提升 LinUCB 学习信号
+    # 建议 2：CQR 校准（保留——提升区间命中率，属预测层；默认开）
+    conformal: bool = True
+    target_coverage: float = 0.8
+    cal_frac: float = 0.25
+    # 借鉴②（Plan §2.3）：预测器 fit 段与 test 段之间的隔离带。默认开——训练段
+    # 末尾砍 purge_w 行，净值结论更诚实。purged=False 保留旧的紧贴切分做 A/B。
+    purged: bool = True
+    feat_lookback: int = 21       # 特征最长回看（价格空间复合窗，勿填 20）
+    label_horizon: int = 1        # 标签前看（次日）
+
+
+def compute_reward(step_pnl: float, bh_step: float, init_cash: float,
+                   scale: float, *, excess: bool = True) -> float:
+    """回合单步 reward（纯函数，可单测）。
+
+      - excess=True：相对 buy&hold 的超额（(step_pnl - bh_step)/init_cash·scale），
+        直接对齐"打赢持有"，是 P3.1 的默认。
+      - excess=False：原始 step_pnl/init_cash·scale（不对齐基准）。
+
+    注：曾试验过的风险调整 reward（sharpe / drawdown_penalized，即"Tier1 建议1"）
+    未通过时段稳健性检验（6 段翻转、胜率 42%），已移除，详见
+    docs/ML_TIER1_ROBUSTNESS.md。
+    """
+    if excess:
+        return (step_pnl - bh_step) / init_cash * scale
+    return step_pnl / init_cash * scale
 
 
 def _state_vec(row: pd.Series) -> np.ndarray:
@@ -65,10 +92,18 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         return {"code": code, "error": "样本不足"}
 
     split_at = valid[int(len(valid) * cfg.train_frac)]
-    train_df = feat.loc[[i for i in valid if i < split_at]]
+    # 借鉴②（Plan §2.3）：训练段末尾砍 purge_w 行隔离带（test 不变），使预测器
+    # fit 段与 test 段不相邻——挤掉边界标签重叠 + 相似性乐观，净值结论更诚实。
+    # 备注：purge 后 CQR 校准集（取自 train 尾部）随之前移，对 test 的"新鲜度"略降；
+    # 若实测覆盖率系统性偏离目标，可考虑校准集仍取紧邻 test 的近样本（Plan §2.3 备注）。
+    purge_w = (cfg.feat_lookback + cfg.label_horizon) if cfg.purged else 0
+    train_df = feat.loc[[i for i in valid if i < split_at - purge_w]]
     lo_a, hi_a = mlcfg.alpha_for(code)  # 按股自适应分位（与报告一致）
-    model = IntervalModel(seed=cfg.seed, high_alpha=hi_a,
-                          low_alpha=lo_a).fit(train_df)
+    model = IntervalModel(
+        seed=cfg.seed, high_alpha=hi_a, low_alpha=lo_a,
+        conformal=cfg.conformal, target_coverage=cfg.target_coverage,
+        cal_frac=cfg.cal_frac, label_horizon=cfg.label_horizon,
+    ).fit(train_df)
 
     test_idx = [i for i in valid if i >= split_at]
     dim = 1 + len(FEATURE_COLS)
@@ -96,6 +131,8 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
     bh_shares = None
     bh_prev = cfg.init_cash  # 上一步 buy&hold 净值（算超额奖励用）
     hit_n = hit_total = 0    # 区间命中统计（与 predictor 口径一致：次日真实高低全落入区间）
+    # 借鉴③（Plan §3.3）：旁路收集信号序列（不改 reward/动作/净值），测试段末算 IC
+    sig_lo, sig_hi, sig_yl, sig_yh = [], [], [], []
 
     for i in test_idx:
         row = feat.iloc[i]
@@ -115,6 +152,9 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         hit_total += 1
         if row["y_high_ret"] <= hi_r and row["y_low_ret"] >= lo_r:
             hit_n += 1
+        # 借鉴③：旁路记录（预测下/上沿 + 真实次日低/高，ret 空间）
+        sig_lo.append(lo_r); sig_hi.append(hi_r)
+        sig_yl.append(float(row["y_low_ret"])); sig_yh.append(float(row["y_high_ret"]))
 
         # --- buy_hold：期初一次性买入并持有 ---
         if bh_shares is None:
@@ -126,7 +166,8 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         nav_dates.append(next_day)
 
         # --- S0 规则 ---
-        _apply(accs["rule"], rule.act(_ctx(accs["rule"], close_t), L_hat, H_hat), bars, cfg)
+        ract = rule.act(_ctx(accs["rule"], close_t), L_hat, H_hat)
+        _apply(accs["rule"], ract, bars, cfg)
         nav_curves["rule"].append(accs["rule"].equity(mark_next))
 
         # --- S2 bandit ---
@@ -141,9 +182,8 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         _apply(accs["bandit"], chosen, bars, cfg)
         eq_after = accs["bandit"].equity(mark_next)
         step_pnl = eq_after - eq_before
-        # P3.1：奖励=相对 buy&hold 的超额（直接对齐"打赢持有"），放大提升学习信号
-        raw = (step_pnl - bh_step) if cfg.excess_reward else step_pnl
-        reward = raw / cfg.init_cash * cfg.reward_scale
+        reward = compute_reward(step_pnl, bh_step, cfg.init_cash,
+                                cfg.reward_scale, excess=cfg.excess_reward)
         bandit.update(chosen_id, x, reward)
         nav_curves["bandit"].append(eq_after)
 
@@ -157,7 +197,7 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
                     accs["human"].sell(f.fill_price, float(d["qty"]))
         nav_curves["human"].append(accs["human"].equity(mark_next))
 
-    return {
+    result = {
         "code": code,
         "n_test_days": len(nav_curves["bandit"]),
         # 测试窗区间命中率（与报告展示的自适应分位同口径，供报告直接引用）
@@ -175,7 +215,14 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
         "backend": "lightgbm" if _lgb() else "sklearn",
         "nav_curves": nav_curves,
         "nav_dates": nav_dates,
+        # 借鉴③：信号层评估（旁路观测，不影响净值）。width_ic 为主指标。
+        "signal": sig.signal_report(sig_lo, sig_hi, sig_yl, sig_yh),
+        # 口径标注（报告头部用）
+        "reward_mode": "excess" if cfg.excess_reward else "raw",
+        "conformal": bool(cfg.conformal),
+        "purged": bool(cfg.purged),
     }
+    return result
 
 
 # ---- helpers ----
@@ -205,12 +252,21 @@ def _lgb():
 
 
 if __name__ == "__main__":
+    from dataclasses import replace
+    # 标准口径：超额-bandit + CQR 校准 + purged 隔离带（与 report 同口径）。
+    # 风险调整 reward / regime 软切换（原 Tier1 建议1+3）未通过时段稳健性检验，
+    # 已移除，详见 docs/ML_TIER1_ROBUSTNESS.md。
+    base = BTConfig()  # conformal/purged 默认开
     print(f"{'code':9} {'days':>5} {'rule':>9} {'bandit':>9} {'human':>9} {'buy_hold':>9}  net(bandit)")
     for code in mlcfg.TARGETS:
-        r = run_backtest(code)
+        cov = mlcfg.coverage_for(code)
+        cfg_i = replace(base, target_coverage=cov)
+        r = run_backtest(code, cfg_i)
         if "error" in r:
             print(f"{code}: {r['error']}"); continue
         fe = r["final_equity"]
+        s = r.get("signal") or {}
         print(f"{code:9} {r['n_test_days']:>5} "
               f"{fe['rule']:>9} {fe['bandit']:>9} {fe['human']:>9} {fe['buy_hold']:>9}  "
-              f"净值={r['net_value']['bandit']} 命中={r['interval_hit_rate']}  [{r['backend']}]")
+              f"净值={r['net_value']['bandit']} 命中={r['interval_hit_rate']} "
+              f"宽度IC={s.get('width_ic')}  [{r['backend']}]")

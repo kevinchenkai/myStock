@@ -1,5 +1,7 @@
 # ML 新算法建议清单（讨论稿 v0.1）
 
+> **⚠️ 后续更新（2026-07-18）**：第一档三件套已落地并复检。**建议1（风险调整 reward）与建议3（HMM regime 软切换）未通过时段稳健性检验（6 时段翻转、胜率 42%），已从代码移除**，详见 [`ML_TIER1_ROBUSTNESS.md`](ML_TIER1_ROBUSTNESS.md)。**建议2（CQR 校准）稳健有效、保留**。下方原始提案保留作历史，阅读时请对照该记录。
+>
 > 状态：本文件为**新算法建议清单**，承接 [`ML_OVERVIEW.md`](ML_OVERVIEW.md) 的"下一步优先级 = regime 感知 > 扩样本 > RL"与 [`ML_PLAN.md`](ML_PLAN.md) 的"能停则停、打不过基线如实记录"纪律。**未拍板、未开工**，供讨论与排期。
 >
 > 关联：数据口径见 [`DATA.md`](DATA.md)，盈亏口径见 [`mystock/pnl.py`](../mystock/pnl.py)，现有 ML 代码见 [`mystock/ml/`](../mystock/ml/)。

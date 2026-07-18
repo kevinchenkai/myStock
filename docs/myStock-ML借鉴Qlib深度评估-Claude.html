@@ -223,7 +223,7 @@
     <tr><td><code>regime.py</code></td><td>HMM 市场状态 + 无泄漏前向滤波</td><td><b>亮点</b>：显式避开 hmmlearn 的 forward-backward（会偷看未来），手写 log 空间 forward filtering。自带无泄漏自检</td></tr>
     <tr><td><code>policy.py</code></td><td>S0 规则 / LinUCB / Regime 软切换</td><td>13 臂离散动作、regime 按后验概率软混合。刻意不用深度 RL——<b>对小样本是正确取舍</b></td></tr>
     <tr><td><code>simulator.py</code></td><td>1h 盘中限价撮合 + 独立账户</td><td>逐根 1h bar 判"先到 low 还是先到 high"，移动平均成本。残余近似（bar 内顺序/部分成交/滑点）如实标注</td></tr>
-    <tr><td><code>backtest.py</code></td><td>逐日回放 + 三基线对照 + 风险调整 reward</td><td>预测向量化、NaN 兜底、reward 4 模式（raw/excess/sharpe/dd）。<b>基线对照是灵魂</b></td></tr>
+    <tr><td><code>backtest.py</code></td><td>逐日回放 + 三基线对照 + 超额-bandit</td><td>预测向量化、NaN 兜底、reward=raw/excess（风险调整 reward 复检未过已移除，见 ML_TIER1_ROBUSTNESS.md）。<b>基线对照是灵魂</b></td></tr>
     <tr><td><code>offline_rl.py</code></td><td>离线 RL（Discrete CQL）</td><td>行为策略 rollout → CQL → 同口径回测。定位为"研究性、跑不赢就记录"，克制</td></tr>
     <tr><td><code>fetch.py / data.py / db.py / config.py</code></td><td>独立库采集 / 只读对齐 / schema</td><td>训练库 <code>data/ml/mystock_ml.db</code> 与生产库<b>物理隔离</b>，只读快照 deals/orders。边界干净</td></tr>
   </table>

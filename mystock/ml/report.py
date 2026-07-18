@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import datetime as dt
 import html
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 from . import config as mlcfg
@@ -168,6 +169,54 @@ def _verdict(bt: dict) -> str:
     return " ".join(parts)
 
 
+def _fmt_ic(v) -> str:
+    """IC 值格式化：None/NaN → 「—」，否则带符号 3 位。"""
+    if v is None or v != v:
+        return "—"
+    return f"{v:+.3f}"
+
+
+def _two_level_verdict(bt: dict) -> str:
+    """借鉴③（Plan §3.3）：两级评估——先信号层，再策略层，规则化生成分诊结论。
+
+    宽度优先（分位模型的忠实度量）：
+      - 宽度 IC 高 + 净值输 → 区间跟得住振幅但没换成钱 → 执行/挂价档是瓶颈（攻决策层）。
+      - 宽度 IC 低 → 区间连振幅都跟不住 → 攻预测层/因子（即借鉴①）。
+      - 方向 IC ≈ 0 → 只说明无方向信息（分位模型本就没学方向），单凭它不下"信号无效"结论。
+    这句诊断直接告诉团队下一步该往哪使劲——两级评估最大的价值。
+    """
+    s = bt.get("signal") or {}
+    w_ic, m_ic = s.get("width_ic"), s.get("mid_ic")
+    fe, init = bt["final_equity"], bt["init_cash"]
+    b, bh = fe.get("bandit"), fe.get("buy_hold")
+    beat = (b is not None and b == b and bh is not None and bh == bh and b > bh)
+
+    if w_ic is None or w_ic != w_ic:
+        sig_line = "信号层：宽度 IC 不可得（样本不足）。"
+        head = ""
+    else:
+        strong = w_ic >= 0.15   # 单标的时间轴 IC 天然弱，0.15 已算有跟踪力
+        if strong and not beat:
+            head = (f"<b style='color:{C_UP}'>信号跟得住振幅但没换成钱</b>"
+                    f"（宽度 IC={_fmt_ic(w_ic)}，净值未超买入持有）→ "
+                    f"<b>瓶颈在执行/挂价档</b>，下一步攻决策层（挂价、数量档、reward）。")
+        elif strong and beat:
+            head = (f"<b style='color:{C_UP}'>信号有跟踪力且已换成超额</b>"
+                    f"（宽度 IC={_fmt_ic(w_ic)}，净值超买入持有）→ 预测+执行链路本段成立。")
+        else:
+            head = (f"<b style='color:{C_DOWN}'>信号连振幅都跟不住</b>"
+                    f"（宽度 IC={_fmt_ic(w_ic)}）→ <b>先攻预测层/因子</b>（借鉴①的因子库），"
+                    f"此时调执行层是缘木求鱼。")
+        sig_line = f"信号层：宽度 IC={_fmt_ic(w_ic)}（主）、中点 IC={_fmt_ic(m_ic)}（次）。"
+
+    # 方向 IC 的诚实注解（避免误判"信号无效"）
+    note = ""
+    if m_ic is not None and m_ic == m_ic and abs(m_ic) < 0.05:
+        note = ("　<span style='color:#888'>中点 IC≈0 属预期——分位模型没学方向，"
+                "不据此判\"信号无效\"，以宽度 IC 为准。</span>")
+    return sig_line + " " + head + note
+
+
 def _stock_section(code: str, bt: dict, pred: dict) -> str:
     fe, nv = bt["final_equity"], bt["net_value"]
     init = bt["init_cash"]
@@ -199,11 +248,39 @@ def _stock_section(code: str, bt: dict, pred: dict) -> str:
       <div style="margin-top:10px;padding:10px 12px;background:#fafafa;border-left:3px solid #ccc;
            border-radius:4px;font-size:13px;line-height:1.7">
         <b>分析总结：</b>{_verdict(bt)}</div>
+      <div style="margin-top:8px;padding:10px 12px;background:#f4f8fb;border-left:3px solid #2a6fd8;
+           border-radius:4px;font-size:13px;line-height:1.7">
+        <b>两级评估（信号 vs 执行）：</b>{_two_level_verdict(bt)}</div>
     </section>"""
 
 
-def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None) -> Path:
-    cfg = cfg or BTConfig()
+@dataclass
+class _ReportCfg:
+    """build_report 的开关（透传到 BTConfig / predict_next_day）。
+
+    标准口径：超额-bandit + CQR 校准（建议2，提升区间命中率）+ purged 隔离带（借鉴②）。
+    风险调整 reward / HMM regime 软切换（原 Tier1 建议1+3）未通过时段稳健性检验、
+    已移除，详见 docs/ML_TIER1_ROBUSTNESS.md。
+    """
+    conformal: bool = True
+    target_coverage: float = 0.70   # 兜底；实际按股走 mlcfg.coverage_for(code)
+
+
+def _mode_banner(cfg: BTConfig) -> str:
+    """报告头部一行：当前 reward / 预测口径（透明化标准开关）。"""
+    tags = [f"reward={'excess' if cfg.excess_reward else 'raw'}"]
+    tags.append(f"CQR={'on' if cfg.conformal else 'off'}"
+                + (f"(目标{cfg.target_coverage:.0%})" if cfg.conformal else ""))
+    tags.append(f"purge={'on(隔离带)' if getattr(cfg, 'purged', False) else 'off'}")
+    return " · ".join(tags)
+
+
+def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
+                 rcfg: _ReportCfg | None = None) -> Path:
+    rcfg = rcfg or _ReportCfg()
+    cfg = cfg or BTConfig(
+        conformal=rcfg.conformal, target_coverage=rcfg.target_coverage,
+    )
     today = dt.date.today().isoformat()
     out_dir = out_dir or (mlcfg.REPORTS_DIR / today)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -211,21 +288,27 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None) -> Pa
     sections, summary_rows = [], ""
     for code in mlcfg.TARGETS:
         daily = mldata.load_daily(code)
-        bt = run_backtest(code, cfg)
+        # 按股自适应 CQR 目标覆盖率（收窄区间；与 ALPHA_BY_CODE 同模式）
+        cov = mlcfg.coverage_for(code)
+        cfg_i = cfg if cfg.target_coverage == cov else replace(cfg, target_coverage=cov)
+        bt = run_backtest(code, cfg_i)
         if "error" in bt:
             continue
         lo_a, hi_a = mlcfg.alpha_for(code)  # 按股自适应分位（收窄区间）
         pred = predict_next_day(daily, seed=cfg.seed,
-                                high_alpha=hi_a, low_alpha=lo_a)
+                                high_alpha=hi_a, low_alpha=lo_a,
+                                conformal=cfg.conformal, target_coverage=cov)
         sections.append(_stock_section(code, bt, pred))
         fe = bt["final_equity"]
         b, bh = fe.get("bandit"), fe.get("buy_hold")
         # NaN/None 时不下「超越」结论（nan 比较恒 False，会误判为 ✗）
         beat = "—" if (b is None or b != b or bh is None or bh != bh) else ("✓" if b > bh else "✗")
+        w_ic = (bt.get("signal") or {}).get("width_ic")
         summary_rows += (f"<tr><td>{code}</td>"
                          f"<td style='text-align:right'>{_fmt_eq(b)}</td>"
                          f"<td style='text-align:right'>{_fmt_eq(bh)}</td>"
                          f"<td style='text-align:center'>{beat}</td>"
+                         f"<td style='text-align:right'>{_fmt_ic(w_ic)}</td>"
                          f"<td>{pred['L_hat']:,.2f} ~ {pred['H_hat']:,.2f}</td>"
                          f"<td style='text-align:right'>{pred['width_pct']:.2f}%</td>"
                          f"<td style='text-align:right'>{_fmt_pct(bt.get('interval_hit_rate'))}</td></tr>")
@@ -236,19 +319,21 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None) -> Pa
 h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}</style></head><body>
 <h1>myStock ML 回测报告 · {today}</h1>
 <p style="color:#888">3 美股(USD) + 3 港股(HKD)，各股独立账户本币计价 · 目标=最大化达成交易净值 · 红涨绿跌 · 离线产物（不碰 web）</p>
+<p style="color:#666;font-size:12px">口径：{_mode_banner(cfg)}</p>
 {_metrics_guide()}
 <h2>总览：Bandit vs 买入持有 + 次日预测</h2>
 <table style="border-collapse:collapse;min-width:560px">
   <tr style="border-bottom:1px solid #ccc"><th style="text-align:left">标的</th>
     <th style="text-align:right">Bandit 期末</th><th style="text-align:right">买入持有</th>
-    <th>超越</th><th style="text-align:left">次日预测区间</th>
+    <th>超越</th><th style="text-align:right">宽度IC</th><th style="text-align:left">次日预测区间</th>
     <th style="text-align:right">区间宽</th><th style="text-align:right">命中率</th></tr>
   {summary_rows}
 </table>
-<p style="color:#888;font-size:12px">"超越"= Bandit 期末净值是否高于买入持有。"命中率"= 测试窗内次日真实高/低
+<p style="color:#888;font-size:12px">"超越"= Bandit 期末净值是否高于买入持有。"宽度IC"= 预测区间宽 vs 真实次日振幅的
+时间轴 Spearman 相关（信号层主指标，单标的天然偏弱，仅作诊断非门槛）。"命中率"= 测试窗内次日真实高/低
 全落进预测区间的比例（分位收窄的诚实代价，~50% 属预期，见指标说明）。结论看相对值，绝对收益不单独采信。</p>
 {''.join(sections)}
-<hr><p style="color:#aaa;font-size:12px">生成于 {dt.datetime.now():%Y-%m-%d %H:%M}。完整方案见 docs/ML_PLAN.md，速览见 docs/ML_OVERVIEW.md。</p>
+<hr><p style="color:#aaa;font-size:12px">生成于 {dt.datetime.now():%Y-%m-%d %H:%M}。完整方案见 docs/ML_PLAN.md，速览见 docs/ML_OVERVIEW.md，新算法见 docs/ML_ALGORITHM_PROPOSAL.md。</p>
 </body></html>"""
 
     index = out_dir / "index.html"

@@ -40,6 +40,21 @@ def alpha_for(code: str) -> tuple[float, float]:
     return ALPHA_BY_CODE.get(code, DEFAULT_ALPHA)
 
 
+# ---- CQR 目标覆盖率（建议 2，按股自适应）----
+# 区间宽度与覆盖率直接对赌：目标越高→CQR 扩展越多→区间越宽。
+#   0.80：宽区间、命中 ~82%（宽度 7-13%）
+#   0.70：中档、命中 ~72%（宽度比 0.80 降 ~20%）← 默认
+#   0.60：窄区间、命中 ~62%（激进，易脱靶）
+# 注：base 分位（ALPHA_BY_CODE）收窄不会让最终区间变窄——CQR 会自适应补偿到目标
+# 覆盖率。要收窄区间只能调这里。低波动股可更激进（0.65），高波动股可放宽（0.75）。
+# 改前用 walk-forward 实测验证命中率不崩。
+DEFAULT_COVERAGE = 0.70
+COVERAGE_BY_CODE: dict[str, float] = {}
+def coverage_for(code: str) -> float:
+    """返回该标的的 CQR 目标覆盖率，未配置则回退默认。"""
+    return COVERAGE_BY_CODE.get(code, DEFAULT_COVERAGE)
+
+
 # ---- 抓取窗口（yfinance 实测硬限制，见 docs/ML_PLAN.md §2.1）----
 DAILY_PERIOD = "5y"      # 日线可取 5 年
 HOURLY_PERIOD = "730d"   # 1h 上限约 2 年（730d 单次可取，无需分段）
