@@ -269,10 +269,18 @@ function renderPortfolioOverview(rows) {
   // 账户总览卡：来自 account_funds（HK+US 综合账户，HKD 记账）。仅在有数据时展示。
   const acctCard = renderAccountCard();
 
+  // 说明话术按语义分行（<br>），避免一长句拥挤难读。
+  const notes = [
+    `组合概览基于最新快照（${esc(state.positions.snapshot || "")}）。`,
+    acctCard ? "账户总览为 HK+US 综合账户，按 HKD 记账。" : "",
+    "其余各市场不同币种不可相加，港股按 HKD、美股按 USD 分别汇总。",
+    "占比按持仓支数（货币中性）；浮盈率 = 浮盈额 / 成本额。",
+  ].filter(Boolean).join("<br>");
+
   host.innerHTML = `
     ${acctCard}
     <div class="pf-grid">${cards}</div>
-    <div class="disclaimer">组合概览基于最新快照（${esc(state.positions.snapshot || "")}）。${acctCard ? "账户总览为 HK+US 综合账户按 HKD 记账；" : ""}其余各市场不同币种不可相加，港股按 HKD、美股按 USD 分别汇总；占比按持仓支数（货币中性）。浮盈率 = 浮盈额 / 成本额。</div>`;
+    <div class="disclaimer">${notes}</div>`;
 }
 
 // 账户总览卡：真实账户净资产 / 现金 / 仓位 / 购买力（区别于按币种拆的持仓市值卡）。
