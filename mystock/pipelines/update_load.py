@@ -48,6 +48,8 @@ def run() -> int:
     try:
         # 持仓：始终覆盖当天快照
         init_load.collect_positions(conn)
+        # 账户资金：每天覆盖一条快照（综合账户，只查一次）
+        init_load.collect_account_funds(conn)
 
         order_start = _incremental_start(conn, "futu_order", "datetime")
         init_load.collect_orders(conn, order_start, end)
@@ -64,6 +66,8 @@ def run() -> int:
 
         # 通用信息：每日全量刷新（UPSERT 覆盖）
         init_load.collect_profiles(conn)
+        # 富途盘面增量字段（换手率/振幅/52 周高低），合并进 stock_profiles
+        init_load.collect_market_snapshot(conn)
     finally:
         conn.close()
 

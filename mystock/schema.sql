@@ -91,6 +91,13 @@ CREATE TABLE IF NOT EXISTS stock_profiles (
     recommendation      TEXT,                 -- 分析师评级
     currency            TEXT,                 -- 货币
     website             TEXT,                 -- 官网
+    -- 盘面增量字段（来自富途 get_market_snapshot，yfinance 无/不稳）。
+    -- 与本表其余字段同为「当前快照」，随每日 update 覆盖刷新。
+    turnover_rate       REAL,                 -- 换手率%（当日）
+    amplitude           REAL,                 -- 振幅%（当日）
+    week52_high         REAL,                 -- 52 周最高价（本币）
+    week52_low          REAL,                 -- 52 周最低价（本币）
+    snap_synced_at      TEXT,                 -- 盘面字段入库时间（独立于 synced_at）
     synced_at           TEXT                  -- 入库时间
 );
 
@@ -106,6 +113,26 @@ CREATE TABLE IF NOT EXISTS fx_rates (
     close           REAL,                 -- 收盘汇率（1 美元 = close 人民币）
     synced_at       TEXT,                 -- 入库时间
     PRIMARY KEY (pair, date)
+);
+
+-- 账户资金每日快照（富途 accinfo_query）。单一 HK+US 综合保证金账户，
+-- 每天一条：合并总额按 report_currency 记账（默认 HKD），另存港币/美元侧拆分。
+-- 与 positions 同理：历史不可从富途回补，空缺只能随 update.sh 自然积累。
+CREATE TABLE IF NOT EXISTS account_funds (
+    snapshot_date       TEXT PRIMARY KEY,     -- YYYY-MM-DD，每天一条
+    report_currency     TEXT,                 -- 合并记账币种（HKD）
+    total_assets        REAL,                 -- 账户净资产（证券+现金+…）
+    market_val          REAL,                 -- 持仓证券市值
+    cash                REAL,                 -- 现金总额
+    frozen_cash         REAL,                 -- 冻结资金
+    avl_withdrawal_cash REAL,                 -- 可提现金
+    power               REAL,                 -- 最大购买力
+    hkd_assets          REAL,                 -- 港币侧资产
+    hk_cash             REAL,                 -- 港币现金
+    usd_assets          REAL,                 -- 美元侧资产
+    us_cash             REAL,                 -- 美元现金
+    risk_status         TEXT,                 -- 风险等级（LEVEL1–9）
+    updated_at          TEXT                  -- 入库时间
 );
 
 -- 行情跳过名单：连续多次抓取为空（如退市 / yfinance 无数据）的代码，

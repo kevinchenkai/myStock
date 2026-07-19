@@ -91,6 +91,7 @@ const state = {
   pnl: { raw: [], market: "", sort: { key: null, dir: 0 } },
   finance: { year: "", built: false },
   trend: { raw: [], days: 30 },
+  funds: { latest: null, history: [] },
   fx: { raw: [], pair: "USDCNY" },
 };
 
@@ -157,6 +158,22 @@ async function loadPositions() {
   } catch (e) {
     wrap.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
   }
+  // 账户资金：独立加载，失败不影响持仓表（OpenD 未开时可能为空）
+  loadAccountFunds();
+}
+
+// 账户资金：拉取最新快照 + 历史序列，供组合概览与资产趋势消费。
+async function loadAccountFunds() {
+  try {
+    const data = await getJSON("/api/account-funds");
+    state.funds.latest = data.latest || null;
+    state.funds.history = data.history || [];
+  } catch (e) {
+    state.funds.latest = null;
+    state.funds.history = [];
+  }
+  // 资金到手后重渲染组合概览（追加账户总览卡）
+  if (state.positions.raw.length) renderPortfolioOverview(state.positions.raw);
 }
 
 function renderPositions() {
@@ -249,9 +266,56 @@ function renderPortfolioOverview(rows) {
       </div>`;
   }).join("");
 
+  // 账户总览卡：来自 account_funds（HK+US 综合账户，HKD 记账）。仅在有数据时展示。
+  const acctCard = renderAccountCard();
+
   host.innerHTML = `
+    ${acctCard}
     <div class="pf-grid">${cards}</div>
-    <div class="disclaimer">组合概览基于最新快照（${esc(state.positions.snapshot || "")}）。不同币种不可相加，港股按 HKD、美股按 USD 分别汇总；占比按持仓支数（货币中性）。浮盈率 = 浮盈额 / 成本额。</div>`;
+    <div class="disclaimer">组合概览基于最新快照（${esc(state.positions.snapshot || "")}）。${acctCard ? "账户总览为 HK+US 综合账户按 HKD 记账；" : ""}其余各市场不同币种不可相加，港股按 HKD、美股按 USD 分别汇总；占比按持仓支数（货币中性）。浮盈率 = 浮盈额 / 成本额。</div>`;
+}
+
+// 账户总览卡：真实账户净资产 / 现金 / 仓位 / 购买力（区别于按币种拆的持仓市值卡）。
+function renderAccountCard() {
+  const f = state.funds.latest;
+  if (!f || f.total_assets == null) return "";
+  const ccy = f.report_currency || "HKD";
+  const ta = Number(f.total_assets);
+  const mv = Number(f.market_val) || 0;
+  const cash = Number(f.cash) || 0;
+  const posRatio = ta > 0 ? (mv / ta) * 100 : null;   // 仓位 = 持仓市值 / 总资产
+  const power = f.power == null ? null : Number(f.power);
+  const stale = f.snapshot_date && f.snapshot_date !== state.positions.snapshot;
+  return `
+    <div class="pf-account">
+      <div class="pf-account-head">
+        <span class="pf-acct-title">账户总览</span>
+        <span class="pf-ccy">${esc(ccy)} 记账</span>
+        ${stale ? `<span class="pf-acct-stale">资金快照 ${esc(f.snapshot_date)}</span>` : ""}
+      </div>
+      <div class="pf-account-body">
+        <div class="pf-acct-metric">
+          <div class="pf-acct-val">${fmtNum(ta)}</div>
+          <div class="pf-acct-label">总资产</div>
+        </div>
+        <div class="pf-acct-metric">
+          <div class="pf-acct-val">${fmtNum(mv)}</div>
+          <div class="pf-acct-label">持仓市值</div>
+        </div>
+        <div class="pf-acct-metric">
+          <div class="pf-acct-val">${fmtNum(cash)}</div>
+          <div class="pf-acct-label">现金</div>
+        </div>
+        <div class="pf-acct-metric">
+          <div class="pf-acct-val">${posRatio === null ? "—" : posRatio.toFixed(1) + "%"}</div>
+          <div class="pf-acct-label">仓位</div>
+        </div>
+        <div class="pf-acct-metric">
+          <div class="pf-acct-val">${power === null ? "—" : fmtNum(power)}</div>
+          <div class="pf-acct-label">最大购买力</div>
+        </div>
+      </div>
+    </div>`;
 }
 
 // 表头点击：倒序 → 正序 → 取消，循环切换。
@@ -746,7 +810,8 @@ function renderTrend() {
       </div>`;
   }).join("");
 
-  info.innerHTML = `<div class="trend-grid">${cards}</div>`;
+  const acctCard = renderNetAssetCard(dates);
+  info.innerHTML = `<div class="trend-grid">${acctCard}${cards}</div>`;
   const windowLabel = state.trend.days ? `近 ${state.trend.days} 天` : "全部区间";
   disc.textContent =
     `${windowLabel}：${dates.length} 个快照（${dates[0]} ~ ${dates[dates.length - 1]}）。` +
@@ -801,6 +866,34 @@ function renderTrendTable() {
   wrap.innerHTML = `<div class="scroll-table"><table>
     <thead><tr><th class="text">日期</th>${ths}</tr></thead>
     <tbody>${rows}</tbody></table></div>`;
+}
+
+// 账户净资产趋势卡：来自 account_funds 历史序列（HKD 综合记账），
+// 按当前趋势时间窗过滤后取首末，展示最新净资产 + 区间变化。有数据才显示。
+function renderNetAssetCard(windowDates) {
+  const hist = state.funds.history || [];
+  if (hist.length < 1 || !windowDates.length) return "";
+  // 与趋势图同窗（起点对齐）：取时间窗起点当日及之后的资金快照。
+  // 只用下界、不设上界——资金快照仅向前积累，最新一条（可能晚于持仓快照日）
+  // 始终是最相关的，避免因持仓/资金快照日不同步而漏显。
+  const lo = windowDates[0];
+  const inWin = hist.filter((r) => r.snapshot_date >= lo && r.total_assets != null);
+  if (!inWin.length) return "";
+  const ccy = inWin[inWin.length - 1].report_currency || "HKD";
+  const first = Number(inWin[0].total_assets);
+  const last = Number(inWin[inWin.length - 1].total_assets);
+  const chg = last - first;
+  const pct = first > 0 ? (chg / first) * 100 : null;
+  const single = inWin.length < 2;   // 窗内只有一天：无从算区间变化
+  return `
+    <div class="trend-card trend-card-acct">
+      <div class="trend-card-head"><span class="trend-mkt">账户净资产</span><span class="trend-ccy">${esc(ccy)}</span></div>
+      <div class="trend-mv">${fmtNum(last)}<span class="trend-mv-label">最新总资产</span></div>
+      <div class="trend-rows">
+        <div class="trend-row"><span>区间净资产变化</span><span class="${single ? "" : plClass(chg)}">${single ? "—" : fmtSigned(chg.toFixed(0)) + (pct === null ? "" : ` (${fmtSigned(pct.toFixed(2), "%")})`)}</span></div>
+        <div class="trend-row"><span>快照天数</span><span>${inWin.length} 天</span></div>
+      </div>
+    </div>`;
 }
 
 function destroyTrendCharts() {
@@ -1138,6 +1231,9 @@ const PROFILE_FIELDS = [
   { key: "股息率%", num: true }, { key: "Beta", num: true },
   { key: "目标均价", num: true, cur: true }, { key: "分析师评级" },
   { key: "货币" }, { key: "官网", link: true },
+  // 盘面增量字段（富途快照）：换手率/振幅为百分比；52 周高低为本币价格。
+  { key: "换手率%", num: true }, { key: "振幅%", num: true },
+  { key: "52周最高", num: true, cur: true }, { key: "52周最低", num: true, cur: true },
 ];
 
 async function loadProfile(code) {

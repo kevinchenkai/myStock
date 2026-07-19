@@ -152,6 +152,53 @@ def test_purge_code_removes_from_all_tables():
         os.remove(path)
 
 
+def test_account_funds_upsert_overwrites_same_day():
+    conn, path = _conn()
+    try:
+        row = {
+            "snapshot_date": "2026-07-18", "report_currency": "HKD",
+            "total_assets": 1000000.0, "market_val": 700000.0, "cash": 300000.0,
+            "frozen_cash": 0.0, "avl_withdrawal_cash": 300000.0, "power": 1500000.0,
+            "hkd_assets": 800000.0, "hk_cash": 250000.0,
+            "usd_assets": 25000.0, "us_cash": 6400.0,
+            "risk_status": "LEVEL3", "updated_at": "now",
+        }
+        db.upsert_account_funds(conn, [row])
+        # 当天重抓覆盖（总资产变化）
+        db.upsert_account_funds(conn, [dict(row, total_assets=1100000.0)])
+        cur = conn.execute("SELECT COUNT(*) AS c, total_assets FROM account_funds")
+        r = cur.fetchone()
+        assert r["c"] == 1
+        assert r["total_assets"] == 1100000.0
+    finally:
+        conn.close()
+        os.remove(path)
+
+
+def test_column_migration_adds_missing_snapshot_columns():
+    # 模拟旧库：手建一个缺盘面列的 stock_profiles，再跑 init_db 应自动补齐
+    fd, path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    try:
+        conn = db.get_connection(path)
+        conn.execute(
+            "CREATE TABLE stock_profiles (futu_code TEXT PRIMARY KEY, long_name TEXT, synced_at TEXT)"
+        )
+        conn.commit()
+        conn.close()
+        # init_db 应通过列迁移补齐 turnover_rate/amplitude/week52_high/week52_low/snap_synced_at
+        db.init_db(path)
+        conn = db.get_connection(path)
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(stock_profiles)")}
+        for c in ("turnover_rate", "amplitude", "week52_high", "week52_low", "snap_synced_at"):
+            assert c in cols, f"缺列 {c}"
+        # 旧列保留
+        assert "long_name" in cols
+        conn.close()
+    finally:
+        os.remove(path)
+
+
 def test_all_traded_codes_dedup():
     conn, path = _conn()
     try:

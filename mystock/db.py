@@ -28,12 +28,39 @@ def get_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
     return conn
 
 
+# 轻量列迁移：对已存在的表按需补齐新增列（schema.sql 的 CREATE TABLE
+# IF NOT EXISTS 不会给旧表加列）。key=表名，value=[(列名, 列定义), ...]。
+# 新增可空列，幂等，旧库升级时自动补齐；无需手写 ALTER。
+_COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
+    "stock_profiles": [
+        ("turnover_rate", "REAL"),
+        ("amplitude", "REAL"),
+        ("week52_high", "REAL"),
+        ("week52_low", "REAL"),
+        ("snap_synced_at", "TEXT"),
+    ],
+}
+
+
+def _apply_column_migrations(conn: sqlite3.Connection) -> None:
+    """对已存在的表补齐 _COLUMN_MIGRATIONS 里声明的缺失列（ADD COLUMN）。"""
+    for table, cols in _COLUMN_MIGRATIONS.items():
+        cur = conn.execute(f"PRAGMA table_info({table})")
+        existing = {row["name"] for row in cur.fetchall()}
+        if not existing:
+            continue  # 表尚不存在（executescript 已按新 schema 建好）
+        for name, decl in cols:
+            if name not in existing:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {decl}")
+
+
 def init_db(db_path: Optional[str] = None) -> None:
-    """执行 schema.sql 建表（IF NOT EXISTS，可重复执行）。"""
+    """执行 schema.sql 建表（IF NOT EXISTS，可重复执行）+ 轻量列迁移。"""
     conn = get_connection(db_path)
     try:
         with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
             conn.executescript(f.read())
+        _apply_column_migrations(conn)
         conn.commit()
     finally:
         conn.close()
@@ -107,6 +134,11 @@ def upsert_profiles(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
 
 def upsert_fx_rates(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
     return _upsert(conn, "fx_rates", rows, ["pair", "date"])
+
+
+def upsert_account_funds(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
+    """账户资金每日快照 UPSERT（主键 snapshot_date，当天重抓覆盖）。"""
+    return _upsert(conn, "account_funds", rows, ["snapshot_date"])
 
 
 def get_profile(conn: sqlite3.Connection, futu_code: str) -> Optional[dict]:

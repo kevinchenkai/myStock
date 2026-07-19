@@ -51,6 +51,34 @@ def collect_positions(conn) -> None:
         print(f"[positions] 失败: {e}", file=sys.stderr)
 
 
+def collect_account_funds(conn) -> None:
+    """账户资金每日快照（accinfo_query）。
+
+    账户为 HK+US 综合账户，只查一次（用首个配置市场的上下文即可），
+    与 positions 一样每天覆盖一条快照。OpenD 未开 / 查询失败不中断整体。
+    """
+    snapshot_date = db.today_str()
+    now = _now()
+    market = CONFIG.markets[0] if CONFIG.markets else "HK"
+    try:
+        with fc.FutuClient(market) as client:
+            dff = client.query_funds()
+        row = fc.fund_row(dff, snapshot_date, now)
+        if row is None:
+            db.write_sync_log(conn, "futu_funds", snapshot_date, snapshot_date, 0, "ok", "no data")
+            print("[funds] 无账户资金数据，跳过")
+            return
+        db.upsert_account_funds(conn, [row])
+        db.write_sync_log(conn, "futu_funds", snapshot_date, snapshot_date, 1, "ok")
+        ta = row.get("total_assets")
+        cur = row.get("report_currency") or ""
+        print(f"[funds] 写入账户快照（{snapshot_date}）总资产 {ta:,.2f} {cur}"
+              if ta is not None else f"[funds] 写入账户快照（{snapshot_date}）")
+    except Exception as e:  # noqa: BLE001
+        db.write_sync_log(conn, "futu_funds", snapshot_date, snapshot_date, 0, "error", str(e))
+        print(f"[funds] 失败: {e}", file=sys.stderr)
+
+
 def collect_orders(conn, start: str, end: str) -> None:
     now = _now()
     total = 0
@@ -173,6 +201,29 @@ def collect_profiles(conn) -> None:
     print(f"[profiles] 完成：{msg}")
 
 
+def collect_market_snapshot(conn) -> None:
+    """富途行情快照的盘面增量字段（换手率/振幅/52 周高低），合并进 stock_profiles。
+
+    一次批量取全（标的数 << 400 上限）。OpenD 未开 / 查询失败不中断整体，
+    仅记 sync_log。仅更新盘面列，不影响 yfinance 写的公司/估值字段。
+    """
+    now = _now()
+    all_codes = db.all_traded_codes(conn)
+    if not all_codes:
+        db.write_sync_log(conn, "futu_snapshot", None, None, 0, "ok", "no codes")
+        print("[snapshot] 无可抓取的代码，跳过")
+        return
+    try:
+        df = fc.fetch_snapshots(all_codes)
+        rows = fc.snapshot_fields(df, now)
+        n = db.upsert_profiles(conn, rows) if rows else 0
+        db.write_sync_log(conn, "futu_snapshot", None, None, n, "ok")
+        print(f"[snapshot] 盘面字段 UPSERT {n} 条（换手率/振幅/52 周高低）")
+    except Exception as e:  # noqa: BLE001
+        db.write_sync_log(conn, "futu_snapshot", None, None, 0, "error", str(e))
+        print(f"[snapshot] 失败: {e}", file=sys.stderr)
+
+
 def collect_fx(conn, start: str, end: str, pair: str = "USDCNY",
                yf_symbol: str = "CNY=X") -> None:
     """抓取美元-人民币（或其它）汇率日线，UPSERT 入库。
@@ -205,6 +256,7 @@ def run() -> int:
     conn = db.get_connection()
     try:
         collect_positions(conn)
+        collect_account_funds(conn)
         collect_orders(conn, start, end)
         collect_deals(conn, start, end)
         # yfinance 用日期粒度
@@ -213,6 +265,8 @@ def run() -> int:
         collect_fx(conn, start, end_date)
         # 通用信息（依赖 quotes 已更新的跳过名单，故放在最后）
         collect_profiles(conn)
+        # 富途盘面增量字段，合并进 stock_profiles（yfinance 缺项）
+        collect_market_snapshot(conn)
     finally:
         conn.close()
 

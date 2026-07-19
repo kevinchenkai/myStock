@@ -22,6 +22,7 @@ from ..code_map import futu_market_of
 try:
     from futu import (
         OpenSecTradeContext,
+        OpenQuoteContext,
         TrdMarket,
         TrdEnv,
         SecurityFirm,
@@ -29,6 +30,7 @@ try:
     )
 except ImportError:  # pragma: no cover - 仅在未安装 futu-api 时触发
     OpenSecTradeContext = None
+    OpenQuoteContext = None
     TrdMarket = None
     TrdEnv = None
     SecurityFirm = None
@@ -229,6 +231,19 @@ class FutuClient:
             return pd.DataFrame()
         return pd.concat(frames, ignore_index=True)
 
+    def query_funds(self) -> pd.DataFrame:
+        """账户资金快照（accinfo_query）。
+
+        账户为 HK+US 综合保证金账户，返回单一记账币种（默认 HKD）的合并
+        快照，行内含港币/美元侧拆分子字段。故只需查一次，不按市场循环。
+        """
+        ret, data = self._ctx.accinfo_query(trd_env=self.trd_env)
+        if ret != RET_OK:
+            raise FutuError(f"查询账户资金失败({self.market}): {data}")
+        if data is None or len(data) == 0:
+            return pd.DataFrame()
+        return data
+
 
 # ---------------- DataFrame -> 入库 dict 的规整 ----------------
 
@@ -257,6 +272,25 @@ def _g(row, *names, default=None):
         if n in row and not _is_missing(row[n]):
             return row[n]
     return default
+
+
+def _num(v):
+    """数值字段规整：富途对缺失数值返回字符串 'N/A'，此处统一转 None，
+    其余尝试转 float（失败则原样返回）。"""
+    if _is_missing(v):
+        return None
+    if isinstance(v, str):
+        s = v.strip()
+        if s in ("", "N/A", "n/a", "NA", "--"):
+            return None
+        try:
+            return float(s)
+        except ValueError:
+            return None
+    try:
+        return float(v)
+    except (ValueError, TypeError):
+        return None
 
 
 def _market_from_code(code: str, fallback: str = "") -> str:
@@ -343,4 +377,79 @@ def deal_rows(df: pd.DataFrame, market: str, now: str) -> list[dict]:
                 "synced_at": now,
             }
         )
+    return rows
+
+
+def fund_row(df: pd.DataFrame, snapshot_date: str, now: str) -> Optional[dict]:
+    """把 accinfo_query 的单行结果规整成 account_funds 入库 dict。
+
+    综合账户只有一行；空 DataFrame 返回 None。数值字段经 _num 处理
+    富途的 'N/A' 占位。
+    """
+    if df is None or df.empty:
+        return None
+    r = df.iloc[0]
+    return {
+        "snapshot_date": snapshot_date,
+        "report_currency": _g(r, "currency"),
+        "total_assets": _num(_g(r, "total_assets")),
+        "market_val": _num(_g(r, "market_val")),
+        "cash": _num(_g(r, "cash")),
+        "frozen_cash": _num(_g(r, "frozen_cash")),
+        "avl_withdrawal_cash": _num(_g(r, "avl_withdrawal_cash")),
+        "power": _num(_g(r, "power")),
+        "hkd_assets": _num(_g(r, "hkd_assets")),
+        "hk_cash": _num(_g(r, "hk_cash")),
+        "usd_assets": _num(_g(r, "usd_assets")),
+        "us_cash": _num(_g(r, "us_cash")),
+        "risk_status": _g(r, "risk_status"),
+        "updated_at": now,
+    }
+
+
+# ---------------- 行情快照（盘面增量字段）----------------
+# get_market_snapshot 是行情接口（OpenQuoteContext），单次最多 400 标的，
+# 限频 30s/60 次。本项目标的数远小于 400，一次批量取全。仅取 yfinance
+# 缺的盘面字段（换手率/振幅/52 周高低）合并进 stock_profiles。
+
+def fetch_snapshots(codes: list[str]) -> pd.DataFrame:
+    """批量抓取行情快照，返回原始 DataFrame（含全部快照列）。
+
+    codes: 富途代码列表。空列表返回空 DataFrame。OpenD 未开 / 查询失败抛
+    FutuError（调用方决定是否忽略）。
+    """
+    _require_futu()
+    if not codes:
+        return pd.DataFrame()
+    ctx = OpenQuoteContext(host=CONFIG.futu_host, port=CONFIG.futu_port)
+    try:
+        ret, data = ctx.get_market_snapshot(list(codes))
+    finally:
+        ctx.close()
+    if ret != RET_OK:
+        raise FutuError(f"查询行情快照失败: {data}")
+    if data is None or len(data) == 0:
+        return pd.DataFrame()
+    return data
+
+
+def snapshot_fields(df: pd.DataFrame, now: str) -> list[dict]:
+    """从快照 DataFrame 提取盘面增量字段，规整成 stock_profiles UPSERT 行。
+
+    每行仅含主键 futu_code + 盘面列 + snap_synced_at（不含 yfinance 资料列，
+    UPSERT 时只更新这些列，不干扰 collect_profiles 写的公司/估值字段）。
+    """
+    rows = []
+    for _, r in df.iterrows():
+        code = _g(r, "code", default="")
+        if not code:
+            continue
+        rows.append({
+            "futu_code": code,
+            "turnover_rate": _num(_g(r, "turnover_rate")),
+            "amplitude": _num(_g(r, "amplitude")),
+            "week52_high": _num(_g(r, "highest52weeks_price")),
+            "week52_low": _num(_g(r, "lowest52weeks_price")),
+            "snap_synced_at": now,
+        })
     return rows

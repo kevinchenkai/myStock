@@ -310,6 +310,23 @@ header .sub .down { font-weight: 700; }
 }
 .pf-row > span:first-child { color: var(--muted); }
 
+/* 账户总览卡：真实账户净资产（区别于按币种拆的持仓市值卡），横跨整行、accent 边框 */
+.pf-account {
+  border: 1px solid var(--accent); border-radius: var(--radius-sm);
+  background: var(--panel-2); padding: 18px 24px; margin-bottom: 16px;
+  border-left-width: 4px;
+}
+.pf-account-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.pf-acct-title { font-size: 15px; font-weight: 700; }
+.pf-acct-stale { margin-left: auto; font-size: 12px; color: var(--muted); }
+.pf-account-body {
+  display: grid; gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+.pf-acct-metric { display: flex; flex-direction: column; gap: 2px; }
+.pf-acct-val { font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pf-acct-label { font-size: 12px; color: var(--muted); }
+
 /* ---------------- 资产趋势（历史快照，市值/浮盈双图）---------------- */
 .trend-grid {
   display: grid; gap: 16px; margin-bottom: 8px;
@@ -319,6 +336,8 @@ header .sub .down { font-weight: 700; }
   border: 1px solid var(--border); border-radius: var(--radius-sm);
   background: var(--panel-2); padding: 16px 20px;
 }
+/* 账户净资产卡：accent 左边框，与按币种的持仓市值卡区分 */
+.trend-card-acct { border-left: 3px solid var(--accent); }
 .trend-card-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
 .trend-mkt { font-size: 15px; font-weight: 700; }
 .trend-ccy { font-size: 12px; color: var(--muted); }

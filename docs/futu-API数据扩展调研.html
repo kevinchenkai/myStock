@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>myStock · 富途 API 数据扩展调研与升级计划</title>
+<style>
+  :root {
+    --bg: #fafafa;
+    --surface: #ffffff;
+    --surface-2: #f4f4f6;
+    --border: #e3e3e8;
+    --text: #1f2330;
+    --muted: #6b7280;
+    --primary: #c0392b;
+    --primary-dark: #8e2a20;
+    --accent: #2c6fbb;
+    --up: #d23a35;
+    --down: #2e8b57;
+    --code-bg: #f5f3ee;
+    --code-text: #2a2a2a;
+    --warn: #b8770b;
+    --ok: #2e8b57;
+  }
+  html[data-theme="dark"] {
+    --bg: #15171d; --surface: #1d2028; --surface-2: #242833; --border: #33384a;
+    --text: #e4e6ee; --muted: #9aa0b0; --primary: #e57368; --primary-dark: #c0392b;
+    --accent: #6ea3d6; --code-bg: #1b1e26; --code-text: #e4e6ee; --warn: #e0a93b; --ok: #4cae7a;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) {
+      --bg: #15171d; --surface: #1d2028; --surface-2: #242833; --border: #33384a;
+      --text: #e4e6ee; --muted: #9aa0b0; --primary: #e57368; --primary-dark: #c0392b;
+      --accent: #6ea3d6; --code-bg: #1b1e26; --code-text: #e4e6ee; --warn: #e0a93b; --ok: #4cae7a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+                 "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+    line-height: 1.7; font-size: 15px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  .layout { display: flex; min-height: 100vh; }
+  nav.toc {
+    width: 280px; flex-shrink: 0; background: var(--surface);
+    border-right: 1px solid var(--border); padding: 24px 18px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto;
+  }
+  nav.toc h2 { font-size: 13px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin: 24px 0 8px; }
+  nav.toc h2:first-child { margin-top: 0; }
+  nav.toc a { display: block; color: var(--text); padding: 4px 10px; border-radius: 6px; font-size: 14px; }
+  nav.toc a:hover { background: var(--surface-2); text-decoration: none; }
+  nav.toc a.sub { padding-left: 22px; font-size: 13px; color: var(--muted); }
+  main { flex: 1; max-width: 980px; padding: 40px 48px 120px; margin: 0 auto; }
+  header.hero { border-bottom: 2px solid var(--primary); padding-bottom: 18px; margin-bottom: 32px; }
+  header.hero .badge {
+    display: inline-block; background: var(--primary); color: #fff; font-size: 12px;
+    padding: 2px 10px; border-radius: 999px; letter-spacing: 1px; margin-bottom: 12px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 32px; }
+  header.hero p { margin: 0; color: var(--muted); }
+  section { margin-bottom: 56px; scroll-margin-top: 24px; }
+  h2 { font-size: 24px; border-left: 4px solid var(--primary); padding-left: 12px; margin: 0 0 18px; }
+  h3 { font-size: 18px; margin: 28px 0 10px; color: var(--text); }
+  h4 { font-size: 15px; margin: 18px 0 8px; color: var(--accent); }
+  p { margin: 10px 0; }
+  ul, ol { margin: 10px 0; padding-left: 24px; }
+  li { margin: 4px 0; }
+  .lead { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px 20px; margin: 16px 0; }
+  code {
+    font-family: "SF Mono", Menlo, Consolas, "JetBrains Mono", monospace;
+    background: var(--code-bg); color: var(--code-text); padding: 1px 6px; border-radius: 4px; font-size: 13px;
+  }
+  pre {
+    background: var(--code-bg); color: var(--code-text); padding: 14px 16px; border-radius: 8px;
+    overflow-x: auto; border: 1px solid var(--border); font-size: 13px; line-height: 1.55;
+  }
+  pre code { background: transparent; padding: 0; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 14px 0; background: var(--surface);
+    border: 1px solid var(--border); border-radius: 8px; overflow: hidden; font-size: 14px;
+  }
+  th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+  td code, th code { white-space: nowrap; }
+  .callout { border-left: 4px solid var(--accent); background: var(--surface); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 14px 0; }
+  .callout.warn { border-color: var(--warn); }
+  .callout.danger { border-color: var(--up); }
+  .callout.ok { border-color: var(--ok); }
+  .callout .tag { font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 4px; }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.danger .tag { color: var(--up); }
+  .callout.ok .tag { color: var(--ok); }
+  .up { color: var(--up); font-weight: 600; }
+  .down { color: var(--down); font-weight: 600; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 900px) {
+    .layout { flex-direction: column; }
+    nav.toc { position: static; width: 100%; height: auto; border-right: none; border-bottom: 1px solid var(--border); }
+    main { padding: 24px 18px 80px; }
+    .grid-2 { grid-template-columns: 1fr; }
+  }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 999px; font-size: 12px; background: var(--surface-2); border: 1px solid var(--border); color: var(--muted); }
+  .pill.p0 { background: var(--up); color: #fff; border-color: var(--up); }
+  .pill.p1 { background: var(--warn); color: #fff; border-color: var(--warn); }
+  .pill.p2 { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .pill.no { background: var(--surface-2); color: var(--muted); }
+  .theme-toggle {
+    position: fixed; right: 20px; bottom: 20px; background: var(--surface); border: 1px solid var(--border);
+    border-radius: 999px; padding: 8px 14px; cursor: pointer; color: var(--text); font-size: 13px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.08); z-index: 100;
+  }
+  .theme-toggle:hover { background: var(--surface-2); }
+  .score { font-weight: 700; }
+  .score.hi { color: var(--up); }
+  .score.mid { color: var(--warn); }
+  .score.lo { color: var(--muted); }
+</style>
+</head>
+<body>
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem("mystock-doc-theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+    } catch (e) {}
+  })();
+</script>
+
+<div class="layout">
+<nav class="toc">
+  <h2>概览</h2>
+  <a href="#intro">调研目的与方法</a>
+  <a href="#verified">✅ 可行性验证结果</a>
+  <a href="#baseline">现状：已用 vs 未用</a>
+  <h2>候选接口评估</h2>
+  <a href="#accinfo" class="sub">A · 账户资金 accinfo_query</a>
+  <a href="#capflow" class="sub">B · 资金流向 capital_flow</a>
+  <a href="#snapshot" class="sub">C · 市场快照 market_snapshot</a>
+  <a href="#plate" class="sub">D · 所属板块 owner_plate</a>
+  <a href="#hiskline" class="sub">E · 历史 K 线 history_kline</a>
+  <a href="#others" class="sub">F · 其它（盘口/逐笔等）</a>
+  <h2>结论</h2>
+  <a href="#matrix">优先级矩阵</a>
+  <a href="#roadmap">升级计划（分期）</a>
+  <a href="#caveats">风险与边界</a>
+</nav>
+
+<main>
+<header class="hero">
+  <span class="badge">已本地 OpenD 实测 · 升级计划</span>
+  <h1>富途 API 数据扩展调研与升级计划</h1>
+  <p>评估 futu OpenAPI 还有哪些数据可获取，并经本地 OpenD 实测验证可行性 · 2026-07-18</p>
+</header>
+
+<!-- ========== 0 ========== -->
+<section id="intro">
+  <h2>调研目的与方法</h2>
+  <div class="lead">
+    <p>目标：在<strong>不破坏现有架构边界</strong>（采集层抓取 → SQLite → Web 只读）的前提下，找出富途 OpenAPI 中<strong>当前尚未接入、且能实质提升产品价值</strong>的数据源，给出可执行的优先级建议。</p>
+  </div>
+  <p>方法：</p>
+  <ol>
+    <li>通读现有 <code>mystock/collectors/futu_client.py</code> 与 <code>schema.sql</code>，确认已接入的富途接口与数据表；</li>
+    <li>调研富途官方文档（行情接口 / 交易接口总览及各子接口页），逐一比对字段、市场支持（仅关心 HK / US）、限频、以及<strong>是否需要付费行情权限</strong>；</li>
+    <li>按「产品价值 × 落地成本 × 边界契合度」三维打分，产出优先级。</li>
+  </ol>
+  <div class="callout">
+    <span class="tag">评估口径</span>
+    本项目是<strong>个人持仓复盘</strong>工具，非实时交易终端。因此评估天然偏向：<em>账户/持仓维度的增量信息</em> &gt; 实时盘口类高频数据。凡需要付费实时行情权限、或只有当日实时快照而无历史沉淀能力的接口，价值大打折扣。
+  </div>
+</section>
+
+<!-- ========== 验证 ========== -->
+<section id="verified">
+  <h2>✅ 可行性验证结果（本地 OpenD 实测）</h2>
+  <div class="callout ok">
+    <span class="tag">结论先行</span>
+    在本地 OpenD（已登录）用只读探针实测了全部 4 个候选接口：<strong>全部返回真实数据，且当前账户权限完全够用</strong>。均在<strong>未设置交易密码</strong>（未 <code>unlock_trade</code>）的情况下取到数——包括账户资金。原计划里标"需实测"的资金流向、板块，<strong>HK 与 US 均通过</strong>。
+  </div>
+
+  <table>
+    <tr><th>接口</th><th>实测结果</th><th>数据样例（2026-07-17 / 18）</th></tr>
+    <tr>
+      <td><code>accinfo_query</code><br>账户资金</td>
+      <td class="down">✅ 通过（HK+US 综合账户）</td>
+      <td>成功返回：总资产 / 持仓市值 / 现金 / 港币侧资产 / 美元侧资产 / 购买力 / 风险等级（LEVEL3）等全部字段。<span class="muted">（具体金额涉隐私，此处不列）</span></td>
+    </tr>
+    <tr>
+      <td><code>get_capital_flow</code><br>资金流向</td>
+      <td class="down">✅ 通过（HK 与 US 均可）</td>
+      <td>HK.00700 返回 <strong>244 天</strong>日频、US.AAPL <strong>251 天</strong>；含主力/超大/大/中/小单净流入</td>
+    </tr>
+    <tr>
+      <td><code>get_market_snapshot</code><br>市场快照</td>
+      <td class="down">✅ 通过</td>
+      <td>HK.00700 换手率 0.399% / 振幅 6.36% / 量比 1.085 / 52 周 411–678；<br>US.AAPL 换手率 0.433% / 52 周 200.7–335（均为 yfinance 缺项）</td>
+    </tr>
+    <tr>
+      <td><code>get_owner_plate</code><br>所属板块</td>
+      <td class="down">✅ 通过（US 也可，文档过于保守）</td>
+      <td>HK.00700 命中"云计算/AI应用/港股通/元宇宙"等；US.AAPL 命中"消费电子(行业)/巴菲特持仓/标普500十大"等</td>
+    </tr>
+  </table>
+
+  <div class="callout warn">
+    <span class="tag">关键：账户是「HK+US 综合保证金账户」</span>
+    <code>get_acc_list</code> 显示只有<strong>一个实盘账户</strong>（<code>trdmarket_auth=[HK, US, …]</code>）。<code>accinfo_query</code> 返回<strong>单一记账币种的合并快照</strong>（默认 HKD），并在同一行内给出币种拆分子字段：<code>hkd_assets/hk_cash</code>、<code>usd_assets/us_cash</code> 等。传 <code>currency=USD</code> 会把<strong>总额</strong>整体换算成美元（同一账户、不同记账币种）。<br>
+    → 因此设计为<strong>每天一条快照</strong>，同时存：合并总额（HKD）+ 港币侧（资产/现金）+ 美元侧（资产/现金）。既守住"HKD/USD 不混算"，又能算真实净资产。
+  </div>
+
+  <h3>yfinance 重叠情况（你提到"yfinance 也有的可考虑"）</h3>
+  <table>
+    <tr><th>数据</th><th>yfinance 是否有</th><th>取舍</th></tr>
+    <tr><td>账户资金 / 现金 / 购买力</td><td class="up">无（yfinance 无账户概念）</td><td>富途独有 → <strong>做</strong></td></tr>
+    <tr><td>资金流向（主力净流入）</td><td class="up">无</td><td>富途独有 → <strong>做</strong></td></tr>
+    <tr><td>换手率 / 振幅 / 量比</td><td class="up">无（或不稳定）</td><td>富途补齐 → <strong>做（增量字段）</strong></td></tr>
+    <tr><td>52 周高低</td><td>部分有（<code>fiftyTwoWeek*</code>）</td><td>富途更稳，可二选一 → 顺带</td></tr>
+    <tr><td>行业 sector/industry</td><td>有（粗粒度）</td><td>富途胜在<strong>概念板块</strong> → 做概念，行业沿用 yfinance 亦可</td></tr>
+    <tr><td>PE/PB/市值/股息</td><td class="down">有（已入 <code>stock_profiles</code>）</td><td>重叠 → <strong>不重复抓</strong>，维持 yfinance</td></tr>
+    <tr><td>历史日线 OHLCV</td><td class="down">有（已用）</td><td>富途历史 K 线受<strong>付费配额</strong>限制 → <strong>维持 yfinance</strong></td></tr>
+  </table>
+</section>
+
+<!-- ========== 1 ========== -->
+<section id="baseline">
+  <h2>现状：已用 vs 未用</h2>
+  <p>当前富途侧只接入了<strong>交易账户的三类记录</strong>，行情类数据全部走 yfinance。</p>
+
+  <h3>已接入（futu_client.py）</h3>
+  <table>
+    <tr><th>接口</th><th>数据表</th><th>内容</th></tr>
+    <tr><td><code>position_list_query</code></td><td><code>positions</code></td><td>当前持仓快照（每日一份）</td></tr>
+    <tr><td><code>history_order_list_query</code></td><td><code>orders</code></td><td>历史委托订单（全状态）</td></tr>
+    <tr><td><code>history_deal_list_query</code></td><td><code>deals</code></td><td>历史成交回报</td></tr>
+  </table>
+
+  <h3>未接入（本次调研重点）</h3>
+  <table>
+    <tr><th>接口</th><th>类别</th><th>一句话价值</th></tr>
+    <tr><td><code>accinfo_query</code></td><td>交易</td><td>账户真实<strong>总资产 / 现金 / 购买力</strong>（按币种拆分）</td></tr>
+    <tr><td><code>get_capital_flow</code></td><td>行情</td><td>个股<strong>主力资金净流入</strong>（含历史日频，近 1 年）</td></tr>
+    <tr><td><code>get_market_snapshot</code></td><td>行情</td><td>实时快照：换手率、振幅、量比、52 周高低等</td></tr>
+    <tr><td><code>get_owner_plate</code></td><td>行情</td><td>个股所属<strong>行业 / 概念板块</strong></td></tr>
+    <tr><td><code>request_history_kline</code></td><td>行情</td><td>历史 K 线（<span class="up">受配额限制</span>，非免费）</td></tr>
+    <tr><td><code>get_rt_data / get_rt_ticker / get_order_book / get_broker_queue</code></td><td>行情</td><td>分时 / 逐笔 / 盘口 / 经纪队列（高频实时）</td></tr>
+  </table>
+
+  <div class="callout warn">
+    <span class="tag">最大的认知缺口</span>
+    现有 <code>positions</code> 表只有<strong>持仓证券</strong>的市值，<strong>没有账户现金、没有真实总资产、没有购买力</strong>。「组合概览」「资产趋势」目前算的都是"持仓市值"，不是"账户净资产"——现金进出会让这两个数字与券商 App 对不上。<code>accinfo_query</code> 正好补齐这块，是本次调研<strong>价值最高</strong>的发现。
+  </div>
+</section>
+
+<!-- ========== A ========== -->
+<section id="accinfo">
+  <h2>A · 账户资金 <code>accinfo_query</code> <span class="pill p0">P0 · 实测通过</span></h2>
+
+  <h3>能拿到什么</h3>
+  <p>实时账户快照，含资产、现金、购买力，且<strong>按币种拆分</strong>（正好契合本项目 HKD/USD 不混算的口径）：</p>
+  <table>
+    <tr><th>字段</th><th>含义</th></tr>
+    <tr><td><code>total_assets</code></td><td>账户净资产（证券 + 现金 + 债券）</td></tr>
+    <tr><td><code>market_val</code></td><td>持仓证券市值</td></tr>
+    <tr><td><code>hk_cash / us_cash</code></td><td>港币 / 美元现金（按币种）</td></tr>
+    <tr><td><code>frozen_cash</code></td><td>冻结资金</td></tr>
+    <tr><td><code>avl_withdrawal_cash</code></td><td>可提现金</td></tr>
+    <tr><td><code>power</code>、<code>hkd_net_cash_power / usd_net_cash_power</code></td><td>最大购买力 / 现金购买力（按币种）</td></tr>
+    <tr><td><code>risk_status</code></td><td>风险等级（LEVEL1–9）</td></tr>
+  </table>
+
+  <h3>可行性 <span class="down">（实测✅）</span></h3>
+  <ul>
+    <li>属交易接口，复用现有 <code>OpenSecTradeContext</code>；实测<strong>无需交易密码即可读</strong>（未 unlock 也返回数据）。</li>
+    <li>限频宽松（刷新缓存时每账户 30 秒 10 次；本项目每天 1 次，毫无压力）。</li>
+    <li>与现有 <code>query_positions</code> 几乎同源，改动集中在采集层，<strong>成本很低</strong>。</li>
+    <li>实测：总资产 / 持仓市值 / 现金 / 购买力 / 风险等级（LEVEL3）等字段均正常返回。<span class="muted">（金额涉隐私，此处略）</span></li>
+  </ul>
+
+  <h3>产品价值 <span class="score hi">★★★★★</span></h3>
+  <ul>
+    <li><strong>把"持仓市值"升级为"账户净资产"</strong>：组合概览卡新增「总资产 / 现金 / 持仓占比 / 购买力」，与券商 App 对齐。</li>
+    <li><strong>资产趋势更真实</strong>：新增账户净资产曲线，能反映现金进出（现有快照做不到）。</li>
+    <li><strong>现金比例</strong>：可算"仓位"（持仓市值 / 总资产），复盘"满仓/空仓时点"。</li>
+  </ul>
+
+  <div class="callout ok">
+    <span class="tag">落地建议（据实测账户模型）</span>
+    因只有<strong>一个 HK+US 综合账户</strong>，新增 <code>account_funds</code> 表按<strong>每日一条快照</strong>存：
+    <pre><code>account_funds(
+  snapshot_date TEXT PRIMARY KEY,   -- 每天一条
+  report_currency TEXT,             -- 记账币种(HKD)
+  total_assets REAL,                -- 合并总资产
+  market_val REAL, cash REAL, frozen_cash REAL,
+  power REAL,                       -- 最大购买力
+  hkd_assets REAL, hk_cash REAL,    -- 港币侧
+  usd_assets REAL, us_cash REAL,    -- 美元侧
+  risk_status TEXT, updated_at TEXT
+)</code></pre>
+    随 <code>update.sh</code> 每天抓一份（限频 30s/10 次，毫无压力）。前端组合概览新增「总资产 / 现金 / 仓位 / 购买力」，资产趋势加"账户净资产"线。<strong>投入产出比最高</strong>。
+  </div>
+</section>
+
+<!-- ========== B ========== -->
+<section id="capflow">
+  <h2>B · 资金流向 <code>get_capital_flow</code> <span class="pill p1">P1 · 实测通过</span></h2>
+
+  <h3>能拿到什么</h3>
+  <p>个股资金净流入，按订单大小分层，且<strong>提供历史日频（近 1 年）</strong>——这点很关键，能沉淀入库：</p>
+  <table>
+    <tr><th>字段</th><th>含义</th></tr>
+    <tr><td><code>in_flow</code></td><td>整体净流入</td></tr>
+    <tr><td><code>main_in_flow</code></td><td>主力净流入（仅历史周期）</td></tr>
+    <tr><td><code>super_in_flow / big_in_flow</code></td><td>超大单 / 大单净流入</td></tr>
+    <tr><td><code>mid_in_flow / sml_in_flow</code></td><td>中单 / 小单净流入</td></tr>
+    <tr><td><code>capital_flow_item_time</code></td><td>时间（日频时为日期）</td></tr>
+  </table>
+
+  <h3>可行性 <span class="down">（实测✅ HK+US 均通过）</span></h3>
+  <ul>
+    <li>行情接口，<code>PeriodType.DAY</code> 实测：HK.00700 返回 <strong>244 天</strong>、US.AAPL <strong>251 天</strong>日频历史。</li>
+    <li>限频 30 秒 30 次（本项目 38 只标的、每天 1 次，绰绰有余）；美股<strong>也支持</strong>，无需担心权限。</li>
+    <li>中等成本：新增采集函数 + <code>capital_flow</code> 表（主键 <code>code+date</code>）+ 个股详情页一个展示位。</li>
+  </ul>
+
+  <h3>产品价值 <span class="score mid">★★★★☆</span></h3>
+  <ul>
+    <li>个股详情页新增「主力资金流向」柱状/折线：直观看"聪明钱"进出，是持仓复盘的强补充。</li>
+    <li>可与 K 线叠加，观察"放量上涨是否有主力承接"。</li>
+    <li>近 1 年历史可一次性回补入库，之后随 update 增量——完全符合"沉淀式"数据模式。</li>
+  </ul>
+</section>
+
+<!-- ========== C ========== -->
+<section id="snapshot">
+  <h2>C · 市场快照 <code>get_market_snapshot</code> <span class="pill p2">P2 可选</span></h2>
+
+  <h3>能拿到什么</h3>
+  <p>实时快照，字段远比 yfinance <code>info</code> 丰富且更"盘面化"：<code>turnover_rate</code>（换手率）、<code>amplitude</code>（振幅）、<code>volume_ratio</code>（量比）、<code>bid_ask_ratio</code>（委比）、<code>highest52weeks_price / lowest52weeks_price</code>（52 周高低）、<code>pe_ratio / pb_ratio / pe_ttm_ratio</code>、<code>dividend_ttm</code>、<code>total_market_val</code>、<code>lot_size</code> 等。批量最多 400 标的/次，限频 30 秒 60 次。</p>
+
+  <h3>价值与取舍 <span class="score mid">★★★☆☆</span></h3>
+  <ul>
+    <li><strong>换手率 / 振幅 / 量比 / 52 周高低</strong>是 yfinance 缺的、对复盘有用的盘面指标，可补进 <code>stock_profiles</code> 或新表。</li>
+    <li><strong>但是</strong>：它是<strong>实时快照，无历史</strong>——只能每天抓一份沉淀，且估值字段与现有 yfinance <code>stock_profiles</code> 高度重叠。</li>
+    <li>结论：<strong>非刚需</strong>。若已做 A/B，可顺带把"换手率/振幅/52 周高低"三个 yfinance 没有的字段补进来，增量小。</li>
+  </ul>
+</section>
+
+<!-- ========== D ========== -->
+<section id="plate">
+  <h2>D · 所属板块 <code>get_owner_plate</code> <span class="pill p2">P2 可选</span></h2>
+  <p>返回个股所属的<strong>行业 / 概念板块</strong>（<code>plate_code / plate_name / plate_type</code>）。限频 30 秒 10 次，每次 ≤200 标的。</p>
+  <h3>价值 <span class="score mid">★★★☆☆</span></h3>
+  <ul>
+    <li>可给持仓做<strong>行业/概念聚类</strong>：组合概览新增"行业分布"（如科技/消费/新能源占比），比现有"美股/港股"更有洞察。</li>
+    <li>yfinance 的 <code>sector/industry</code> 已提供粗粒度行业，富途板块胜在<strong>概念板块</strong>（如"AI 概念""港股通"）与本地化命名。</li>
+    <li>实测：<strong>HK 与 US 均返回丰富板块</strong>（文档说"美股未明确"过于保守）。腾讯命中"云计算/AI应用/元宇宙"，苹果命中"消费电子(行业)/巴菲特持仓/标普500十大"。</li>
+  </ul>
+</section>
+
+<!-- ========== E ========== -->
+<section id="hiskline">
+  <h2>E · 历史 K 线 <code>request_history_kline</code> <span class="pill no">不推荐替换 yfinance</span></h2>
+  <div class="callout danger">
+    <span class="tag">关键限制：付费配额</span>
+    官方明确：历史 K 线配额<strong>按账户资产与交易活跃度分配</strong>，「7 天内只能拉取有限只股票的历史 K 线」，消耗的配额 7 天后才释放。<strong>这不是免费的 yfinance 替代品</strong>——无法批量下载 38 只标的的历史日线。
+  </div>
+  <ul>
+    <li>字段确实更全（含 <code>turnover_rate / change_rate / pe_ratio</code>），数据深度也好（日 K 近 20 年）。</li>
+    <li>但配额模型决定了它<strong>不适合本项目"全持仓每日刷新"</strong>的用法。</li>
+    <li>结论：<strong>维持现状用 yfinance 抓日线</strong>（已加限频节流防护）。富途历史 K 线仅在"某只重点股要看更长历史/更全字段"时按需点抓，不做常规管线。</li>
+  </ul>
+</section>
+
+<!-- ========== F ========== -->
+<section id="others">
+  <h2>F · 其它接口（评估后排除） <span class="pill no">不适配</span></h2>
+  <table>
+    <tr><th>接口</th><th>为何不适配本项目</th></tr>
+    <tr><td><code>get_rt_data</code> 分时<br><code>get_rt_ticker</code> 逐笔</td><td>高频<strong>实时</strong>数据，无历史沉淀价值；本项目是复盘工具，非盯盘终端。</td></tr>
+    <tr><td><code>get_order_book</code> 盘口<br><code>get_broker_queue</code> 经纪队列</td><td>瞬时盘口，仅对下单决策有意义，与"持仓复盘"无关。</td></tr>
+    <tr><td><code>get_option_chain</code> 期权链<br><code>get_warrant</code> 窝轮</td><td>当前持仓为正股，无衍生品需求。</td></tr>
+    <tr><td><code>get_plate_stock</code> 板块成分</td><td>选股场景，非持仓复盘所需。</td></tr>
+  </table>
+  <p class="muted">这些接口本身能力强，但与"个人持仓复盘、离线沉淀"的产品定位不契合，故不纳入。</p>
+</section>
+
+<!-- ========== 结论 ========== -->
+<section id="matrix">
+  <h2>优先级矩阵</h2>
+  <table>
+    <tr>
+      <th>接口</th><th>产品价值</th><th>落地成本</th><th>边界契合</th><th>需付费权限?</th><th>结论</th>
+    </tr>
+    <tr>
+      <td><code>accinfo_query</code><br>账户资金</td>
+      <td><span class="score hi">★★★★★</span></td>
+      <td>低</td><td>完美（有历史沉淀）</td><td class="down">否</td>
+      <td><span class="pill p0">P0</span> 立即做</td>
+    </tr>
+    <tr>
+      <td><code>get_capital_flow</code><br>资金流向</td>
+      <td><span class="score hi">★★★★☆</span></td>
+      <td>中</td><td>好（日频可入库）</td><td class="down">否（实测✅）</td>
+      <td><span class="pill p1">P1</span> 做</td>
+    </tr>
+    <tr>
+      <td><code>get_owner_plate</code><br>所属板块</td>
+      <td><span class="score mid">★★★☆☆</span></td>
+      <td>低</td><td>好（静态分类）</td><td class="down">否（HK+US 实测✅）</td>
+      <td><span class="pill p2">P2</span> 顺带做（HK+US）</td>
+    </tr>
+    <tr>
+      <td><code>get_market_snapshot</code><br>市场快照</td>
+      <td><span class="score mid">★★★☆☆</span></td>
+      <td>低</td><td>一般（仅实时快照）</td><td class="down">否</td>
+      <td><span class="pill p2">P2</span> 补 3 个字段即可</td>
+    </tr>
+    <tr>
+      <td><code>request_history_kline</code><br>历史 K 线</td>
+      <td><span class="score mid">★★★☆☆</span></td>
+      <td>高（配额）</td><td>差（不能批量）</td><td class="up">是（配额制）</td>
+      <td><span class="pill no">不做</span> 维持 yfinance</td>
+    </tr>
+  </table>
+</section>
+
+<section id="roadmap">
+  <h2>升级计划（分期）</h2>
+  <p>可行性已全部实测通过，以下为可直接开工的三期计划。每期独立可交付、独立提交。</p>
+
+  <h3>第一期 · 账户净资产 <span class="pill p0">P0</span></h3>
+  <div class="callout ok">
+    <span class="tag">目标</span>把产品从"看持仓市值"升级为"看账户净资产"。
+  </div>
+  <table>
+    <tr><th>层</th><th>改动</th></tr>
+    <tr><td>schema</td><td>新增 <code>account_funds</code> 表（每日一条快照，字段见 §A）</td></tr>
+    <tr><td>db.py</td><td><code>upsert_account_funds()</code>（UPSERT 幂等）</td></tr>
+    <tr><td>futu_client.py</td><td><code>query_funds()</code>：<code>accinfo_query</code> 取综合账户 + 币种拆分子字段 → 规整成一行</td></tr>
+    <tr><td>update_load / init_load</td><td><code>collect_account_funds(conn)</code>，接入 <code>update.sh</code>（每天 1 次）</td></tr>
+    <tr><td>app.py</td><td><code>/api/account-funds</code>（读最新 + 历史序列）</td></tr>
+    <tr><td>前端</td><td>组合概览新增「总资产 / 现金 / 仓位% / 购买力」；资产趋势加"账户净资产"线</td></tr>
+    <tr><td>测试</td><td><code>query_funds</code> 的行规整写成纯函数 + 单测（脱敏样例）</td></tr>
+  </table>
+  <p><strong>验收</strong>：页面总资产与富途 App 对得上；仓位% = 持仓市值 / 总资产。</p>
+
+  <h3>第二期 · 主力资金流向 <span class="pill p1">P1</span></h3>
+  <table>
+    <tr><th>层</th><th>改动</th></tr>
+    <tr><td>schema</td><td><code>capital_flow(code, date, in_flow, main_in_flow, super_in_flow, big_in_flow, mid_in_flow, sml_in_flow, synced_at)</code>，主键 <code>code+date</code></td></tr>
+    <tr><td>futu_client.py</td><td><code>query_capital_flow(code)</code>：<code>get_capital_flow(PeriodType.DAY)</code>，复用限频退避</td></tr>
+    <tr><td>pipelines</td><td>首次回补近 1 年（38 只 × 30s/30 次限频，几分钟内完成）；之后随 update 增量</td></tr>
+    <tr><td>app.py / 前端</td><td><code>/api/capital-flow?code=</code>；个股详情页「主力资金流向」柱状图（红涨绿跌）</td></tr>
+  </table>
+  <p><strong>验收</strong>：个股详情页出现近 N 日主力净流入柱图，可与 K 线时间对齐。</p>
+
+  <h3>第三期 · 板块聚类 + 盘面增量字段 <span class="pill p2">P2</span></h3>
+  <table>
+    <tr><th>层</th><th>改动</th></tr>
+    <tr><td>owner_plate</td><td>新增 <code>stock_plates(code, plate_name, plate_type)</code>；组合概览加"行业/概念分布"聚合</td></tr>
+    <tr><td>market_snapshot</td><td>把 yfinance 缺的 <code>turnover_rate / amplitude / volume_ratio / 52周高低</code> 补进 <code>stock_profiles</code> 或新表（每日快照）</td></tr>
+  </table>
+  <p><strong>验收</strong>：组合概览可按行业/概念看持仓占比；个股详情多出换手率/振幅/52 周高低。</p>
+
+  <div class="callout warn">
+    <span class="tag">不做</span>
+    历史 K 线（付费配额）维持 yfinance；PE/PB/市值/股息（与 yfinance 重叠）不重复抓；分时/逐笔/盘口（高频实时、无沉淀价值）不做。
+  </div>
+</section>
+
+<section id="caveats">
+  <h2>风险与边界</h2>
+  <ul>
+    <li><strong>权限已实测排除</strong>：资金流向 / 快照 / 板块在当前账户 HK+US 均返回数据，账户资金无需交易密码即可读——原先"最大不确定性"已消除。但若日后更换账户/降级行情权限，仍需重跑探针。</li>
+    <li><strong>OpenD 依赖</strong>：这些都是富途接口，抓取时 OpenD 必须已启动并登录（与现有 <code>update.sh</code> 前置条件一致）；OpenD 未开时优雅跳过、记 <code>sync_log</code>，不中断 yfinance 部分。</li>
+    <li><strong>坚守架构边界</strong>：所有新数据一律走"采集层抓 → 入 SQLite → Web 只读"。前端<strong>绝不</strong>直连富途。新表沿用 UPSERT 幂等 + 每日快照/增量的既有模式。</li>
+    <li><strong>限频复用现有机制</strong>：交易接口沿用 <code>_query_with_retry</code> 的退避；行情接口新增时也要加对应节流（参照 yfinance 那次限频教训）。</li>
+    <li><strong>历史不可回补的仍不可回补</strong>：账户资金、快照都是"当日快照"，历史空缺只能随 <code>update.sh</code> 自然积累——与 <code>positions</code> 同理，需在文档中写明。</li>
+    <li><strong>隐私</strong>：账户资金是<strong>更敏感</strong>的数据，仍只入 <code>data/mystock.db</code>（已 gitignore），绝不进 git。</li>
+  </ul>
+
+  <div class="lead">
+    <p><strong>一句话总结</strong>：4 个候选接口已本地 OpenD 实测<strong>全部可行</strong>（HK+US、无需交易密码）。第一期做 <code>accinfo_query</code>（账户净资产，价值最高）；第二期做资金流向（已验证近 1 年日频可入库）；第三期打包板块聚类 + 盘面增量字段。与 yfinance 重叠的（历史日线、PE/PB/市值/股息）不重复抓，各取所长。</p>
+  </div>
+</section>
+
+</main>
+</div>
+
+<button class="theme-toggle" id="theme-toggle" type="button">🌓 主题</button>
+<script>
+  (function () {
+    var btn = document.getElementById("theme-toggle");
+    btn.addEventListener("click", function () {
+      var cur = document.documentElement.getAttribute("data-theme");
+      var next = cur === "dark" ? "light" : "dark";
+      document.documentElement.setAttribute("data-theme", next);
+      try { localStorage.setItem("mystock-doc-theme", next); } catch (e) {}
+    });
+  })();
+</script>
+</body>
+</html>

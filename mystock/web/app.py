@@ -14,6 +14,7 @@
   GET /api/pnl                 交易盈亏（已实现，每股一行）
   GET /api/finance?year=2026   年度财务统计（现金流口径，按美股/港股分别汇总）
   GET /api/asset-trend         资产趋势（历史快照聚合，按市场分组的市值/浮盈时序）
+  GET /api/account-funds       账户资金（最新快照 + 历史净资产序列，HK+US 综合账户）
   GET /api/fx?pair=USDCNY      外汇日线（默认美元兑人民币）
 """
 from __future__ import annotations
@@ -48,6 +49,11 @@ _PROFILE_LABELS = [
     ("recommendation", "分析师评级"),
     ("currency", "货币"),
     ("website", "官网"),
+    # 盘面增量字段（富途快照，yfinance 缺）。52 周高低为本币价格。
+    ("turnover_rate", "换手率%"),
+    ("amplitude", "振幅%"),
+    ("week52_high", "52周最高"),
+    ("week52_low", "52周最低"),
 ]
 
 
@@ -233,6 +239,31 @@ def api_asset_trend():
         for r in rows:
             r["currency"] = ccy.get(r["market"])
         return jsonify({"rows": rows})
+    finally:
+        conn.close()
+
+
+@app.route("/api/account-funds")
+def api_account_funds():
+    """账户资金：最新一条快照 + 历史序列（用于组合概览与净资产趋势）。
+
+    账户为 HK+US 综合账户，每天一条。返回
+    {latest: {...} | None, history: [{snapshot_date, total_assets, market_val, cash}, ...]}
+    history 按日期升序，字段精简（趋势图用）。
+    """
+    conn = get_db()
+    try:
+        cur = conn.execute(
+            "SELECT * FROM account_funds ORDER BY snapshot_date DESC LIMIT 1"
+        )
+        row = cur.fetchone()
+        latest = dict(row) if row else None
+        cur = conn.execute(
+            "SELECT snapshot_date, report_currency, total_assets, market_val, cash "
+            "FROM account_funds ORDER BY snapshot_date ASC"
+        )
+        history = rows_to_list(cur)
+        return jsonify({"latest": latest, "history": history})
     finally:
         conn.close()
 
