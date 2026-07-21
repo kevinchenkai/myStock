@@ -265,7 +265,7 @@
 <section id="overview">
   <h2>1 · 项目是什么</h2>
   <div class="lead">
-    <p><strong>一句话</strong>：把分散在 <strong>富途</strong>（持仓 / 历史订单 / 历史成交）和 <strong>yfinance</strong>（每日行情 / 公司信息）的数据，统一抓进本地 SQLite，再用本地 Flask 页面查询、下钻到单只股票、计算交易盈亏与复盘。</p>
+    <p><strong>一句话</strong>：把分散在 <strong>富途</strong>（持仓 / 历史订单 / 历史成交 / 账户资金 / 盘面快照 / 资金流向）和 <strong>yfinance</strong>（每日行情 / 公司信息 / 汇率）的数据，统一抓进本地 SQLite，再用本地 Flask 页面查询、下钻到单只股票、计算交易盈亏与复盘。</p>
   </div>
 
   <h3>定位与边界</h3>
@@ -302,7 +302,7 @@ yfinance（行情 / 通用信息）──────────────┴
     <thead><tr><th>层</th><th>位置</th><th>职责</th><th>能否离线</th></tr></thead>
     <tbody>
       <tr><td>采集层</td><td><code>mystock/collectors/</code></td><td>从富途 OpenD 与 yfinance 拉数据，清洗后写库</td><td>否（需网络 / OpenD 登录）</td></tr>
-      <tr><td>存储层</td><td><code>data/mystock.db</code> (SQLite)</td><td>8 张表，全部 UPSERT 幂等</td><td>是</td></tr>
+      <tr><td>存储层</td><td><code>data/mystock.db</code> (SQLite)</td><td>10 张表，全部 UPSERT 幂等</td><td>是</td></tr>
       <tr><td>展示层</td><td><code>mystock/web/</code></td><td>Flask 路由 + 原生 JS 前端，只读库</td><td>是</td></tr>
     </tbody>
   </table>
@@ -366,6 +366,7 @@ python -m pytest tests/ -q</code></pre>
 │   ├── DATA.md                   # 数据字典（面向分析/建模，必读）
 │   ├── ML_PLAN.md                # ML 完整方案与决策记录
 │   ├── ML_OVERVIEW.md            # ML 速览（一页看懂）
+│   ├── futu-API数据扩展调研.html  # 富途接口可行性实测 + 三期升级计划
 │   └── 项目接手指南.html          # ← 本文件
 ├── environment.yml               # conda 环境 mk
 ├── config.example.yaml           # 配置模板
@@ -404,7 +405,7 @@ python -m pytest tests/ -q</code></pre>
       <tr><td><code>mystock/config.py</code></td><td>读 <code>config.yaml</code>；交易密码用环境变量 <code>MYSTOCK_FUTU_TRADE_PWD</code> 覆盖</td></tr>
       <tr><td><code>mystock/code_map.py</code></td><td>富途 ↔ yfinance 代码互转（纯函数，HK.00700↔0700.HK、US.AAPL↔AAPL）</td></tr>
       <tr><td><code>mystock/db.py</code></td><td>SQLite 连接 / 建表 / 通用 UPSERT / 跳过名单 / purge</td></tr>
-      <tr><td><code>mystock/schema.sql</code></td><td>8 张表的 DDL</td></tr>
+      <tr><td><code>mystock/schema.sql</code></td><td>10 张表的 DDL</td></tr>
       <tr><td><code>mystock/collectors/futu_client.py</code></td><td>富途持仓/订单/成交抓取，含限频退避与 80 天窗口分段</td></tr>
       <tr><td><code>mystock/collectors/yf_client.py</code></td><td>yfinance 日线 + 汇率 + 公司信息（<code>fetch_daily</code> / <code>fetch_fx</code> / <code>fetch_profile</code>）</td></tr>
       <tr><td><code>mystock/pipelines/init_load.py</code></td><td>全量初始化（建库 + 全量抓取 + profiles）</td></tr>
@@ -489,9 +490,10 @@ python -m pytest tests/ -q</code></pre>
     <thead><tr><th>函数</th><th>用途</th></tr></thead>
     <tbody>
       <tr><td><code>get_connection()</code></td><td>返回 SQLite 连接，<code>row_factory=Row</code>（按列名访问），自动建父目录</td></tr>
-      <tr><td><code>init_db()</code></td><td>执行 <code>schema.sql</code>，<code>IF NOT EXISTS</code> 可重复</td></tr>
-      <tr><td><code>_upsert(conn, table, rows, conflict_keys)</code></td><td>通用 UPSERT，按主键冲突时更新非主键列</td></tr>
-      <tr><td><code>upsert_positions / orders / deals / quotes / profiles / fx_rates</code></td><td>各表的语义化封装</td></tr>
+      <tr><td><code>init_db()</code></td><td>执行 <code>schema.sql</code>（<code>IF NOT EXISTS</code> 可重复）+ <code>_apply_column_migrations()</code> 轻量列迁移</td></tr>
+      <tr><td><code>_apply_column_migrations(conn)</code></td><td>按 <code>_COLUMN_MIGRATIONS</code> 给<strong>已存在的旧表</strong>补齐新增列（<code>ALTER TABLE ADD COLUMN</code>），幂等</td></tr>
+      <tr><td><code>_upsert(conn, table, rows, conflict_keys)</code></td><td>通用 UPSERT，按主键冲突时更新非主键列。<strong>只更新 row dict 里出现的列</strong> —— 这让两个采集器可以各写同一张表的不同列而互不覆盖（如 profiles 与盘面快照）</td></tr>
+      <tr><td><code>upsert_positions / orders / deals / quotes / profiles / fx_rates / account_funds / capital_flow</code></td><td>各表的语义化封装</td></tr>
       <tr><td><code>replace_position_snapshot(conn, date, rows)</code></td><td>持仓专用：先 DELETE 当天再插入，保证已清仓标的不残留</td></tr>
       <tr><td><code>write_sync_log / last_sync_point</code></td><td>同步日志；增量更新据此取上次 range_end</td></tr>
       <tr><td><code>all_traded_codes(conn)</code></td><td>从 positions/orders/deals 去重得到全部富途代码</td></tr>
@@ -528,8 +530,10 @@ python -m pytest tests/ -q</code></pre>
     <li><strong>限频控制</strong>：富途历史订单/成交接口限频"每 30 秒最多 10 次"。<code>RATE_LIMIT_INTERVAL=3.2s</code> 窗口间隔，命中限频关键字自动退避 <code>RATE_LIMIT_BACKOFF=30s</code> 重试（最多 5 次）。</li>
     <li><strong>80 天窗口分段</strong>：<code>WINDOW_DAYS=80</code>，<code>_date_windows(start, end)</code> 把长区间切成 ≤80 天窗口逐段查询后 <code>pd.concat</code> 合并（单次默认仅 90 天）。</li>
     <li><code>FutuClient(market)</code>：上下文管理器，<code>__enter__</code> 连接 + <code>_maybe_unlock</code>，<code>__exit__</code> 关闭。</li>
-    <li>三个查询：<code>query_positions()</code> / <code>query_orders(start, end)</code> / <code>query_deals(start, end)</code>。</li>
-    <li>三个规整函数：<code>position_rows()</code> / <code>order_rows()</code> / <code>deal_rows()</code> 把 DataFrame 转入库 dict；<code>_g(row, *names)</code> 按候选列名取首个非空值（兼容富途字段名变化）。</li>
+    <li><strong>交易接口</strong>（<code>OpenSecTradeContext</code>）四个查询：<code>query_positions()</code> / <code>query_orders(start, end)</code> / <code>query_deals(start, end)</code> / <code>query_funds()</code>（账户资金）。</li>
+    <li><strong>行情接口</strong>（<code>OpenQuoteContext</code>）与交易接口是<strong>两套上下文</strong>，经 <code>quote_ctx()</code> 上下文管理器打开：<code>fetch_snapshots(codes)</code>（批量盘面快照，单次 ≤400 标的）与 <code>fetch_capital_flow(ctx, code, start, end)</code>（日频资金流向）。后者逐只调用，<strong>复用同一个 ctx</strong> 避免每只重连。</li>
+    <li>规整函数（纯函数，可单测）：<code>position_rows()</code> / <code>order_rows()</code> / <code>deal_rows()</code> / <code>fund_row()</code> / <code>snapshot_fields()</code> / <code>capital_flow_rows()</code> 把 DataFrame 转入库 dict；<code>_g(row, *names)</code> 按候选列名取首个非空值（兼容富途字段名变化）。</li>
+    <li><code>_num(v)</code>：富途对缺失数值返回<strong>字符串 <code>'N/A'</code></strong>（不是 NaN/None），直接入库会污染 REAL 列 —— 统一经此转 None。</li>
     <li><code>raw_json</code>：原始记录整行 JSON 化后入库，schema 之外的信息可后续解析。</li>
   </ul>
 
@@ -556,7 +560,8 @@ python -m pytest tests/ -q</code></pre>
   <h2>9 · pipelines —— 流水线</h2>
 
   <h3>9.1 init_load.py（全量，<code>init.sh</code> 调用）</h3>
-  <p>流程：<code>init_db()</code> → <code>collect_positions</code> → <code>collect_orders(start, end)</code> → <code>collect_deals</code> → <code>collect_quotes(start, end_date)</code> → <code>collect_fx</code> → <code>collect_profiles</code>（放最后，依赖 quotes 已更新的跳过名单）。每步写 <code>sync_log</code>。</p>
+  <p>流程：<code>init_db()</code> → <code>collect_positions</code> → <code>collect_account_funds</code> → <code>collect_orders(start, end)</code> → <code>collect_deals</code> → <code>collect_quotes(start, end_date)</code> → <code>collect_fx</code> → <code>collect_profiles</code>（依赖 quotes 已更新的跳过名单）→ <code>collect_market_snapshot</code> → <code>collect_capital_flow</code>。每步写 <code>sync_log</code>，共 9 个数据源。</p>
+  <p><code>collect_market_snapshot</code> 只写 <code>stock_profiles</code> 的<strong>盘面列</strong>（换手率/振幅/52 周高低）。这依赖 <code>_upsert</code> 的一个性质：<strong>只更新 row dict 里出现的列</strong>，所以它与 <code>collect_profiles</code>（写公司/估值列）互不覆盖，先后顺序无关。</p>
   <p><code>collect_quotes</code> 会先 <code>get_quote_skiplist</code> 过滤，对抓到空的标的 <code>record_quote_empty</code>，抓到数据则 <code>clear_quote_skip</code>。结束汇总 <code>X ok / Y empty / Z err / N skipped</code>。</p>
 
   <h3>9.2 update_load.py（增量，<code>update.sh</code> 调用）</h3>
@@ -566,7 +571,8 @@ python -m pytest tests/ -q</code></pre>
     <li>持仓：始终覆盖当天快照。</li>
     <li>订单/成交：从"上次同步点当天 00:00"重抓（UPSERT 天然幂等）。</li>
     <li>行情/汇率：从上次 range_end 当天重抓（PK 覆盖）。</li>
-    <li>profiles：每日全量刷新（UPSERT 覆盖）。</li>
+    <li>profiles / 盘面快照 / 账户资金：每日全量刷新（UPSERT 覆盖，各自只写自己那几列）。</li>
+    <li>资金流向：同样取上次同步点当天。<strong>首次运行无同步点</strong> → 回退 <code>start_date</code> → 再被 <code>CAPITAL_FLOW_MAX_DAYS</code>(370 天) 抬到富途能给的边界 → <strong>自动完成近 1 年回补</strong>（38 只约 1 分钟），之后每天只重抓当天。无需任何一次性回补脚本。</li>
   </ul>
 
   <h3>9.3 maintenance.py（手动运维）</h3>
@@ -648,11 +654,13 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
       <tr><td><code>GET /api/pnl</code></td><td>交易盈亏（已实现，按成交数据，移动平均成本 + 持仓成本兜底）</td></tr>
       <tr><td><code>GET /api/finance?year=2026</code></td><td>年度财务统计（现金流口径，按美股/港股分别汇总）</td></tr>
       <tr><td><code>GET /api/asset-trend</code></td><td>资产趋势（历史快照聚合，按市场分组）</td></tr>
+      <tr><td><code>GET /api/account-funds</code></td><td>账户资金（最新快照 + 历史净资产序列，HK+US 综合账户按 HKD 记账）</td></tr>
       <tr><td><code>GET /api/fx?pair=USDCNY</code></td><td>外汇日线（默认美元兑人民币）</td></tr>
       <tr><td><code>GET /api/quotes?code=&start=&end=</code></td><td>某代码日线</td></tr>
       <tr><td><code>GET /api/stock/&lt;code&gt;</code></td><td>聚合：该股票行情 + 订单 + 成交</td></tr>
       <tr><td><code>GET /api/stock/&lt;code&gt;/profile</code></td><td>通用信息（公司/估值，读自 <code>stock_profiles</code>）</td></tr>
       <tr><td><code>GET /api/stock/&lt;code&gt;/analysis</code></td><td>单股交易复盘：成交 + FIFO 回合 + 统计 + 客观观察</td></tr>
+      <tr><td><code>GET /api/stock/&lt;code&gt;/capital-flow?days=60</code></td><td>该股日频资金流向（主力/超大/大/中/小单净流入，本币）</td></tr>
     </tbody>
   </table>
 
@@ -670,19 +678,20 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
     <li><strong>主题</strong>：<code>theme.js</code> 三态循环"跟随系统 → 浅色 → 深色"，<code>localStorage</code> 记忆；<code>&lt;head&gt;</code> 内首屏脚本提前应用，防闪烁。</li>
   </ul>
 
-  <h3>11.3 价格走势图（Lightweight-Charts）</h3>
+  <h3>11.3 图表（Lightweight-Charts）</h3>
   <ul>
     <li>用 vendored 的 <code>static/vendor/lightweight-charts.standalone.production.js</code>（离线、无构建）。</li>
-    <li>该库需真实 DOM 容器 + 创建后注入数据：<code>renderChart</code> 只产出占位容器，<code>openStock</code> 在 <code>innerHTML</code> 写入后调 <code>mountChart()</code> 挂载。</li>
-    <li>浮窗关闭 / 切复盘时<strong>必须 <code>destroyChart()</code></strong> 释放，避免内存泄漏。</li>
+    <li>该库需真实 DOM 容器 + 创建后注入数据，故一律<strong>两段式</strong>：<code>renderChart</code> 只产出占位容器，<code>openStock</code> 在 <code>innerHTML</code> 写入后调 <code>mountChart()</code> 挂载。资金流向柱图同理（<code>renderCapitalFlow</code> 占位 → <code>loadCapitalFlow</code> 异步取数 → <code>mountFlowChart</code> 挂载）。</li>
+    <li>浮窗关闭 / 切复盘时<strong>必须 <code>destroyChart()</code></strong> 释放，避免内存泄漏。<strong>资金流向图的销毁挂在 <code>destroyChart()</code> 内部</strong>一并触发 —— 两图同生共死，不必在每个关闭点各调一次（漏调即泄漏）。</li>
     <li>颜色从 CSS 变量读取以适配红涨绿跌 + 深浅主题。</li>
+    <li>容器高度需 <strong>CSS 与 JS 两处一致</strong>：K 线 320px、资金流向柱图 220px（<code>#flow-host</code> 覆写 <code>.chart-host</code> 的默认高度）。</li>
   </ul>
 </section>
 
 <!-- ============ 12. 表结构 ============ -->
 <section id="schema">
   <h2>12 · 数据库表结构（schema.sql）</h2>
-  <p>8 张表。完整 DDL 见 <code>mystock/schema.sql</code>；字段级数据字典见 <code>docs/DATA.md</code> 与本指南 §13。</p>
+  <p>10 张表。完整 DDL 见 <code>mystock/schema.sql</code>；字段级数据字典见 <code>docs/DATA.md</code> 与本指南 §13。</p>
 
   <table>
     <thead><tr><th>表</th><th>用途</th><th>主键</th><th>来源</th></tr></thead>
@@ -691,8 +700,10 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
       <tr><td><code>orders</code></td><td>历史<strong>委托订单</strong>（事件流水）</td><td>order_id</td><td>富途</td></tr>
       <tr><td><code>deals</code></td><td>历史<strong>成交回报</strong>（盈亏最权威事实表）</td><td>deal_id</td><td>富途</td></tr>
       <tr><td><code>daily_quotes</code></td><td>日线行情（OHLCV + 复权 + 分红拆股）</td><td>(yf_symbol, date)</td><td>yfinance</td></tr>
-      <tr><td><code>stock_profiles</code></td><td>公司/估值通用信息（横截面快照，无历史）</td><td>futu_code</td><td>yfinance</td></tr>
+      <tr><td><code>stock_profiles</code></td><td>公司/估值通用信息 + 富途盘面字段（横截面快照，无历史）</td><td>futu_code</td><td>yfinance + 富途</td></tr>
       <tr><td><code>fx_rates</code></td><td>外汇日线（当前 USDCNY）</td><td>(pair, date)</td><td>yfinance</td></tr>
+      <tr><td><code>account_funds</code></td><td>账户资金<strong>每日快照</strong>（净资产/现金/购买力）</td><td>snapshot_date</td><td>富途</td></tr>
+      <tr><td><code>capital_flow</code></td><td>个股<strong>日频资金流向</strong>（主力/超大/大/中/小单净流入）</td><td>(code, date)</td><td>富途</td></tr>
       <tr><td><code>quote_skiplist</code></td><td>行情跳过名单（运维）</td><td>futu_code</td><td>系统</td></tr>
       <tr><td><code>sync_log</code></td><td>同步日志（运维，增量起点）</td><td>id (自增)</td><td>系统</td></tr>
     </tbody>
@@ -701,13 +712,16 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
   <h3>实体关系</h3>
   <div class="ascii">stock_profiles ─┐ (futu_code)
 positions ──────┤ 每只股票一个 futu_code，跨表主键
-daily_quotes ───┘ (有 yf_symbol 和 futu_code 两列；跨表 JOIN 用 futu_code)
+daily_quotes ───┤ (有 yf_symbol 和 futu_code 两列；跨表 JOIN 用 futu_code)
+capital_flow ───┘ (列名为 code，语义同 futu_code；date 与 daily_quotes.date 对齐可 JOIN)
 
 orders 1 ──< deals N        (orders.order_id = deals.order_id)
+
+account_funds               账户级每日快照，不含 code，无法与个股表关联
 </div>
 
   <h3>索引</h3>
-  <p><code>idx_orders_code</code> / <code>idx_deals_code</code> / <code>idx_deals_order</code> / <code>idx_quotes_futu</code> / <code>idx_positions_code</code> / <code>idx_fx_pair_date</code>。</p>
+  <p><code>idx_orders_code</code> / <code>idx_deals_code</code> / <code>idx_deals_order</code> / <code>idx_quotes_futu</code> / <code>idx_positions_code</code> / <code>idx_fx_pair_date</code> / <code>idx_capflow_code_date</code>。</p>
 </section>
 
 <!-- ============ 13. 数据字典速查 ============ -->
@@ -759,6 +773,22 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
     <li>当天未收盘时 <code>close</code> 可能为空，前端/分析须过滤（注意 JS 中 <code>Number(null)/Number("")===0</code>，不能只用 <code>isFinite</code>）。</li>
     <li><code>CNY=X</code> 即 USDCNY；勿与 <code>CNH=X</code>（离岸）混淆。</li>
   </ul>
+
+  <h3>account_funds —— 账户资金每日快照</h3>
+  <ul>
+    <li>账户是<strong>单一 HK+US 综合保证金账户</strong>，<code>accinfo_query</code> 返回<strong>一行</strong>，故本表每天只有一条（主键 <code>snapshot_date</code>，不含 code/market）。</li>
+    <li>合计字段（<code>total_assets / market_val / cash / power</code>）按 <code>report_currency</code> 记账（默认 <strong>HKD</strong>），行内另有港币侧（<code>hkd_assets / hk_cash</code>）与美元侧（<code>usd_assets / us_cash</code>）拆分。<strong>拆分字段是各自本币</strong>，与合计不同币种，勿直接相加。</li>
+    <li>与 <code>positions</code> 同理：<strong>历史不可从富途回补</strong>，空缺只能随 <code>update.sh</code> 自然积累。</li>
+    <li>实测<strong>无需交易密码</strong>（未 <code>unlock_trade</code>）即可读取。</li>
+  </ul>
+
+  <h3>capital_flow —— 个股日频资金流向</h3>
+  <ul>
+    <li>富途独有（<strong>yfinance 无此数据</strong>）。金额为标的<strong>本币</strong>（HK→HKD、US→USD），<strong>正 = 净流入</strong>。</li>
+    <li><code>main_in_flow</code>（主力）<strong>≈ 超大单 + 大单</strong>，<strong>不是</strong>六档之和 —— 把六个字段相加会得出错误的"总流入"。整体口径请直接用 <code>in_flow</code>。</li>
+    <li>只有<strong>近 1 年</strong>日频历史（实测 HK 约 246 天 / US 约 252 天），更早取不到 → 起点经 <code>CAPITAL_FLOW_MAX_DAYS</code> 抬高。</li>
+    <li><code>date</code> 与 <code>daily_quotes.date</code> 同为 <code>YYYY-MM-DD</code>，可直接 JOIN 做"放量上涨是否有主力承接"一类分析。</li>
+  </ul>
 </section>
 
 <!-- ============ 14. 关键口径与约定 ============ -->
@@ -780,6 +810,7 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
 
   <h3>14.4 资产趋势 / 组合概览口径</h3>
   <p>均从已入库 <code>positions</code> 快照聚合，<strong>零新抓取</strong>（Web 只读边界）。跨币种不相加，按市场各画一条线 / 各一张卡；快照不可从富途回补，历史空缺只能随 <code>update.sh</code> 自然积累。</p>
+  <p><strong>账户总览卡</strong>是唯一的例外来源：读 <code>account_funds</code>（富途综合账户，<strong>按 HKD 记账</strong>），与按市场分币种汇总的其余卡片<strong>口径不同</strong>，故单独成卡并在说明里标注，不与各市场数字混算。仓位% = <code>market_val / total_assets</code>。</p>
 
   <h3>14.5 复盘范围</h3>
   <p><code>analyze_stock</code> 仅做<strong>客观交易行为复盘</strong>，不输出个性化投资建议（你不是持牌投顾）。</p>
@@ -831,7 +862,27 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
 
   <div class="callout warn">
     <span class="tag">9. purge 不可逆</span>
-    <code>maintenance purge &lt;代码&gt;</code> 删所有表数据，<strong>会改历史盈亏</strong>。仅退市清仓且不再关注时用。
+    <code>maintenance purge &lt;代码&gt;</code> 删所有表数据，<strong>会改历史盈亏</strong>。仅退市清仓且不再关注时用。新增按 code 存储的表时<strong>记得加进 <code>purge_code</code> 的 targets 列表</strong>，否则会留下孤儿数据。
+  </div>
+
+  <div class="callout danger">
+    <span class="tag">10. 富途资金流向 start/end 是闭区间</span>
+    与 yfinance 的 <code>end</code> <strong>排他相反</strong>：<code>get_capital_flow(start, end)</code> 两端<strong>都含</strong>，传 <code>end=今天</code> 能取到当天。<strong>切勿套用 <code>_end_inclusive</code></strong>（会多抓一天）。同一个代码库里两套相反语义，改动前先确认在跟哪个数据源打交道。
+  </div>
+
+  <div class="callout danger">
+    <span class="tag">11. main_in_flow 不是各档之和</span>
+    <code>main_in_flow</code>（主力）≈ 超大单 + 大单。把 <code>super/big/mid/sml</code> 四档与它<strong>相加会重复计算</strong>。整体口径请直接用 <code>in_flow</code>。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">12. 富途缺失数值是字符串 'N/A'</span>
+    不是 <code>NaN</code>/<code>None</code>，<code>pd.isna()</code> <strong>判不出来</strong>，直接入库会往 REAL 列塞字符串。所有富途数值字段必须过 <code>_num()</code>。
+  </div>
+
+  <div class="callout warn">
+    <span class="tag">13. CREATE TABLE IF NOT EXISTS 不会给旧表加列</span>
+    给已有表加字段时，光改 <code>schema.sql</code> 对<strong>已存在的库无效</strong>（建表语句直接跳过）。须在 <code>db.py</code> 的 <code>_COLUMN_MIGRATIONS</code> 里登记，由 <code>_apply_column_migrations()</code> 在 <code>init_db()</code> 中 <code>ALTER TABLE ADD COLUMN</code> 补齐。
   </div>
 </section>
 
@@ -921,7 +972,7 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
   </ol>
 
   <h3>测试</h3>
-  <p>ML 子包纯函数单测（不依赖 GPU / 可在 <code>mk</code> 跑）：<code>test_ml_calibrator</code>（CQR 符号/有限样本分位/覆盖率按股）、<code>test_ml_cv</code>（借鉴② purged 切分：隔离带/min_train/扩张窗单调/第0折不丢）、<code>test_ml_signal_eval</code>（借鉴③ IC：完美/噪声/RankIC 抗异常/宽度 IC 跟踪振幅）、<code>test_ml_policy</code> / <code>test_ml_simulator</code> / <code>test_ml_nan_guard</code> / <code>test_ml_offline_rl</code>。全套 103 测试（<code>test_ml_regime</code> / <code>test_ml_reward</code> 随建议1+3 移除而删）。</p>
+  <p>ML 子包纯函数单测（不依赖 GPU / 可在 <code>mk</code> 跑）：<code>test_ml_calibrator</code>（CQR 符号/有限样本分位/覆盖率按股）、<code>test_ml_cv</code>（借鉴② purged 切分：隔离带/min_train/扩张窗单调/第0折不丢）、<code>test_ml_signal_eval</code>（借鉴③ IC：完美/噪声/RankIC 抗异常/宽度 IC 跟踪振幅）、<code>test_ml_policy</code> / <code>test_ml_simulator</code> / <code>test_ml_nan_guard</code> / <code>test_ml_offline_rl</code>。ML 子包合计 62 测试，仓库全量 117（<code>test_ml_regime</code> / <code>test_ml_reward</code> 随建议1+3 移除而删）。</p>
 
   <h3>产物</h3>
   <p>每日生成自包含 HTML 报告，归档 <code>data/ml/reports/&lt;date&gt;/</code>，红涨绿跌、不碰 web。cron 每工作日早 8 点（北京时间）跑 <code>ml.sh all</code>。报告头部口径行透明化当前 reward / CQR / regime 模式。</p>
@@ -1013,10 +1064,10 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
   <h3>动手验证（加深理解）</h3>
   <ul>
     <li>☐ <code>sqlite3 data/mystock.db</code> 看几张表的实际数据与行数</li>
-    <li>☐ 在持仓 Tab 点表头排序、切市场筛选、点代码下钻看 K 线与复盘浮窗</li>
+    <li>☐ 在持仓 Tab 点表头排序、切市场筛选、点代码下钻看 K 线、主力资金流向柱图与复盘浮窗</li>
     <li>☐ <code>python -m mystock.pipelines.maintenance skiplist</code> 看跳过名单</li>
     <li>☐ 跑一次 <code>bash scripts/update.sh</code>，观察 <code>sync_log</code> 新增记录</li>
-    <li>☐ <code>conda activate mk && python -m pytest tests/ -q</code>（115 测试全过）</li>
+    <li>☐ <code>conda activate mk && python -m pytest tests/ -q</code>（117 测试全过）</li>
     <li>☐ <code>bash scripts/ml.sh train</code> 跑一次回测 + 报告，看 <code>data/ml/reports/latest.html</code> 头部口径行（reward/CQR/regime）</li>
     <li>☐ <code>MYSTOCK_ML_TIER1=1 python -m mystock.ml.backtest</code> 看 Tier1 vs 保守口径 A/B（验收门槛）</li>
   </ul>
