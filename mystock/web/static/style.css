@@ -499,6 +499,15 @@ th.sortable .arrow { font-size: 9px; color: var(--accent); margin-left: 3px; }
   overflow: hidden;
 }
 
+/* 主力资金流向：柱图容器比 K 线矮（副图定位），高度需与 JS 里的 height 一致 */
+#flow-host { height: 220px; }
+/* 柱图抬头：近 N 日主力净流入合计（红涨绿跌沿用 .up / .down） */
+.flow-summary {
+  margin-bottom: 8px; font-size: 13px; color: var(--muted);
+}
+.flow-summary b { font-size: 15px; margin: 0 4px; }
+.flow-sub { color: var(--muted); }
+
 /* 美元汇率 Tab 基本信息 */
 #fx-info { margin-bottom: 14px; }
 /* 自适应宽度的指标卡行：每张卡按内容自然伸展，整行不够再换行；卡内不折字。 */

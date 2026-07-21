@@ -5,6 +5,7 @@
   - orders:       PRIMARY KEY (order_id)                      → UPSERT
   - deals:        PRIMARY KEY (deal_id)                       → UPSERT
   - daily_quotes: PRIMARY KEY (yf_symbol, date)               → 覆盖
+  - capital_flow: PRIMARY KEY (code, date)                    → 覆盖
 """
 from __future__ import annotations
 
@@ -134,6 +135,11 @@ def upsert_profiles(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
 
 def upsert_fx_rates(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
     return _upsert(conn, "fx_rates", rows, ["pair", "date"])
+
+
+def upsert_capital_flow(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
+    """资金流向日频 UPSERT（主键 code+date，重抓当天覆盖）。"""
+    return _upsert(conn, "capital_flow", rows, ["code", "date"])
 
 
 def upsert_account_funds(conn: sqlite3.Connection, rows: Sequence[dict]) -> int:
@@ -278,6 +284,7 @@ def purge_code(conn: sqlite3.Connection, futu_code: str) -> dict:
         ("deals", "code"),
         ("daily_quotes", "futu_code"),
         ("stock_profiles", "futu_code"),
+        ("capital_flow", "code"),
         ("quote_skiplist", "futu_code"),
     ]
     deleted = {}

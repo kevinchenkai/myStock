@@ -135,6 +135,23 @@ CREATE TABLE IF NOT EXISTS account_funds (
     updated_at          TEXT                  -- 入库时间
 );
 
+-- 个股资金流向日频（富途 get_capital_flow，PeriodType.DAY）。
+-- 富途独有（yfinance 无此数据），提供近 1 年日频历史 → 首次可一次性回补，
+-- 之后随 update.sh 增量。金额单位为标的本币（HK→HKD、US→USD），正=净流入。
+-- 注意 main_in_flow（主力）≈ 超大单 + 大单，并非各档之和，勿把六个字段相加。
+CREATE TABLE IF NOT EXISTS capital_flow (
+    code            TEXT NOT NULL,        -- 富途代码，如 HK.00700 / US.AAPL
+    date            TEXT NOT NULL,        -- YYYY-MM-DD
+    in_flow         REAL,                 -- 整体净流入
+    main_in_flow    REAL,                 -- 主力净流入（超大单+大单）
+    super_in_flow   REAL,                 -- 超大单净流入
+    big_in_flow     REAL,                 -- 大单净流入
+    mid_in_flow     REAL,                 -- 中单净流入
+    sml_in_flow     REAL,                 -- 小单净流入
+    synced_at       TEXT,                 -- 入库时间
+    PRIMARY KEY (code, date)
+);
+
 -- 行情跳过名单：连续多次抓取为空（如退市 / yfinance 无数据）的代码，
 -- 后续直接跳过，避免重复无效请求与库的退市警告噪音。
 CREATE TABLE IF NOT EXISTS quote_skiplist (
@@ -165,3 +182,4 @@ CREATE INDEX IF NOT EXISTS idx_deals_order ON deals(order_id);
 CREATE INDEX IF NOT EXISTS idx_quotes_futu ON daily_quotes(futu_code);
 CREATE INDEX IF NOT EXISTS idx_positions_code ON positions(code);
 CREATE INDEX IF NOT EXISTS idx_fx_pair_date ON fx_rates(pair, date);
+CREATE INDEX IF NOT EXISTS idx_capflow_code_date ON capital_flow(code, date);

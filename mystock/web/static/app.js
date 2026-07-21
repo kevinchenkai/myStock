@@ -1086,12 +1086,14 @@ async function openStock(code) {
       dataFreshnessBanner(d.quotes) +
       section("通用信息", `<div id="detail-profile"><div class="empty">加载通用信息中…</div></div>`) +
       section("价格走势（K线）", renderChart(d.quotes)) +
+      section("主力资金流向（近 60 日）", renderCapitalFlow()) +
       section(`历史日线（${d.quotes.length} 条）`, renderQuotesTable(d.quotes)) +
       section(`我的订单（${d.orders.length} 条）`, renderDetailOrders(d.orders)) +
       section(`我的成交（${d.deals.length} 条）`, renderDetailDeals(d.deals));
     bindSectionToggles(body);
-    mountChart();        // 占位容器已入 DOM，挂载蜡烛图 + 成交量
-    loadProfile(code);   // 通用信息走 yfinance 实时接口，异步填充
+    mountChart();          // 占位容器已入 DOM，挂载蜡烛图 + 成交量
+    loadProfile(code);     // 通用信息走 yfinance 实时接口，异步填充
+    loadCapitalFlow(code); // 资金流向读库，异步填充后挂载柱图
   } catch (e) {
     body.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
   }
@@ -1244,6 +1246,102 @@ const PROFILE_FIELDS = [
   { key: "52周最高", num: true, cur: true }, { key: "52周最低", num: true, cur: true },
 ];
 
+// ---------- 主力资金流向（富途日频）----------
+// 资金流向金额动辄上亿，直接展示会淹没在零里 → 压成 亿/万 单位。
+// 返回带符号字符串（正=净流入）。
+function fmtFlow(v) {
+  const n = Number(v);
+  if (v === null || v === undefined || v === "" || !isFinite(n)) return "—";
+  const sign = n > 0 ? "+" : n < 0 ? "-" : "";
+  const abs = Math.abs(n);
+  if (abs >= 1e8) return `${sign}${(abs / 1e8).toFixed(2)} 亿`;
+  if (abs >= 1e4) return `${sign}${(abs / 1e4).toFixed(1)} 万`;
+  return `${sign}${abs.toFixed(0)}`;
+}
+
+let _flowHandle = null;   // 资金流向图实例
+let _flowData = null;     // 待挂载数据
+
+function renderCapitalFlow() {
+  // 与 K 线同样的两段式：先出占位容器，数据到位后由 mountFlowChart 挂载。
+  return `<div id="flow-host-wrap"><div class="empty">加载资金流向中…</div></div>`;
+}
+
+function destroyFlowChart() {
+  if (_flowHandle) {
+    try { _flowHandle.remove(); } catch (e) {}
+    _flowHandle = null;
+  }
+  _flowData = null;
+}
+
+async function loadCapitalFlow(code) {
+  const wrap = document.getElementById("flow-host-wrap");
+  if (!wrap) return;
+  try {
+    const r = await getJSON(`/api/stock/${encodeURIComponent(code)}/capital-flow?days=60`);
+    const rows = (r.rows || []).filter((x) => x.main_in_flow !== null && x.main_in_flow !== undefined);
+    if (!rows.length) {
+      wrap.innerHTML = `<div class="empty">暂无资金流向数据（需运行 update.sh 抓取）</div>`;
+      return;
+    }
+    // 汇总：近 N 日主力净流入合计 + 流入/流出天数，给柱图一个结论性抬头
+    let sum = 0, inDays = 0, outDays = 0;
+    for (const x of rows) {
+      const v = Number(x.main_in_flow);
+      sum += v;
+      if (v > 0) inDays++; else if (v < 0) outDays++;
+    }
+    wrap.innerHTML = `
+      <div class="flow-summary">
+        近 ${rows.length} 日主力净流入合计
+        <b class="${plClass(sum)}">${fmtFlow(sum)}</b>
+        <span class="flow-sub">（流入 ${inDays} 天 / 流出 ${outDays} 天，标的本币）</span>
+      </div>
+      <div class="chart-host" id="flow-host"></div>`;
+    _flowData = rows;
+    mountFlowChart();
+  } catch (e) {
+    wrap.innerHTML = `<div class="empty">资金流向加载失败：${esc(e.message)}</div>`;
+  }
+}
+
+// 主力净流入柱状图：红=净流入 / 绿=净流出（中国习惯，与 K 线一致）。
+function mountFlowChart() {
+  const host = document.getElementById("flow-host");
+  if (!host || !_flowData || !_flowData.length) return;
+  if (typeof LightweightCharts === "undefined") {
+    host.innerHTML = `<div class="empty">图表库未加载</div>`;
+    return;
+  }
+  const c = chartColors();
+  const chart = LightweightCharts.createChart(host, {
+    width: host.clientWidth || 720,
+    height: 220,
+    layout: { background: { color: "transparent" }, textColor: c.muted },
+    grid: { vertLines: { color: c.border }, horzLines: { color: c.border } },
+    rightPriceScale: { borderColor: c.border },
+    timeScale: { borderColor: c.border, timeVisible: false },
+    crosshair: { mode: LightweightCharts.CrosshairMode.Normal },
+  });
+  const series = chart.addHistogramSeries({
+    priceFormat: { type: "volume" },   // 紧凑数值轴，避免亿级数字撑开刻度
+    base: 0,                            // 以 0 为基线，正上负下
+  });
+  series.setData(_flowData.map((r) => {
+    const v = Number(r.main_in_flow);
+    return { time: r.date, value: v, color: v >= 0 ? c.up : c.down };
+  }));
+  chart.timeScale().fitContent();
+
+  const ro = new ResizeObserver(() => {
+    if (_flowHandle === chart) chart.applyOptions({ width: host.clientWidth });
+  });
+  ro.observe(host);
+
+  _flowHandle = chart;
+}
+
 async function loadProfile(code) {
   const wrap = document.getElementById("detail-profile");
   if (!wrap) return;
@@ -1320,12 +1418,14 @@ function chartColors() {
 }
 
 // 销毁当前图表（浮窗关闭/重开时调用），避免内存泄漏与重复挂载。
+// 资金流向图与 K 线同生共死（同一浮窗），一并销毁，免得每处关闭都要记着调两个。
 function destroyChart() {
   if (_chartHandle) {
     try { _chartHandle.remove(); } catch (e) {}
     _chartHandle = null;
   }
   _chartData = null;
+  destroyFlowChart();
 }
 
 // 在占位容器已插入 DOM 后挂载蜡烛图 + 成交量副图。

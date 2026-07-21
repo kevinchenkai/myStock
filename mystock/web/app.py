@@ -11,6 +11,7 @@
   GET /api/stock/<code>        聚合：该股票行情 + 订单 + 成交
   GET /api/stock/<code>/profile    通用信息（公司/估值，读自 stock_profiles）
   GET /api/stock/<code>/analysis   交易复盘（成交明细 + FIFO 回合 + 复盘统计）
+  GET /api/stock/<code>/capital-flow?days=60  日频资金流向（富途，本币）
   GET /api/pnl                 交易盈亏（已实现，每股一行）
   GET /api/finance?year=2026   年度财务统计（现金流口径，按美股/港股分别汇总）
   GET /api/asset-trend         资产趋势（历史快照聚合，按市场分组的市值/浮盈时序）
@@ -333,6 +334,34 @@ def api_stock(code: str):
                 "deals": deals,
             }
         )
+    finally:
+        conn.close()
+
+
+@app.route("/api/stock/<code>/capital-flow")
+def api_stock_capital_flow(code: str):
+    """单只股票的日频资金流向（富途，读自 capital_flow 表）。
+
+    默认返回最近 60 个交易日（?days= 可调），按日期升序便于直接画图。
+    金额为标的本币（HK→HKD、US→USD），正=净流入。
+    """
+    try:
+        days = int(request.args.get("days", 60))
+    except ValueError:
+        days = 60
+    days = max(1, min(days, 400))
+    conn = get_db()
+    try:
+        # 先按日期倒序取最近 N 条，再翻正序返回
+        cur = conn.execute(
+            "SELECT date, in_flow, main_in_flow, super_in_flow, big_in_flow, "
+            "mid_in_flow, sml_in_flow FROM capital_flow "
+            "WHERE code = ? ORDER BY date DESC LIMIT ?",
+            (code, days),
+        )
+        rows = rows_to_list(cur)
+        rows.reverse()
+        return jsonify({"code": code, "rows": rows})
     finally:
         conn.close()
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from .. import db
 from ..config import CONFIG
@@ -23,6 +23,10 @@ from ..collectors import yf_client as yc
 # yfinance 按 IP 限频，密集连发易触发「Too Many Requests」。这里在每次
 # 请求前小睡一下，把请求摊开，显著降低撞限频的概率。第一个标的不睡。
 YF_THROTTLE_SEC = 0.5
+
+# 富途资金流向的历史深度：日频只提供近 1 年（实测 HK 237 / US 243 个交易日）。
+# 回补起点早于此没有意义，统一抬到这个边界。留 5 天余量。
+CAPITAL_FLOW_MAX_DAYS = 370
 
 
 def _now() -> str:
@@ -224,6 +228,59 @@ def collect_market_snapshot(conn) -> None:
         print(f"[snapshot] 失败: {e}", file=sys.stderr)
 
 
+def collect_capital_flow(conn, start: str, end: str) -> None:
+    """富途日频资金流向（主力/超大/大/中/小单净流入），逐只抓取入库。
+
+    富途只提供近 1 年日频历史：早于 CAPITAL_FLOW_MAX_DAYS 的 start 会被抬到
+    该边界（再早也拿不到，白跑一趟）。限频 30s/30 次 → 标的间垫间隔。
+    单只失败不中断整体；OpenD 未开时整体跳过并记 sync_log。
+    """
+    now = _now()
+    all_codes = db.all_traded_codes(conn)
+    if not all_codes:
+        db.write_sync_log(conn, "futu_capflow", start, end, 0, "ok", "no codes")
+        print("[capflow] 无可抓取的代码，跳过")
+        return
+
+    # 抬到富途能给的最早日期，避免请求注定为空的区间
+    floor = (datetime.now() - timedelta(days=CAPITAL_FLOW_MAX_DAYS)).strftime("%Y-%m-%d")
+    eff_start = max(start[:10], floor)
+
+    grand_total = 0
+    ok_codes = 0
+    empty_codes = 0
+    err_codes = 0
+    print(f"[capflow] 准备抓取 {len(all_codes)} 个标的的资金流向（{eff_start} ~ {end}）…")
+    try:
+        with fc.quote_ctx() as ctx:
+            for i, code in enumerate(all_codes):
+                if i:
+                    time.sleep(fc.CAPITAL_FLOW_INTERVAL)  # 限频 30s/30 次
+                try:
+                    df = fc.fetch_capital_flow(ctx, code, eff_start, end)
+                    rows = fc.capital_flow_rows(df, code, now)
+                    if not rows:
+                        empty_codes += 1
+                        print(f"  · {code}: 无数据")
+                        continue
+                    n = db.upsert_capital_flow(conn, rows)
+                    grand_total += n
+                    ok_codes += 1
+                    print(f"  ✓ {code}: {n} 条")
+                except Exception as e:  # noqa: BLE001
+                    err_codes += 1
+                    print(f"  ✗ {code}: {e}", file=sys.stderr)
+    except Exception as e:  # noqa: BLE001
+        # 连不上 OpenD（行情上下文都开不了）→ 整体跳过
+        db.write_sync_log(conn, "futu_capflow", eff_start, end, grand_total, "error", str(e))
+        print(f"[capflow] 失败: {e}", file=sys.stderr)
+        return
+
+    msg = f"{ok_codes} ok / {empty_codes} empty / {err_codes} err"
+    db.write_sync_log(conn, "futu_capflow", eff_start, end, grand_total, "ok", msg)
+    print(f"[capflow] 完成：{msg}，共 {grand_total} 条")
+
+
 def collect_fx(conn, start: str, end: str, pair: str = "USDCNY",
                yf_symbol: str = "CNY=X") -> None:
     """抓取美元-人民币（或其它）汇率日线，UPSERT 入库。
@@ -267,6 +324,8 @@ def run() -> int:
         collect_profiles(conn)
         # 富途盘面增量字段，合并进 stock_profiles（yfinance 缺项）
         collect_market_snapshot(conn)
+        # 富途日频资金流向（近 1 年一次性回补）
+        collect_capital_flow(conn, start, end_date)
     finally:
         conn.close()
 

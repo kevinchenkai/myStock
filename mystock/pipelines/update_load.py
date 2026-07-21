@@ -68,6 +68,11 @@ def run() -> int:
         init_load.collect_profiles(conn)
         # 富途盘面增量字段（换手率/振幅/52 周高低），合并进 stock_profiles
         init_load.collect_market_snapshot(conn)
+
+        # 资金流向：增量起点取上次同步当天（当天覆盖）。首次运行无同步点 →
+        # 回退 start_date，再被 CAPITAL_FLOW_MAX_DAYS 抬到近 1 年 → 自动完成回补。
+        capflow_start = _incremental_start(conn, "futu_capflow", "date")
+        init_load.collect_capital_flow(conn, capflow_start, end_date)
     finally:
         conn.close()
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import time
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from typing import Callable, Optional
 
@@ -26,6 +27,7 @@ try:
         TrdMarket,
         TrdEnv,
         SecurityFirm,
+        PeriodType,
         RET_OK,
     )
 except ImportError:  # pragma: no cover - 仅在未安装 futu-api 时触发
@@ -34,6 +36,7 @@ except ImportError:  # pragma: no cover - 仅在未安装 futu-api 时触发
     TrdMarket = None
     TrdEnv = None
     SecurityFirm = None
+    PeriodType = None
     RET_OK = "RET_OK"
 
 
@@ -407,10 +410,26 @@ def fund_row(df: pd.DataFrame, snapshot_date: str, now: str) -> Optional[dict]:
     }
 
 
-# ---------------- 行情快照（盘面增量字段）----------------
-# get_market_snapshot 是行情接口（OpenQuoteContext），单次最多 400 标的，
-# 限频 30s/60 次。本项目标的数远小于 400，一次批量取全。仅取 yfinance
-# 缺的盘面字段（换手率/振幅/52 周高低）合并进 stock_profiles。
+# ---------------- 行情接口（OpenQuoteContext）----------------
+# 行情接口与交易接口是两套上下文。快照 / 资金流向都走这里。
+
+@contextmanager
+def quote_ctx():
+    """打开一个行情上下文，退出时自动关闭。
+
+    多标的循环（如资金流向逐只抓）复用同一个上下文，避免每只重连。
+    """
+    _require_futu()
+    ctx = OpenQuoteContext(host=CONFIG.futu_host, port=CONFIG.futu_port)
+    try:
+        yield ctx
+    finally:
+        ctx.close()
+
+
+# get_market_snapshot 单次最多 400 标的，限频 30s/60 次。本项目标的数远小于
+# 400，一次批量取全。仅取 yfinance 缺的盘面字段（换手率/振幅/52 周高低）
+# 合并进 stock_profiles。
 
 def fetch_snapshots(codes: list[str]) -> pd.DataFrame:
     """批量抓取行情快照，返回原始 DataFrame（含全部快照列）。
@@ -421,11 +440,8 @@ def fetch_snapshots(codes: list[str]) -> pd.DataFrame:
     _require_futu()
     if not codes:
         return pd.DataFrame()
-    ctx = OpenQuoteContext(host=CONFIG.futu_host, port=CONFIG.futu_port)
-    try:
+    with quote_ctx() as ctx:
         ret, data = ctx.get_market_snapshot(list(codes))
-    finally:
-        ctx.close()
     if ret != RET_OK:
         raise FutuError(f"查询行情快照失败: {data}")
     if data is None or len(data) == 0:
@@ -451,5 +467,58 @@ def snapshot_fields(df: pd.DataFrame, now: str) -> list[dict]:
             "week52_high": _num(_g(r, "highest52weeks_price")),
             "week52_low": _num(_g(r, "lowest52weeks_price")),
             "snap_synced_at": now,
+        })
+    return rows
+
+
+# ---------------- 资金流向（日频）----------------
+# get_capital_flow 是行情接口，限频 30s/30 次 → 逐只抓时按 1.1s 间隔垫开。
+# PeriodType.DAY 提供近 1 年日频历史（实测 HK 237 天 / US 243 天），且
+# start/end 均为闭区间（传当天可取到当天）→ 首次全量回补 + 之后增量重抓。
+CAPITAL_FLOW_INTERVAL = 1.1
+
+
+def fetch_capital_flow(ctx, code: str, start: str, end: str) -> pd.DataFrame:
+    """抓取单只标的的日频资金流向。
+
+    ctx: quote_ctx() 产出的行情上下文（多只标的复用，避免逐只重连）。
+    start/end: 'YYYY-MM-DD'，闭区间。无数据返回空 DataFrame；查询失败抛
+    FutuError（调用方逐只捕获，单只失败不中断整体）。
+    """
+    _require_futu()
+    ret, data = ctx.get_capital_flow(
+        code, period_type=PeriodType.DAY, start=start, end=end
+    )
+    if ret != RET_OK:
+        raise FutuError(f"查询资金流向失败({code} {start}~{end}): {data}")
+    if data is None or len(data) == 0:
+        return pd.DataFrame()
+    return data
+
+
+def capital_flow_rows(df: pd.DataFrame, code: str, now: str) -> list[dict]:
+    """把资金流向 DataFrame 规整成 capital_flow 入库行。
+
+    日频时 capital_flow_item_time 形如 '2026-07-21 00:00:00' → 取前 10 位作
+    date。无时间的行跳过（无主键无法入库）。金额为本币，正=净流入。
+    """
+    if df is None or df.empty:
+        return []
+    rows = []
+    for _, r in df.iterrows():
+        ts = _g(r, "capital_flow_item_time", default="")
+        date = str(ts)[:10]
+        if not date:
+            continue
+        rows.append({
+            "code": code,
+            "date": date,
+            "in_flow": _num(_g(r, "in_flow")),
+            "main_in_flow": _num(_g(r, "main_in_flow")),
+            "super_in_flow": _num(_g(r, "super_in_flow")),
+            "big_in_flow": _num(_g(r, "big_in_flow")),
+            "mid_in_flow": _num(_g(r, "mid_in_flow")),
+            "sml_in_flow": _num(_g(r, "sml_in_flow")),
+            "synced_at": now,
         })
     return rows
