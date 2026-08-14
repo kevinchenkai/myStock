@@ -1,0 +1,33 @@
+mystock/ml/server.py
+  s_45d4bc7b28dd8d::t_a38f6adf63ccd9 1-83
+mystock/ml/templates/ml_strategy.html
+  s_45d4bc7b28dd8d::t_79006ed3fd3f9b 1-185
+mystock/ml/strategy.py
+  s_45d4bc7b28dd8d::t_85fe20a35040e6 1-164
+scripts/ml.sh
+  s_45d4bc7b28dd8d::t_fef5504687e87d 7
+  s_45d4bc7b28dd8d::t_4a809bcf625a72 99,102
+  s_45d4bc7b28dd8d::t_21f2466e0f8cde 80-85,90
+tests/test_ml_strategy.py
+  s_45d4bc7b28dd8d::t_6fcde4e7d44244 1-61
+docs/ML_OVERVIEW.md
+  s_45d4bc7b28dd8d::t_be162b3305b1d2 229-230
+  s_45d4bc7b28dd8d::t_cc77512589e14f 257-258,263-282
+  s_45d4bc7b28dd8d::t_1b9aed52a3c30d 283
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.6",
+  "base_commit_sha": "665435b58361609c87b45a6abc7bae817b7fbf62",
+  "prompts": {},
+  "sessions": {
+    "s_45d4bc7b28dd8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a26c1486-53f1-4587-ad74-b35699749e24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
