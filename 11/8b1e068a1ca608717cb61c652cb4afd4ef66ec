@@ -1,0 +1,38 @@
+docs/ML_OVERVIEW.md
+  s_45d4bc7b28dd8d::t_b6f196950dc353 258,263,266-267,274-277
+  s_45d4bc7b28dd8d::t_e3bae5e3783161 5-6,47-48
+mystock/web/app.py
+  s_45d4bc7b28dd8d::t_25331b9f6c23b7 20-23
+  s_45d4bc7b28dd8d::t_c3a312dfdafce5 226-275
+mystock/web/templates/index.html
+  s_45d4bc7b28dd8d::t_7ae36ac880ce46 38
+  s_45d4bc7b28dd8d::t_4f0a6fe00f78d3 142-161
+scripts/ml.sh
+  s_45d4bc7b28dd8d::t_ff2111e4f7daee 91
+docs/项目接手指南.html
+  s_45d4bc7b28dd8d::t_723eb5d7f785ff 905,908
+mystock/web/static/style.css
+  s_45d4bc7b28dd8d::t_c3d0a981fca82c 626-671
+CLAUDE.md
+  s_45d4bc7b28dd8d::t_1c9e9291d645e9 13-15,20-22,24
+mystock/web/static/app.js
+  s_45d4bc7b28dd8d::t_645abce729c23d 1547-1591,1593-1619,1621-1658
+  s_45d4bc7b28dd8d::t_43fe94b4f2711d 1592,1620
+  s_45d4bc7b28dd8d::t_9e611154d77171 66,73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.6",
+  "base_commit_sha": "118b1e068a1ca608717cb61c652cb4afd4ef66ec",
+  "prompts": {},
+  "sessions": {
+    "s_45d4bc7b28dd8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a26c1486-53f1-4587-ad74-b35699749e24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
