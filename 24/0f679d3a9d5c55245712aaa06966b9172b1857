@@ -1,0 +1,19 @@
+mystock/ml/report.py
+  s_45d4bc7b28dd8d::t_28bf00006dcdf4 397-401
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.6",
+  "base_commit_sha": "240f679d3a9d5c55245712aaa06966b9172b1857",
+  "prompts": {},
+  "sessions": {
+    "s_45d4bc7b28dd8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a26c1486-53f1-4587-ad74-b35699749e24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
