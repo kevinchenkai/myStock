@@ -169,3 +169,36 @@ def test_collect_dedups_by_latest_report(tmp_path):
 
 def test_collect_empty_dir(tmp_path):
     assert backfill.collect(tmp_path) == []
+
+
+# ---- 缺口识别（recompute_gaps 的取数依据）----
+class _FakeConn:
+    """只实现 execute("SELECT as_of ...")，返回给定的已有日期。"""
+
+    def __init__(self, have):
+        self._have = [(d,) for d in have]
+
+    def execute(self, sql, params=()):
+        return self._have
+
+
+def test_missing_dates_finds_holes():
+    daily = _daily([(d, 1.0, 2.0) for d in
+                    ("2026-07-23", "2026-07-24", "2026-07-27", "2026-07-28")])
+    conn = _FakeConn({"2026-07-23", "2026-07-27"})
+    assert backfill.missing_dates(conn, "US.NVDA", daily) == [
+        "2026-07-24", "2026-07-28"]
+
+
+def test_missing_dates_respects_since():
+    daily = _daily([(d, 1.0, 2.0) for d in
+                    ("2026-07-23", "2026-07-24", "2026-07-27")])
+    conn = _FakeConn(set())
+    assert backfill.missing_dates(conn, "US.NVDA", daily, since="2026-07-24") == [
+        "2026-07-24", "2026-07-27"]
+
+
+def test_missing_dates_none_when_complete():
+    daily = _daily([(d, 1.0, 2.0) for d in ("2026-07-23", "2026-07-24")])
+    conn = _FakeConn({"2026-07-23", "2026-07-24"})
+    assert backfill.missing_dates(conn, "US.NVDA", daily) == []

@@ -269,6 +269,8 @@ table.rv-t th{{text-align:right;font-weight:600;color:{C_SLATE};font-size:11px;
   letter-spacing:.04em;border-bottom:1px solid {C_LINE};padding:4px 8px}}
 table.rv-t th:first-child{{text-align:left}}
 table.rv-t td{{padding:5px 8px;text-align:right;border-bottom:1px solid #f0f2f4}}
+/* 结果列给足宽度：标签形如「上破 12.34%」，挤窄会被裁掉百分号 */
+table.rv-t th:last-child,table.rv-t td:last-child{{width:1%;padding-right:2px}}
 table.rv-t td:first-child{{text-align:left;color:{C_SLATE}}}
 table.rv-t tr:last-child td{{border-bottom:none}}
 /* 区间带图：预测带（浅）与实际带（深）叠画，戳出部分自然露在外面 */

@@ -973,11 +973,12 @@ account_funds               账户级每日快照，不含 code，无法与个�
   </ol>
 
   <h3>测试</h3>
-  <p>ML 子包纯函数单测（不依赖 GPU / 可在 <code>mk</code> 跑）：<code>test_ml_calibrator</code>（CQR 符号/有限样本分位/覆盖率按股）、<code>test_ml_cv</code>（借鉴② purged 切分：隔离带/min_train/扩张窗单调/第0折不丢）、<code>test_ml_signal_eval</code>（借鉴③ IC：完美/噪声/RankIC 抗异常/宽度 IC 跟踪振幅）、<code>test_ml_policy</code> / <code>test_ml_simulator</code> / <code>test_ml_nan_guard</code> / <code>test_ml_offline_rl</code> / <code>test_ml_review</code>（预测复盘：命中/上破/下破/双破判定、按交易日历取次日、待结算不计入命中率、NaN 实际值不误判、历史 HTML 解析与去重）。ML 子包合计 78 测试，仓库全量 133（<code>test_ml_regime</code> / <code>test_ml_reward</code> 随建议1+3 移除而删）。</p>
+  <p>ML 子包纯函数单测（不依赖 GPU / 可在 <code>mk</code> 跑）：<code>test_ml_calibrator</code>（CQR 符号/有限样本分位/覆盖率按股）、<code>test_ml_cv</code>（借鉴② purged 切分：隔离带/min_train/扩张窗单调/第0折不丢）、<code>test_ml_signal_eval</code>（借鉴③ IC：完美/噪声/RankIC 抗异常/宽度 IC 跟踪振幅）、<code>test_ml_policy</code> / <code>test_ml_simulator</code> / <code>test_ml_nan_guard</code> / <code>test_ml_offline_rl</code> / <code>test_ml_review</code>（预测复盘：命中/上破/下破/双破判定、按交易日历取次日、待结算不计入命中率、NaN 实际值不误判、历史 HTML 解析与去重）。ML 子包合计 81 测试，仓库全量 136（<code>test_ml_regime</code> / <code>test_ml_reward</code> 随建议1+3 移除而删）。</p>
 
   <h3>产物</h3>
   <p>每日生成自包含 HTML 报告，归档 <code>data/ml/reports/&lt;date&gt;/</code>，红涨绿跌、不碰 web。cron 每工作日早 8 点（北京时间）跑 <code>ml.sh all</code>。报告头部口径行透明化当前 reward / CQR / regime 模式。</p>
   <p><strong>近期预测复盘（2026-08-14 新增）</strong>：报告新增一节，把<strong>过去真实给出的次日区间</strong>与该次日实际高/低逐条对照。预测留档在 <code>ml_predictions</code> 表（PK <code>code+as_of</code>），<code>build_report</code> 每次执行会建表 → 首次自动回填历史 HTML（<code>backfill.run_if_empty</code>，表非空即跳过）→ 写入当日预测，<strong>即每跑一次 <code>ml.sh train</code> 就同步一次</strong>。判定逻辑在 <code>review.py</code>（纯函数）：次日按标的自身交易日历取下一根日线（跳周末/假期/停牌），真实 high ≤ H_hat 且 low ≥ L_hat 才算命中，单边戳出即未命中，区分上破/下破以暴露方向偏置。展示按股 tab 切换、默认最近 7 个交易日倒序、其余可展开，交互全部纯 CSS（保持报告零 JS）。</p>
+  <p><strong>缺口重算</strong>：报告非每个交易日都跑，留档会有洞。<code>python -m mystock.ml.backfill --gaps</code> 把日线<strong>截断到基准日 T</strong> 后重跑 <code>predict_next_day</code>，补出「那天本该给出的预测」——训练集与特征都只到 T，<strong>无未来函数</strong>（已用真实留档对照，差异 &le;0.04 &asymp;0.02%，来自 yfinance 对历史 bar 的微幅修订）。三种来源用 <code>source</code> 列区分：<code>live</code>（当天实时）/ <code>backfill</code>（历史 HTML 解析）/ <code>recomputed</code>（事后重算）。</p>
   <div class="callout warn">
     <span class="tag">注意</span>
     <strong>两个口径别混读</strong>：复盘用的是 <code>predict_next_day</code>（<strong>全历史 fit</strong>）的线上预测，与总览「命中率」（回测 walk-forward 模型，训练截止在很早以前）<strong>不是同一个模型</strong>，线上表现通常更差（实测 36–74% vs 回测 59–75%）。另外报告非每个交易日都生成，复盘序列<strong>有洞</strong>，逐行标注基准日与次日，勿当连续序列读。
