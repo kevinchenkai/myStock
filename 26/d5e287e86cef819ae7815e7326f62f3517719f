@@ -1,0 +1,31 @@
+tests/test_ml_review.py
+  s_45d4bc7b28dd8d::t_356665b45130eb 172-204
+mystock/ml/backfill.py
+  s_45d4bc7b28dd8d::t_31b21a91fefd00 203-213
+  s_45d4bc7b28dd8d::t_ecba671419a1a0 16-21,26,30
+  s_45d4bc7b28dd8d::t_227ce382a5b303 97-186
+mystock/ml/report.py
+  s_45d4bc7b28dd8d::t_a31f01eaf6d503 272-273
+docs/ML_OVERVIEW.md
+  s_45d4bc7b28dd8d::t_03278640e5a8cc 69,154
+  s_45d4bc7b28dd8d::t_927d367a7266e7 155-162
+  s_45d4bc7b28dd8d::t_29defed3f4af2a 163-165
+docs/项目接手指南.html
+  s_45d4bc7b28dd8d::t_36506b45f6c798 976,981
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.6",
+  "base_commit_sha": "26d5e287e86cef819ae7815e7326f62f3517719f",
+  "prompts": {},
+  "sessions": {
+    "s_45d4bc7b28dd8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a26c1486-53f1-4587-ad74-b35699749e24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
