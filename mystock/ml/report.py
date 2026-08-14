@@ -394,7 +394,11 @@ def _review_panel(reviews: dict, recent: int = 7) -> str:
         head = ("<tr><th>基准日 → 次日</th><th>预测区间</th><th>实际 低~高</th>"
                 "<th style='text-align:center'>区间对照</th>"
                 "<th style='text-align:center'>结果</th></tr>")
-        latest, older = rs[-recent:], rs[:-recent]
+        # rs 按 as_of 升序（review_predictions 的口径）：末尾 recent 条即最近几日。
+        # 展示时倒序——最新的排最上面，符合"先看最近发生了什么"的阅读习惯。
+        # 只在展示层倒序，不动 review_predictions 的升序返回（那是数据口径，
+        # 命中率统计、价格标尺等都依赖它稳定）。
+        latest, older = rs[-recent:][::-1], rs[:-recent][::-1]
         more = ""
         if older:
             more = f"""
