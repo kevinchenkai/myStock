@@ -10,12 +10,18 @@ myStock 是个人 **港股 / 美股** 持仓、交易、行情的**本地化**�
 
 ```
 富途 OpenD（本地网关 127.0.0.1:11111）──┐ futu-api
-yfinance（行情/通用信息）────────────────┴──► collectors ──► SQLite(data/mystock.db) ──► Web(Flask :8888)
+yfinance（行情/通用信息）────────────────┴──► collectors ──► SQLite(data/mystock.db) ──┐
+                                                                                      ├─► Web(Flask :8888)
+ML 管线（ml.sh data/train）──────────────────► SQLite(data/ml/mystock_ml.db) ─────────┘（只读）
 ```
 
 - **采集层**（`mystock/collectors/`）从富途 OpenD 与 yfinance 拉数据，清洗后写库。
 - **Web 层只读 SQLite**，绝不直接调富途 / yfinance —— 保证页面快、可离线。新增页面功能时遵守此边界：抓取放 pipeline，展示只读库。
+- **Web 可只读 ML 库**（`data/ml/mystock_ml.db`）：ML 的预测留档与回溯结果通过 `/api/ml/*` 暴露给页面。
+  仍是「只读」边界——**Web 绝不写 ML 库、绝不触发训练/抓取**，计算走 `mystock/ml/` 里的纯函数（如 `strategy.run_many`）。
+  反向依赖依然禁止：`mystock/ml/` 不得 import `mystock/web/`。ML 库缺失时相关接口返回 503，不影响其余页面。
 - 数据表（见 [`mystock/schema.sql`](mystock/schema.sql)）：`positions`、`orders`、`deals`、`daily_quotes`、`stock_profiles`、`fx_rates`、`account_funds`、`capital_flow`，外加 `sync_log`、`quote_skiplist`。
+- ML 库表（见 [`mystock/ml/schema.sql`](mystock/ml/schema.sql)）：`ml_quotes_1d`、`ml_quotes_1h`、`ml_predictions`、`ml_deals`、`ml_orders`、`ml_positions`、`ml_sync_log`。
 
 ## 关键模块
 

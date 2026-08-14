@@ -17,6 +17,10 @@
   GET /api/asset-trend         资产趋势（历史快照聚合，按市场分组的市值/浮盈时序）
   GET /api/account-funds       账户资金（最新快照 + 历史净资产序列，HK+US 综合账户）
   GET /api/fx?pair=USDCNY      外汇日线（默认美元兑人民币）
+  GET /api/ml/strategy?codes=&days=30   ML 预测区间挂单回溯（只读 ML 库，实时计算）
+
+ML 接口只**读** data/ml/mystock_ml.db（CLAUDE.md 架构约定），绝不写、不触发训练/抓取。
+ML 库不存在时该接口返回 503，其余页面不受影响。
 """
 from __future__ import annotations
 
@@ -217,6 +221,56 @@ def api_fx():
         return jsonify({"pair": pair, "rows": rows_to_list(cur)})
     finally:
         conn.close()
+
+
+# ---- ML 接口（只读 data/ml/mystock_ml.db；不写、不触发训练/抓取）----
+ML_DEFAULT_CODES = ["US.NVDA", "US.TSLA", "HK.00700", "HK.09988"]
+ML_MAX_DAYS = 400
+
+
+@app.route("/api/ml/strategy")
+def api_ml_strategy():
+    """按 ML 预测区间挂单的回溯（实时按 ML 库计算）。
+
+    策略：基准日 T 收盘后拿到 [L̂, Ĥ] → 次一交易日同时挂限价买 L̂ / 限价卖 Ĥ，
+    各一手（美股 10 股 / 港股 100 股）。撮合走 1h K 线，假设现金与持仓充足。
+
+    参数：codes=逗号分隔富途代码（默认 4 支）、days=回溯交易日数（默认 30，上限 400）。
+    计算在 mystock.ml.strategy（纯函数）里，本处只做参数校验与透传。
+
+    延迟导入 ml 模块：它会拖起 pandas/ml 依赖链，且 ML 库可能未初始化——
+    放模块顶层会让整个 web 应用在没跑过 ml.sh 的环境里起不来。
+    """
+    try:
+        from ..ml import config as mlcfg
+        from ..ml.strategy import run_many
+    except ImportError as e:  # ML 子包依赖缺失
+        return jsonify({"error": f"ML 模块不可用: {e}"}), 503
+
+    if not Path(mlcfg.ML_DB_PATH).exists():
+        return jsonify({
+            "error": f"ML 数据库不存在: {mlcfg.ML_DB_PATH}。"
+                     f"请先运行 `bash scripts/ml.sh data`。"
+        }), 503
+
+    raw = request.args.get("codes", "")
+    want = [c.strip().upper() for c in raw.split(",") if c.strip()]
+    # 只接受 TARGETS 内的代码——库里没有其他标的的预测与 1h bars，放行只会得到空结果
+    codes = [c for c in want if c in mlcfg.TARGETS] or ML_DEFAULT_CODES
+    try:
+        days = int(request.args.get("days", 30))
+    except ValueError:
+        days = 30
+    days = max(1, min(days, ML_MAX_DAYS))
+
+    return jsonify({
+        "days": days,
+        "codes": codes,
+        "targets": list(mlcfg.TARGETS),
+        "results": run_many(codes, days),
+        "note": ("盈亏未扣佣金/印花税/平台费/融券成本/滑点；"
+                 "假设现金与持仓充足，净持仓可为负（裸空）。"),
+    })
 
 
 @app.route("/api/asset-trend")

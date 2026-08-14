@@ -63,12 +63,14 @@ document.querySelectorAll(".tab").forEach((t) => {
     document.getElementById("panel-pnl").style.display = tab === "pnl" ? "" : "none";
     document.getElementById("panel-trend").style.display = tab === "trend" ? "" : "none";
     document.getElementById("panel-fx").style.display = tab === "fx" ? "" : "none";
+    document.getElementById("panel-ml").style.display = tab === "ml" ? "" : "none";
     if (tab !== "fx") destroyFxChart();     // 离开汇率 Tab 释放图表
     if (tab !== "trend") destroyTrendCharts();  // 离开趋势 Tab 释放图表
     if (tab === "trades") loadTrades();
     if (tab === "pnl") loadPnl();
     if (tab === "trend") loadTrend();
     if (tab === "fx") loadFx();
+    if (tab === "ml" && !mlData) loadMl();   // 首次进入才拉，之后保留结果
   });
 });
 
@@ -1541,6 +1543,118 @@ function renderDetailDeals(deals) {
     <th class="text">时间</th><th class="text">关联订单</th></tr></thead>
     <tbody>${rows}</tbody></table></div>`;
 }
+
+// ---------- ML 挂单回溯（只读 ML 库，实时计算） ----------
+// 策略：基准日 T 收盘后拿到预测 [L̂,Ĥ] → 次一交易日挂限价买 L̂ / 限价卖 Ĥ，
+// 美股 10 股 / 港股 100 股。撮合与盈亏都在后端 mystock/ml/strategy.py 算好，
+// 这里只负责展示。
+let mlData = null;
+let mlCur = 0;
+
+/** 净持仓漂移折线：仓位单向漂移是这个策略最关键的风险，值得画出来。 */
+function mlDrift(rows) {
+  const w = 700, h = 90, pad = 26;
+  const ps = rows.map((r) => r.pos);
+  const lo = Math.min(0, ...ps), hi = Math.max(0, ...ps), rng = (hi - lo) || 1;
+  const X = (i) => pad + (w - 2 * pad) * (i / Math.max(1, ps.length - 1));
+  const Y = (v) => h - pad - (h - 2 * pad) * ((v - lo) / rng);
+  const pts = ps.map((v, i) => `${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join(" ");
+  return `<svg viewBox="0 0 ${w} ${h}" class="ml-svg">
+    <line x1="${pad}" y1="${Y(0).toFixed(1)}" x2="${w - pad}" y2="${Y(0).toFixed(1)}"
+      stroke="currentColor" stroke-dasharray="3 3" opacity=".35"/>
+    <text x="${pad - 4}" y="${(Y(0) + 3).toFixed(1)}" text-anchor="end" opacity=".6">0</text>
+    <text x="${pad - 4}" y="${(Y(hi) + 3).toFixed(1)}" text-anchor="end" opacity=".6">${hi}</text>
+    <text x="${pad - 4}" y="${(Y(lo) + 3).toFixed(1)}" text-anchor="end" opacity=".6">${lo}</text>
+    <polyline points="${pts}" fill="none" stroke="currentColor" stroke-width="1.8"/>
+  </svg>`;
+}
+
+function mlPanel(r) {
+  if (!r.n_days) {
+    return `<div class="muted ml-msg">${esc(r.code)}：该窗口无可用数据（缺预测留档或 1h K 线）。</div>`;
+  }
+  const s = r.summary;
+  const body = r.rows.map((x) => {
+    const b = x.buy_price === null ? '<span class="muted">—</span>'
+      : `<b class="down">${fmtNum(x.buy_price)}</b>`;
+    const sl = x.sell_price === null ? '<span class="muted">—</span>'
+      : `<b class="up">${fmtNum(x.sell_price)}</b>`;
+    // 净持仓：负=裸空（红），正=多头（绿）——沿用红涨绿跌
+    const pc = x.pos < 0 ? "up" : (x.pos > 0 ? "down" : "muted");
+    return `<tr><td class="text">${esc(x.date)}</td>
+      <td>${fmtNum(x.l_hat)} ~ ${fmtNum(x.h_hat)}</td>
+      <td>${fmtNum(x.low)} ~ ${fmtNum(x.high)}</td>
+      <td>${b}</td><td>${sl}</td>
+      <td class="${pc}"><b>${x.pos > 0 ? "+" : ""}${fmtInt(x.pos)}</b></td></tr>`;
+  }).join("");
+  return `
+    <div class="ml-stats">
+      <div class="ml-st"><b class="${plClass(s.total_pnl)}">${fmtSigned(s.total_pnl)}</b>
+        <span>总盈亏 ${esc(r.currency)}</span></div>
+      <div class="ml-st"><b>${s.n_buy} / ${s.n_sell}</b><span>买成 / 卖成（天）</span></div>
+      <div class="ml-st"><b>${s.n_both}</b><span>双边成交（天）</span></div>
+      <div class="ml-st"><b>${fmtSigned(s.cash_flow)}</b><span>现金流净额</span></div>
+      <div class="ml-st"><b class="${s.end_pos < 0 ? "up" : ""}">${s.end_pos > 0 ? "+" : ""}${fmtInt(s.end_pos)} 股</b>
+        <span>期末净持仓</span></div>
+      <div class="ml-st"><b>${fmtSigned(s.mark_value)}</b><span>持仓折算 @${fmtNum(s.last_close)}</span></div>
+    </div>
+    <div class="ml-drift">
+      <div class="muted ml-dlab">净持仓漂移（${s.min_pos} ~ ${s.max_pos} 股，每手 ${r.lot} 股）</div>
+      ${mlDrift(r.rows)}
+    </div>
+    <div class="scroll-table"><table>
+      <thead><tr><th class="text">交易日</th><th>挂单 买L̂ ~ 卖Ĥ</th><th>实际 低~高</th>
+        <th>买成交</th><th>卖成交</th><th>净持仓</th></tr></thead>
+      <tbody>${body}</tbody></table></div>
+    <div class="muted ml-note">窗口 ${esc(r.start || "—")} ~ ${esc(r.end || "—")}，共 ${r.n_days} 个交易日。
+      撮合规则同 ML 回测：限价买在首根 low ≤ L̂ 的 bar 成交、成交价 min(L̂, open)；
+      限价卖在首根 high ≥ Ĥ 的 bar 成交、成交价 max(Ĥ, open)。本页为离线数据分析，不构成投资建议。</div>`;
+}
+
+function renderMl() {
+  if (!mlData) return;
+  const rs = mlData.results;
+  const tabs = rs.map((r, i) => {
+    const t = r.summary.total_pnl;
+    const val = r.n_days
+      ? `<span class="ml-r ${plClass(t)}">${fmtSigned(t, "")}</span>` : "";
+    return `<div class="subtab ${i === mlCur ? "active" : ""}" data-ml="${i}">
+      ${esc(r.code)}${val}</div>`;
+  }).join("");
+  document.getElementById("ml-body").innerHTML = `
+    <div class="ml-warn"><b>注意口径</b>：净持仓可为负（裸空）——只有在「持仓充足」假设下才成立。
+      总盈亏 = 现金流净额（卖−买） + 期末净持仓按最后收盘折算。${esc(mlData.note || "")}</div>
+    <div class="subtabs ml-subtabs">${tabs}</div>
+    ${mlPanel(rs[mlCur])}`;
+  document.querySelectorAll("[data-ml]").forEach((el) => {
+    el.addEventListener("click", () => { mlCur = +el.dataset.ml; renderMl(); });
+  });
+}
+
+async function loadMl() {
+  const btn = document.getElementById("ml-go");
+  btn.disabled = true;
+  document.getElementById("ml-body").innerHTML = '<div class="muted ml-msg">计算中…</div>';
+  const q = new URLSearchParams({
+    codes: document.getElementById("ml-codes").value,
+    days: document.getElementById("ml-days").value,
+  });
+  try {
+    const res = await fetch(`/api/ml/strategy?${q}`);
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.error || `HTTP ${res.status}`);
+    mlData = d;
+    mlCur = 0;
+    renderMl();
+  } catch (e) {
+    document.getElementById("ml-body").innerHTML =
+      `<div class="muted ml-msg">计算失败：${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+document.getElementById("ml-go").addEventListener("click", loadMl);
 
 // 初始化
 loadPositions();

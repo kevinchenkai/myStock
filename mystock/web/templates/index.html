@@ -35,6 +35,7 @@
     <div class="tab" data-tab="pnl">交易盈亏</div>
     <div class="tab" data-tab="trend">资产趋势</div>
     <div class="tab" data-tab="fx">美元汇率</div>
+    <div class="tab" data-tab="ml">ML 挂单回溯</div>
   </div>
 
   <div class="container">
@@ -137,6 +138,26 @@
     <div class="panel" id="panel-fx" style="display:none;">
       <div id="fx-info"></div>
       <div class="chart-host" id="fx-chart"></div>
+    </div>
+
+    <!-- ML 挂单回溯（只读 ML 库，实时计算） -->
+    <div class="panel" id="panel-ml" style="display:none;">
+      <div class="toolbar ml-ctl">
+        <div class="ml-fld">
+          <span class="filter-label">标的（逗号分隔）</span>
+          <input id="ml-codes" value="US.NVDA,US.TSLA,HK.00700,HK.09988" autocomplete="off">
+        </div>
+        <div class="ml-fld ml-fld-sm">
+          <span class="filter-label">回溯交易日</span>
+          <input id="ml-days" type="number" min="1" max="400" value="30">
+        </div>
+        <button class="ml-go" id="ml-go">重新计算</button>
+      </div>
+      <div class="muted ml-hint">
+        按每日预测区间挂单：<b class="down">下沿 L̂ 限价买</b> / <b class="up">上沿 Ĥ 限价卖</b>，
+        美股每次 10 股、港股每次 100 股。撮合走 1h K 线，假设现金与持仓充足。
+      </div>
+      <div id="ml-body"></div>
     </div>
   </div>
 

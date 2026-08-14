@@ -4,7 +4,6 @@
 #   bash scripts/ml.sh data       # 例行更新数据（采集 5 年日线 + 2 年 1h + 生产库只读快照）
 #   bash scripts/ml.sh train      # 本地 Mac 训练/评估（P1 校准 → P2 预测 → P3 回测 → 生成报告）
 #   bash scripts/ml.sh publish    # 发布 HTML 报告到展示服务器（www，公网）
-#   bash scripts/ml.sh serve      # 实时回溯查询服务（127.0.0.1:8899，只读 ML 库）
 #   bash scripts/ml.sh all        # data → train → publish 一条龙（供 cron）
 #
 # 默认子命令 = all。S0/P1/P2/P3.x/报告全是 CPU 算法，本机 mk 环境即可（P4 RL 才需 GPU，见 ml_setup_h20.sh）。
@@ -77,17 +76,10 @@ do_publish() {
   echo "已发布： https://g.ismayday.mobi/mystock/  （当日： .../${TODAY}/）"
 }
 
-do_serve() {
-  # 独立于 web 的 server.sh：ML 只读自己的 mystock_ml.db，不碰生产库（架构边界）。
-  # 前台常驻，Ctrl-C 退出；端口可用 MYSTOCK_ML_WEB_PORT 覆盖。
-  python -m mystock.ml.server
-}
-
 echo "${PREFIX} 开始 [${CMD}]"
 case "${CMD}" in
   data)    activate_env; do_data ;;
   train)   activate_env; do_train ;;
-  serve)   activate_env; do_serve ;;
   publish) run_step "发布到服务器（publish）" do_publish ;;
   all)
     activate_env
@@ -96,10 +88,9 @@ case "${CMD}" in
     run_step "发布到服务器（publish）" do_publish
     ;;
   *)
-    echo "用法: bash scripts/ml.sh {data|train|serve|publish|all}" >&2
+    echo "用法: bash scripts/ml.sh {data|train|publish|all}" >&2
     echo "  data    例行更新数据"
     echo "  train   本地训练/评估 + 生成报告"
-    echo "  serve   实时回溯查询服务（127.0.0.1:8899）"
     echo "  publish 发布 HTML 到 www"
     echo "  all     三步一条龙（默认）"
     exit 1

@@ -2,7 +2,8 @@
 
 > 一页看懂"我们在训练什么、怎么训练、用了哪些数据、结论是什么"。
 > 完整方案 / 决策记录见 [`docs/ML_PLAN.md`](ML_PLAN.md)；数据字典见 [`docs/DATA.md`](DATA.md)。
-> 代码在 [`mystock/ml/`](../mystock/ml/)，独立库 `data/ml/mystock_ml.db`，与 web 生产库完全解耦。
+> 代码在 [`mystock/ml/`](../mystock/ml/)，独立库 `data/ml/mystock_ml.db`，与 web 生产库分库。
+> ML 管线不碰生产库（只读快照）；web 可**只读** ML 库（`/api/ml/*`），反向依赖禁止。
 >
 > **当前状态（截至 2026-07-01）**：P0–P5 + P4 已全部跑通，例行 cron 每工作日自动跑。**实验结论见第三节末"实验总结"**。
 > 一句话裁决：**预测层成立、撮合可信、bandit 涨势局部有效、RL 在此数据量下无效（诚实负结果）。**
@@ -43,7 +44,8 @@ S0 规则基线（永远保留做对照）
 - **防未来函数**：决策只用截至当日收盘可得信息；切分一律按时间 walk-forward，绝不随机打散。
 - **敬畏小样本**：真实成交每标的仅 40 多笔 → 优先稳健可解释方法、强正则、多种子看方差。
 - **单标的独立**：各自账户、各自本金，不共享现金池（第一版）。
-- **工程解耦**：独立库 + 独立采集脚本 + 独立 conda env，**全程不碰 web/生产库**（写 web 是最后的 P6）。
+- **工程解耦**：独立库 + 独立采集脚本 + 独立 conda env。ML 管线**不写生产库**（只读快照）；
+  web 侧可**只读** ML 库把结果展示出来（`/api/ml/*`，2026-08-14 放开），但绝不写 ML 库、不触发训练。
 
 ---
 
@@ -227,7 +229,6 @@ S0 规则基线（永远保留做对照）
 | `review.py` | 预测 vs 次日实际的对齐与命中判定（纯函数） |
 | `backfill.py` | 从历史 HTML 报告回填预测留档（一次性、幂等） |
 | `strategy.py` | 按预测区间挂单的回溯计算（纯函数，手数按市场分档） |
-| `server.py` | 实时回溯查询服务（独立 Flask，只读 ML 库，不碰 web） |
 | `offline_rl.py` | 离线 RL（P4，Discrete CQL，需 d3rlpy/GPU） |
 
 **工程优化记录（2026-07-01 深度审查）**：
@@ -254,25 +255,26 @@ S0/P1/P2/P3.x/报告全是 CPU 算法，**本机 `mk` 环境即可，无需 GPU 
 bash scripts/ml.sh data       # ① 例行更新数据（增量优先，见下）
 bash scripts/ml.sh train      # ② 本地 Mac 训练/评估（P1 校准→P2 预测→P3 回测→生成报告）
 bash scripts/ml.sh publish    # ③ 发布 HTML 报告到 www（公网）
-bash scripts/ml.sh serve      # ④ 实时回溯查询服务（127.0.0.1:8899，前台常驻）
-bash scripts/ml.sh all        # ①②③ 一条龙（默认；供 cron。不含 serve）
+bash scripts/ml.sh all        # 三步一条龙（默认；供 cron）
 
 python -m pytest tests/ -q               # 全套单测（mk 环境）
 ```
 
-### `serve`：按预测区间挂单的实时回溯
+### 按预测区间挂单的实时回溯（Web 端 `ML 挂单回溯` Tab）
 
 与每日 HTML 报告的分工——**报告是当日快照**（cron 产出、可发布、可离线存档）；
-**serve 是实时查询**，参数一改立刻按当前库重算，适合调参与临时探查。
+**Web 端是实时查询**，参数一改立刻按当前库重算，适合调参与临时探查。
+入口在 `bash scripts/server.sh` 起的页面（:8888）「ML 挂单回溯」Tab。
 
 - 策略：基准日 T 收盘后拿到 `[L̂, Ĥ]` → 次一交易日同时挂**限价买 L̂ / 限价卖 Ĥ**，各一手。
   手数按市场分档（`strategy.LOT_BY_MARKET`）：**美股 10 股 / 港股 100 股**（港股板块最小单位）。
 - 撮合复用 `simulator.match_limit_order`（1h K 线），能判盘中先触低还是先触高——
   拿日线 low/high 直接比会把"先冲高后砸低"与反过来混为一谈，成交价也不对。
 - 盈亏 = 现金流净额（卖−买） + 期末净持仓按最后收盘折算。
-- 接口：`GET /api/strategy?codes=US.NVDA,HK.00700&days=30`；页面按股 tab + 逐日明细 + 净持仓漂移图。
-- **独立进程、独立端口**：ML 只读 `mystock_ml.db`，不并进 `mystock/web/app.py`——
-  后者只读生产库，混用会破坏 CLAUDE.md 的架构边界。
+- 接口：`GET /api/ml/strategy?codes=US.NVDA,HK.00700&days=30`；页面按股子 tab + 逐日明细 + 净持仓漂移图。
+- **Web 只读 ML 库**（CLAUDE.md 已放开该边界）：`mystock/web/app.py` 延迟导入 `mystock.ml.strategy`
+  做计算，绝不写 ML 库、不触发训练/抓取；ML 库缺失时该接口返回 503，不影响其余页面。
+  反向依赖仍禁止：`mystock/ml/` 不得 import `mystock/web/`。
 
 > **实测发现（2026-08-14，近 30 交易日）**：NVDA +513 USD / TSLA +980 USD /
 > 腾讯 +15,643 HKD / 阿里 −2,678 HKD。但 **30 天内没有任何一天买卖双边同时成交**——
