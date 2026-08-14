@@ -1574,7 +1574,10 @@ function mlPanel(r) {
     return `<div class="muted ml-msg">${esc(r.code)}：该窗口无可用数据（缺预测留档或 1h K 线）。</div>`;
   }
   const s = r.summary;
-  const body = r.rows.map((x) => {
+  // 表格按交易日倒序（最新在上）——最近发生的不该滚到底部才看到。
+  // 只在展示层倒序：r.rows 的升序是净持仓/权益累计的计算前提，且漂移图依赖它，
+  // 故用 slice() 复制后再 reverse，不就地改数组。
+  const body = r.rows.slice().reverse().map((x) => {
     const b = x.buy_price === null ? '<span class="muted">—</span>'
       : `<b class="down">${fmtNum(x.buy_price)}</b>`;
     const sl = x.sell_price === null ? '<span class="muted">—</span>'
