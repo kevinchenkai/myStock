@@ -11,8 +11,11 @@ import html
 from dataclasses import dataclass, replace
 from pathlib import Path
 
+from . import backfill as mlbackfill
 from . import config as mlcfg
 from . import data as mldata
+from . import db as mldb
+from . import review as mlreview
 from .backtest import BTConfig, run_backtest
 from .predictor import predict_next_day
 
@@ -217,6 +220,230 @@ def _two_level_verdict(bt: dict) -> str:
     return sig_line + " " + head + note
 
 
+C_SLATE = "#5b6470"   # 中性文字（略偏蓝，与报告既有 #2a6fd8 同族，非纯灰）
+C_PANEL = "#f7f8fa"   # 面板底
+C_LINE = "#e3e6ea"    # 分隔线
+C_BOTH = "#8a4fd8"    # 双破（红绿都不合适，用紫作第三态）
+
+# 复盘面板样式（作用域限定 .rv-* ，不影响报告其余部分）。
+# tab 用「radio + :checked ~ 兄弟选择器」纯 CSS 实现——报告是零 JS 的自包含单文件，
+# 加 JS 会破坏这个性质（离线打开、邮件转发、归档都可能禁脚本），故不引入。
+_REVIEW_CSS = f"""
+.rv{{margin:14px 0 8px}}
+/* 6 个 tab 单行放不下时横向滚动，好过折行——折行会让末个 tab 孤零零掉到第二行 */
+.rv-tabs{{display:flex;gap:2px;margin-bottom:0;border-bottom:1px solid {C_LINE};
+  padding-bottom:0;overflow-x:auto;scrollbar-width:thin}}
+.rv input[type=radio]{{position:absolute;opacity:0;pointer-events:none}}
+.rv-tab{{display:inline-flex;align-items:baseline;gap:5px;cursor:pointer;padding:7px 10px;
+  border:1px solid transparent;border-bottom:none;border-radius:6px 6px 0 0;white-space:nowrap;
+  font-size:12.5px;color:{C_SLATE};line-height:1.3;user-select:none;position:relative;top:1px}}
+.rv-tab:hover{{background:{C_PANEL}}}
+.rv-tab .rv-rate{{font-size:11px;font-variant-numeric:tabular-nums;opacity:.75}}
+/* 选中态：标签高亮 + 与下方面板连成一体 */
+.rv-r1:checked ~ .rv-tabs label[for=rv-t1],
+.rv-r2:checked ~ .rv-tabs label[for=rv-t2],
+.rv-r3:checked ~ .rv-tabs label[for=rv-t3],
+.rv-r4:checked ~ .rv-tabs label[for=rv-t4],
+.rv-r5:checked ~ .rv-tabs label[for=rv-t5],
+.rv-r6:checked ~ .rv-tabs label[for=rv-t6]{{background:#fff;border-color:{C_LINE};
+  color:#222;font-weight:600;box-shadow:0 -2px 0 #2a6fd8 inset}}
+.rv input[type=radio]:focus-visible ~ .rv-tabs label{{outline:2px solid #2a6fd8;outline-offset:2px}}
+.rv-panel{{display:none;border:1px solid {C_LINE};border-top:none;border-radius:0 0 8px 8px;padding:14px 16px}}
+.rv-r1:checked ~ .rv-body .rv-p1,
+.rv-r2:checked ~ .rv-body .rv-p2,
+.rv-r3:checked ~ .rv-body .rv-p3,
+.rv-r4:checked ~ .rv-body .rv-p4,
+.rv-r5:checked ~ .rv-body .rv-p5,
+.rv-r6:checked ~ .rv-body .rv-p6{{display:block}}
+/* 汇总条：先给结论，再给逐条明细 */
+.rv-sum{{display:flex;flex-wrap:wrap;gap:18px;align-items:baseline;
+  background:{C_PANEL};border-radius:6px;padding:10px 14px;margin-bottom:12px}}
+.rv-stat{{display:flex;flex-direction:column;gap:2px}}
+.rv-stat b{{font-size:17px;font-variant-numeric:tabular-nums;line-height:1.2}}
+.rv-stat span{{font-size:11px;color:{C_SLATE};letter-spacing:.03em}}
+.rv-diag{{flex:1 1 220px;font-size:12px;color:{C_SLATE};line-height:1.55;min-width:200px}}
+.rv-scroll{{overflow-x:auto}}
+table.rv-t{{border-collapse:collapse;width:100%;font-size:13px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}}
+table.rv-t th{{text-align:right;font-weight:600;color:{C_SLATE};font-size:11px;
+  letter-spacing:.04em;border-bottom:1px solid {C_LINE};padding:4px 8px}}
+table.rv-t th:first-child{{text-align:left}}
+table.rv-t td{{padding:5px 8px;text-align:right;border-bottom:1px solid #f0f2f4}}
+table.rv-t td:first-child{{text-align:left;color:{C_SLATE}}}
+table.rv-t tr:last-child td{{border-bottom:none}}
+/* 区间带图：预测带（浅）与实际带（深）叠画，戳出部分自然露在外面 */
+/* display:inline-block 必需——span 默认 inline，宽高不生效，带图会塌成 0×0 */
+.rv-bar{{display:inline-block;position:relative;width:150px;height:15px;
+  background:#eef0f3;border-radius:3px;overflow:hidden;vertical-align:middle}}
+.rv-bar i{{position:absolute;top:0;bottom:0;display:block}}
+.rv-bar .rv-pred{{background:#cfd6e0;border-radius:2px}}
+/* 实际带的 background 由行内样式按结果着色（命中灰 / 上破红 / 下破绿 / 双破紫） */
+.rv-bar .rv-act{{border-radius:2px;top:4px;bottom:4px;box-shadow:0 0 0 1px #fff}}
+.rv-tag{{display:inline-block;min-width:74px;text-align:center;font-size:11px;
+  padding:2px 8px;border-radius:20px;font-weight:600}}
+.rv-more{{margin-top:10px}}
+.rv-more summary{{cursor:pointer;font-size:12px;color:#2a6fd8;padding:4px 0;
+  list-style:none;display:inline-flex;align-items:center;gap:5px}}
+.rv-more summary::-webkit-details-marker{{display:none}}
+.rv-more summary::before{{content:"▸";font-size:10px;transition:transform .15s}}
+.rv-more[open] summary::before{{transform:rotate(90deg)}}
+/* 折叠态显示「展开」文案，展开态显示「收起」。两条规则的目标元素不同，
+   互不覆盖——写成 [open]/:not([open]) 各自 hide 同一元素会因特异性相同而按
+   源码序决出胜负，导致文案反转。 */
+.rv-more-on{{display:none}}
+.rv-more[open] summary .rv-more-off{{display:none}}
+.rv-more[open] summary .rv-more-on{{display:inline}}
+.rv-note{{color:#8b929c;font-size:11.5px;line-height:1.6;margin:10px 0 0}}
+.rv-key{{display:inline-flex;align-items:center;gap:5px;margin-right:14px;color:{C_SLATE}}}
+.rv-key i{{display:inline-block;width:16px;height:9px;border-radius:2px}}
+@media (prefers-reduced-motion:reduce){{.rv-more summary::before{{transition:none}}}}
+"""
+
+
+def _rv_bar(r: dict, lo: float, hi: float) -> str:
+    """一行的区间带图：预测带（浅底）vs 实际带（实色），共用该股价格标尺。
+
+    实际带按结果着色——命中=中性灰，上破=红，下破=绿（红涨绿跌），双破=紫。
+    只画"带子叠带子"是不够的：命中与戳出在形状上太像，一眼扫过去分不出，
+    故用颜色承担"结果"这一维，形状承担"位置/幅度"这一维。
+    """
+    span = (hi - lo) or 1.0
+
+    def pct(v):
+        return max(0.0, min(100.0, (v - lo) / span * 100))
+
+    p1, p2 = pct(r["l_hat"]), pct(r["h_hat"])
+    a1, a2 = pct(r["actual_low"]), pct(r["actual_high"])
+    c = {"above": C_UP, "below": C_DOWN, "both": C_BOTH}.get(r["miss_side"], C_SLATE)
+    # 无障碍：带图是纯装饰（同行已有数值与结果标签），对读屏隐藏，避免重复播报
+    return (f'<span class="rv-bar" aria-hidden="true">'
+            f'<i class="rv-pred" style="left:{p1:.1f}%;width:{max(0.8, p2 - p1):.1f}%"></i>'
+            f'<i class="rv-act" style="left:{a1:.1f}%;width:{max(1.2, a2 - a1):.1f}%;'
+            f'background:{c}"></i></span>')
+
+
+def _rv_rows(rs: list, lo: float, hi: float) -> str:
+    out = ""
+    for r in rs:
+        if r["status"] == "hit":
+            tag = f'<span class="rv-tag" style="background:#eef1f4;color:{C_SLATE}">✓ 命中</span>'
+        else:
+            side = {"above": "上破", "below": "下破", "both": "双破"}[r["miss_side"]]
+            # 上破=真实涨超上沿→红；下破=真实跌破下沿→绿（红涨绿跌）
+            c = {"above": C_UP, "below": C_DOWN, "both": C_BOTH}[r["miss_side"]]
+            tag = (f'<span class="rv-tag" style="background:{c}14;color:{c}">'
+                   f'{side} {r["miss_pct"]:.2f}%</span>')
+        out += (f"<tr><td>{r['as_of']} → <b style='color:#222'>{r['next_day']}</b></td>"
+                f"<td>{r['l_hat']:,.2f} ~ {r['h_hat']:,.2f}</td>"
+                f"<td>{r['actual_low']:,.2f} ~ {r['actual_high']:,.2f}</td>"
+                f"<td style='text-align:center'>{_rv_bar(r, lo, hi)}</td>"
+                f"<td style='text-align:center'>{tag}</td></tr>")
+    return out
+
+
+def _rv_diagnosis(s: dict) -> str:
+    """据上破/下破的失衡程度给一句诊断——偏置可修，宽度不足是另一回事。"""
+    a, b = s["n_miss_above"], s["n_miss_below"]
+    n = a + b
+    if not n:
+        return "全部命中，无戳出样本。"
+    if a >= b * 2 and a >= 3:
+        return (f"<b style='color:{C_UP}'>上破为主（{a} vs {b}）</b>：区间系统性偏低，"
+                f"属可修的<b>偏置</b>——上沿分位或 CQR 目标覆盖率可调。")
+    if b >= a * 2 and b >= 3:
+        return (f"<b style='color:{C_DOWN}'>下破为主（{b} vs {a}）</b>：区间系统性偏高，"
+                f"属可修的<b>偏置</b>——下沿分位或 CQR 目标覆盖率可调。")
+    return (f"上下破基本均衡（{a} / {b}）：不是方向偏置，而是<b>宽度不足</b>——"
+            f"要提命中率需放宽区间（调高目标覆盖率），代价是区间变宽。")
+
+
+def _review_panel(reviews: dict, recent: int = 7) -> str:
+    """「近期预测复盘」面板：按股 tab 切换，默认展示最近 recent 个交易日。
+
+    数据源 = ml_predictions（报告实时留档 + 历史 HTML 回填），**不是**回测里
+    walk-forward 的历史预测——那是另一个模型（只用前 60% 数据 fit）。这里展示的
+    才是"当时线上真的这么说"的预测，故命中率通常低于总览里的回测命中率。
+
+    纯 CSS 交互（radio tab + details 展开），不引入 JS——保持报告零依赖、
+    离线可读的既有性质。
+    """
+    if not reviews:
+        return ""
+    # 只保留有已结算样本的股票；tab 序号按 TARGETS 顺序稳定
+    items = []
+    for code in mlcfg.TARGETS:
+        rs = [r for r in reviews.get(code, []) if r["status"] in ("hit", "miss")]
+        if rs:
+            items.append((code, rs))
+    if not items:
+        return ""
+
+    radios, tabs, panels = "", "", ""
+    for n, (code, rs) in enumerate(items, start=1):
+        s = mlreview.summarize(reviews.get(code, []))
+        checked = " checked" if n == 1 else ""
+        radios += (f'<input class="rv-r{n}" type="radio" name="rv-tab" '
+                   f'id="rv-t{n}"{checked}>')
+        rate = _fmt_pct(s["hit_rate"])
+        tabs += (f'<label class="rv-tab" for="rv-t{n}">{html.escape(code)}'
+                 f'<span class="rv-rate">{rate}</span></label>')
+
+        # 价格标尺取该股全部样本的极值（预测与实际同尺，跨行可比）
+        lo = min(min(r["l_hat"], r["actual_low"]) for r in rs)
+        hi = max(max(r["h_hat"], r["actual_high"]) for r in rs)
+        head = ("<tr><th>基准日 → 次日</th><th>预测区间</th><th>实际 低~高</th>"
+                "<th style='text-align:center'>区间对照</th>"
+                "<th style='text-align:center'>结果</th></tr>")
+        latest, older = rs[-recent:], rs[:-recent]
+        more = ""
+        if older:
+            more = f"""
+        <details class="rv-more"><summary>
+          <span class="rv-more-off">展开更早的 {len(older)} 条（共 {len(rs)} 条）</span>
+          <span class="rv-more-on">收起更早记录</span></summary>
+          <div class="rv-scroll"><table class="rv-t">{head}{_rv_rows(older, lo, hi)}</table></div>
+        </details>"""
+        pend = sum(1 for r in reviews.get(code, []) if r["status"] == "pending")
+        pend_txt = (f"　<span style='color:#8b929c'>另有 {pend} 条待结算"
+                    f"（次日行情尚未走出）</span>" if pend else "")
+        avg = s["avg_miss_pct"]
+        panels += f"""
+      <div class="rv-panel rv-p{n}">
+        <div class="rv-sum">
+          <div class="rv-stat"><b>{rate}</b><span>命中率</span></div>
+          <div class="rv-stat"><b>{s['n_settled']}</b><span>已结算</span></div>
+          <div class="rv-stat"><b><span style="color:{C_UP}">{s['n_miss_above']}</span>
+            <span style="color:#c9ced6">/</span>
+            <span style="color:{C_DOWN}">{s['n_miss_below']}</span></b><span>上破 / 下破</span></div>
+          <div class="rv-stat"><b>{f'{avg:.2f}%' if avg is not None else '—'}</b><span>平均戳出</span></div>
+          <div class="rv-diag">{_rv_diagnosis(s)}</div>
+        </div>
+        <div class="rv-scroll"><table class="rv-t">{head}{_rv_rows(latest, lo, hi)}</table></div>
+        <p class="rv-note" style="margin-top:8px">显示最近 {len(latest)} 条{pend_txt}</p>
+        {more}
+      </div>"""
+
+    return f"""
+<h2>近期预测复盘：当时说的区间 vs 实际走出来的高低</h2>
+<p style="color:#666;font-size:12px">下表是<b>过去报告真实给出</b>的次日区间（全历史 fit 的线上预测，
+留档于 ml_predictions），与该次日真实高/低的逐条对照。<b>与总览「命中率」不是同一口径</b>——总览那个
+来自回测（walk-forward 模型，训练截止在很早以前），这里是线上预测的实际表现。</p>
+<div class="rv">{radios}
+  <div class="rv-tabs">{tabs}</div>
+  <div class="rv-body">{panels}</div>
+</div>
+<p class="rv-note">
+<span class="rv-key"><i style="background:#cfd6e0"></i>预测区间</span>
+<span class="rv-key"><i style="background:{C_SLATE}"></i>实际·命中</span>
+<span class="rv-key"><i style="background:{C_UP}"></i>实际·上破</span>
+<span class="rv-key"><i style="background:{C_DOWN}"></i>实际·下破</span>
+<span class="rv-key"><i style="background:{C_BOTH}"></i>实际·双破</span>
+<br>「区间对照」浅色条=预测区间，实色条=当日实际高低（按结果着色），同股共用价格标尺——
+实际条探出浅色条的部分即戳出。「上破」=真实最高涨超预测上沿，「下破」=真实最低跌破预测下沿；
+单边戳出即算未命中，不做部分命中粉饰。「平均戳出」=未命中时戳出幅度 / 基准日收盘，取上下较大侧。
+报告非每个交易日都生成，故序列有洞，逐行标注基准日与次日，勿当连续序列读。</p>"""
+
+
 def _stock_section(code: str, bt: dict, pred: dict) -> str:
     fe, nv = bt["final_equity"], bt["net_value"]
     init = bt["init_cash"]
@@ -285,7 +512,12 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
     out_dir = out_dir or (mlcfg.REPORTS_DIR / today)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    sections, summary_rows = [], ""
+    # 预测留档：建表 → 首次自动回填历史 HTML（表非空则跳过，见 backfill.run_if_empty）
+    # 每次生成报告都执行，保证 ml.sh 跑一次数据就同步一次，无需人工干预。
+    mldb.init_ml_db()
+    mlbackfill.run_if_empty()
+
+    sections, summary_rows, pred_rows = [], "", []
     for code in mlcfg.TARGETS:
         daily = mldata.load_daily(code)
         # 按股自适应 CQR 目标覆盖率（收窄区间；与 ALPHA_BY_CODE 同模式）
@@ -299,6 +531,16 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
                                 high_alpha=hi_a, low_alpha=lo_a,
                                 conformal=cfg.conformal, target_coverage=cov)
         sections.append(_stock_section(code, bt, pred))
+        # 本次预测留档（PK code+as_of，当天重跑覆盖）——供后续报告做复盘对照
+        pred_rows.append({
+            "code": code, "as_of": pred["as_of"], "close": pred["close"],
+            "l_hat": pred["L_hat"], "h_hat": pred["H_hat"],
+            "width_pct": pred["width_pct"],
+            "low_alpha": lo_a, "high_alpha": hi_a,
+            "conformal": int(bool(pred["conformal"])), "q_ret": pred["q_ret"],
+            "target_coverage": pred["target_coverage"],
+            "backend": bt["backend"], "source": "live",
+        })
         fe = bt["final_equity"]
         b, bh = fe.get("bandit"), fe.get("buy_hold")
         # NaN/None 时不下「超越」结论（nan 比较恒 False，会误判为 ✗）
@@ -313,10 +555,32 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
                          f"<td style='text-align:right'>{pred['width_pct']:.2f}%</td>"
                          f"<td style='text-align:right'>{_fmt_pct(bt.get('interval_hit_rate'))}</td></tr>")
 
+    # 写入本次预测 + 读回全部留档做复盘（写在渲染前，故当日预测也进表，
+    # 但其次日尚未走出 → review 判为 pending，不进复盘表、不污染命中率）
+    conn = mldb.get_ml_connection()
+    try:
+        if pred_rows:
+            mldb.upsert_predictions(conn, pred_rows)
+            mldb.log_sync(conn, "predictions", row_count=len(pred_rows),
+                          range_end=today)
+        reviews = {
+            code: mlreview.review_predictions(
+                mldb.load_predictions(conn, code), mldata.load_daily(code))
+            for code in mlcfg.TARGETS
+        }
+    finally:
+        conn.close()
+
     page = f"""<!doctype html><html lang="zh"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>myStock ML 回测报告 {today}</title>
-<style>body{{font:14px/1.6 -apple-system,sans-serif;max-width:840px;margin:24px auto;padding:0 16px;color:#222}}
-h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}</style></head><body>
+<style>:root{{color-scheme:light}}
+/* 报告是浅色单主题：必须显式给 background，否则在深色模式的浏览器/客户端里
+   会借用宿主的深色底，配上 color:#222 变成"深底深字"读不了。 */
+body{{font:14px/1.6 -apple-system,sans-serif;max-width:840px;margin:24px auto;padding:0 16px;
+  color:#222;background:#fff}}
+h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}
+{_REVIEW_CSS}</style></head><body>
 <h1>myStock ML 回测报告 · {today}</h1>
 <p style="color:#888">3 美股(USD) + 3 港股(HKD)，各股独立账户本币计价 · 目标=最大化达成交易净值 · 红涨绿跌 · 离线产物（不碰 web）</p>
 <p style="color:#666;font-size:12px">口径：{_mode_banner(cfg)}</p>
@@ -332,6 +596,7 @@ h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}</style></
 <p style="color:#888;font-size:12px">"超越"= Bandit 期末净值是否高于买入持有。"宽度IC"= 预测区间宽 vs 真实次日振幅的
 时间轴 Spearman 相关（信号层主指标，单标的天然偏弱，仅作诊断非门槛）。"命中率"= 测试窗内次日真实高/低
 全落进预测区间的比例（分位收窄的诚实代价，~50% 属预期，见指标说明）。结论看相对值，绝对收益不单独采信。</p>
+{_review_panel(reviews)}
 {''.join(sections)}
 <hr><p style="color:#aaa;font-size:12px">生成于 {dt.datetime.now():%Y-%m-%d %H:%M}。完整方案见 docs/ML_PLAN.md，速览见 docs/ML_OVERVIEW.md，新算法见 docs/ML_ALGORITHM_PROPOSAL.md。</p>
 </body></html>"""

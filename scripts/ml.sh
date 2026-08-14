@@ -57,6 +57,8 @@ do_train() {
   run_step "P1 撮合校准（calibrate）" python -m mystock.ml.calibrate
   run_step "P2 预测器（predictor）"   python -m mystock.ml.predictor
   run_step "P3/P3.1 回测（backtest）" python -m mystock.ml.backtest
+  # report 内部会：建表 → 首次自动回填历史预测 → 写入当日预测 → 渲染「近期预测复盘」。
+  # 即每跑一次 train，ml_predictions 就同步一次，无需额外步骤/人工干预。
   run_step "生成 HTML 报告（report）" python -m mystock.ml.report
 }
 

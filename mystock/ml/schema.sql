@@ -90,6 +90,29 @@ CREATE TABLE IF NOT EXISTS ml_sync_log (
     run_at          TEXT
 );
 
+-- 每日次日区间预测的历史留档（报告生成时写入，供「近期预测复盘」回看）
+-- 口径：predict_next_day 的输出——**全历史 fit**、对 as_of 收盘后预测 as_of 次一交易日
+-- 的 [l_hat, h_hat]。与 backtest 里 walk-forward 的历史预测**不是同一个模型**，勿混用。
+-- PK (code, as_of)：同一基准日重复生成（当天多跑几次报告）覆盖为最后一次。
+CREATE TABLE IF NOT EXISTS ml_predictions (
+    code            TEXT NOT NULL,        -- 富途代码，如 US.NVDA
+    as_of           TEXT NOT NULL,        -- 预测基准日 T（该日收盘后预测 T+1）
+    close           REAL,                 -- T 日收盘价（还原区间用的基准）
+    l_hat           REAL,                 -- 预测区间下沿
+    h_hat           REAL,                 -- 预测区间上沿
+    width_pct       REAL,                 -- 区间宽 / close（%）
+    low_alpha       REAL,                 -- 生成时的分位档（便于回看口径变更）
+    high_alpha      REAL,
+    conformal       INTEGER,              -- 是否启用 CQR 校准（0/1）
+    q_ret           REAL,                 -- CQR 半宽（ret 空间）
+    target_coverage REAL,                 -- CQR 目标覆盖率
+    backend         TEXT,                 -- lightgbm / sklearn
+    source          TEXT,                 -- live=报告实时生成 / backfill=历史 HTML 回填
+    generated_at    TEXT,                 -- 写入时间
+    PRIMARY KEY (code, as_of)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ml_pred_asof ON ml_predictions(as_of);
 CREATE INDEX IF NOT EXISTS idx_ml_q1d_futu ON ml_quotes_1d(futu_code);
 CREATE INDEX IF NOT EXISTS idx_ml_q1h_futu ON ml_quotes_1h(futu_code);
 CREATE INDEX IF NOT EXISTS idx_ml_deals_code ON ml_deals(code);

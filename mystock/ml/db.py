@@ -58,6 +58,44 @@ def upsert(conn: sqlite3.Connection, table: str, rows: Iterable[dict]) -> int:
     return len(rows)
 
 
+PRED_COLS = [
+    "code", "as_of", "close", "l_hat", "h_hat", "width_pct",
+    "low_alpha", "high_alpha", "conformal", "q_ret", "target_coverage",
+    "backend", "source", "generated_at",
+]
+
+
+def upsert_predictions(conn: sqlite3.Connection, rows: Iterable[dict]) -> int:
+    """写入次日区间预测（PK code+as_of，重复生成覆盖）。缺列补 None。
+
+    统一补齐 PRED_COLS 再走通用 upsert——回填行（历史 HTML 只能解析出
+    close/l_hat/h_hat）与实时行（字段齐全）列集不同，不补齐会因 executemany
+    的列名取自首行而错位。
+    """
+    norm = []
+    for r in rows:
+        r = dict(r)
+        r.setdefault("generated_at", now_str())
+        norm.append({c: r.get(c) for c in PRED_COLS})
+    return upsert(conn, "ml_predictions", norm)
+
+
+def load_predictions(
+    conn: sqlite3.Connection, code: Optional[str] = None, *, since: str = "",
+) -> list[dict]:
+    """读预测留档，按 (code, as_of) 升序。code=None 取全部。"""
+    sql = f"SELECT {', '.join(PRED_COLS)} FROM ml_predictions WHERE 1=1"
+    params: list = []
+    if code:
+        sql += " AND code=?"
+        params.append(code)
+    if since:
+        sql += " AND as_of>=?"
+        params.append(since)
+    sql += " ORDER BY code, as_of"
+    return [dict(r) for r in conn.execute(sql, params).fetchall()]
+
+
 def log_sync(
     conn: sqlite3.Connection,
     source: str,
