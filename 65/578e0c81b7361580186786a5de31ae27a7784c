@@ -1,0 +1,23 @@
+README.md
+  s_7f7116297cfabc::t_719fbee0db8be7 3,5,7-15,17-18,25,38-50,54-55,58,72,74,83,96,122,167,171,182-262,265-268,271-337,339-359,363-365,370-381,386-391,394-441,444,454,461-462,471-472
+  s_7f7116297cfabc::t_6b0fa71c86c22b 28-35
+  s_7f7116297cfabc::t_a6b573c949b2c8 106-107
+  s_7f7116297cfabc::t_b0fbf921f963ae 338
+  s_7f7116297cfabc::t_bb0e0e631f5a1c 143
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "65578e0c81b7361580186786a5de31ae27a7784c",
+  "prompts": {},
+  "sessions": {
+    "s_7f7116297cfabc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4234f358-6fb9-4005-af79-be2f8b037cad",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
