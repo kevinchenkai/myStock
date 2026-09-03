@@ -1614,6 +1614,8 @@ function mlPanel(r) {
         <span>成交额收益率<i>÷ 平均单边成交额 ${fmtNum(q.turnover, 0)}</i></span></div>
       <div class="ml-st"><b class="${plClass(q.capital_return)}">${fmtPct(q.capital_return)}</b>
         <span>占款收益率<i>÷ 峰值占款 ${fmtNum(q.peak_exposure, 0)}</i></span></div>
+      <div class="ml-st"><b class="${plClass(q.cash_return)}">${fmtPct(q.cash_return)}</b>
+        <span>现金收益率<i>÷ 实际垫付现金 ${fmtNum(q.max_cash_used, 0)}</i></span></div>
       <div class="ml-st"><b class="${plClass(q.annualized_return)}">${fmtPct(q.annualized_return)}</b>
         <span>线性年化<i>占款收益 × ${q.trading_days_per_year}/${r.n_days}</i></span></div>
     </div>
@@ -1642,6 +1644,7 @@ function mlTotals(totals) {
       <div class="ml-tv"><b class="${plClass(g.total_pnl)}">${fmtSigned(g.total_pnl)}</b><span>合计盈亏</span></div>
       <div class="ml-tv"><b class="${plClass(q.turnover_return)}">${fmtPct(q.turnover_return)}</b><span>成交额收益率</span></div>
       <div class="ml-tv"><b class="${plClass(q.capital_return)}">${fmtPct(q.capital_return)}</b><span>占款收益率</span></div>
+      <div class="ml-tv"><b class="${plClass(q.cash_return)}">${fmtPct(q.cash_return)}</b><span>现金收益率</span></div>
       <div class="ml-tv"><b class="${plClass(q.annualized_return)}">${fmtPct(q.annualized_return)}</b><span>线性年化</span></div>
     </div>`;
   }).join("");
@@ -1664,7 +1667,9 @@ function renderMl() {
     <div class="ml-warn"><b>注意口径</b>：净持仓可为负（裸空）——只有在「持仓充足」假设下才成立。
       总盈亏 = 现金流净额（卖−买） + 期末净持仓按最后收盘折算。
       本策略<b>无预设本金</b>，收益率须先声明分母：<b>成交额收益率</b> = 总盈亏 ÷ 平均单边成交额（每做 1 元生意赚几分，跨标的可比）；
-      <b>占款收益率</b> = 总盈亏 ÷ 峰值占款（|净持仓|×当日收盘的窗口最大值，最接近直觉本金）。
+      <b>占款收益率</b> = 总盈亏 ÷ 峰值占款（|净持仓|×当日收盘的窗口最大值，最接近直觉本金）；
+      <b>现金收益率</b> = 总盈亏 ÷ <b>实际垫付现金</b>（逐日累计现金余额的最低点，按成交价算的真金白银——
+      纯裸空时现金只进不出，该项为 0 并显示 —，表示一分钱没垫）。
       年化为线性折算（×252/天数），样本仅数十天，<b>不可当预期收益</b>。${esc(mlData.note || "")}</div>
     ${mlTotals(mlData.totals)}
     <div class="subtabs ml-subtabs">${tabs}</div>

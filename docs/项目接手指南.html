@@ -669,8 +669,11 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
     <span class="tag">注意</span>
     <code>/api/ml/strategy</code> 的<strong>收益率必须先声明分母</strong> —— 该策略无预设本金（不设初始现金，净持仓还会单向漂移、可为负=裸空），
     直接说"收益率 X%"是没有意义的。故给两个分母：<strong>成交额收益率</strong>（总盈亏 ÷ 平均单边成交额，衡量单位成交额的赚钱效率，跨标的可比）
-    与<strong>占款收益率</strong>（总盈亏 ÷ 峰值 <code>|净持仓|×当日收盘</code>，最接近直觉本金），另附<strong>线性</strong>年化（×252/天数，<strong>非复利</strong>）。
+    、<strong>占款收益率</strong>（总盈亏 ÷ 峰值 <code>|净持仓|×当日收盘</code>，最接近直觉本金）
+    与<strong>现金收益率</strong>（总盈亏 ÷ <strong>实际垫付现金</strong>，即逐日累计现金余额的<strong>最低点</strong>——真金白银，按成交价算、只算现金方向，
+    故<strong>纯裸空时为 0</strong> 表示一分钱没垫），另附<strong>线性</strong>年化（挂在占款口径上，×252/天数，<strong>非复利</strong>）。
     分母为 0 时返回 <code>null</code>、前端显示 <code>—</code> —— 「没有本金可言」与「本金收益为零」是两回事。
+    注意现金口径取余额<strong>最低点</strong>而非期末余额：先连买再卖回时期末可能已转正，但你确实垫付过最低点那笔钱。
     组合汇总<strong>按币种分组</strong>，USD/HKD 不相加。口径与实现见 <code>mystock/ml/strategy.py</code> 的 <code>compute_returns</code> / <code>aggregate_returns</code>。
   </div>
 
@@ -1084,7 +1087,7 @@ account_funds               账户级每日快照，不含 code，无法与个�
     <li>☐ 在持仓 Tab 点表头排序、切市场筛选、点代码下钻看 K 线、主力资金流向柱图与复盘浮窗</li>
     <li>☐ <code>python -m mystock.pipelines.maintenance skiplist</code> 看跳过名单</li>
     <li>☐ 跑一次 <code>bash scripts/update.sh</code>，观察 <code>sync_log</code> 新增记录</li>
-    <li>☐ <code>conda activate mk && python -m pytest tests/ -q</code>（157 测试全过）</li>
+    <li>☐ <code>conda activate mk && python -m pytest tests/ -q</code>（167 测试全过）</li>
     <li>☐ <code>bash scripts/ml.sh train</code> 跑一次回测 + 报告，看 <code>data/ml/reports/latest.html</code> 头部口径行（reward/CQR/regime）</li>
     <li>☐ <code>MYSTOCK_ML_TIER1=1 python -m mystock.ml.backtest</code> 看 Tier1 vs 保守口径 A/B（验收门槛）</li>
   </ul>

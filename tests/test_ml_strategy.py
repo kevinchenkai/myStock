@@ -177,3 +177,109 @@ def test_aggregate_uses_longest_window_for_annualization():
         _mk("US.TSLA", "USD", 0.0, 500.0, 500.0, n_days=30),
     ])
     assert out[0]["n_days"] == 30
+
+
+# ---- 实际动用现金（cash_return）----
+def test_cash_return_divides_by_actual_cash_advanced():
+    r = st.compute_returns(
+        {"total_pnl": 100.0, "buy_amount": 900.0, "sell_amount": 1000.0},
+        peak_exposure=800.0, n_days=10, max_cash_used=500.0)
+    assert r["max_cash_used"] == 500.0
+    assert r["cash_return"] == pytest.approx(0.2)
+
+
+def test_cash_return_is_none_when_no_cash_advanced():
+    """纯裸空：现金只进不出，从未垫付 → 无从谈收益率，返回 None 而非除爆。"""
+    r = st.compute_returns(
+        {"total_pnl": 3755.0, "buy_amount": 34025.0, "sell_amount": 59761.0},
+        peak_exposure=38430.0, n_days=30, max_cash_used=0.0)
+    assert r["cash_return"] is None
+    assert r["capital_return"] is not None   # 占款口径仍有值（融券市值）
+
+
+def test_cash_return_defaults_to_zero_when_arg_omitted():
+    """旧调用方（只传 3 个参数）不能炸——默认无垫付。"""
+    r = st.compute_returns(
+        {"total_pnl": 10.0, "buy_amount": 100.0, "sell_amount": 100.0}, 50.0, 10)
+    assert r["max_cash_used"] == 0.0
+    assert r["cash_return"] is None
+
+
+def test_cash_return_differs_from_capital_return():
+    """两个分母口径不同：现金按成交价、只算现金方向；占款按收盘、含裸空市值。"""
+    r = st.compute_returns(
+        {"total_pnl": 100.0, "buy_amount": 500.0, "sell_amount": 500.0},
+        peak_exposure=1000.0, n_days=10, max_cash_used=400.0)
+    assert r["capital_return"] == pytest.approx(0.1)
+    assert r["cash_return"] == pytest.approx(0.25)
+
+
+def test_annualization_still_based_on_capital_return():
+    """新增现金口径不得让既有年化数字漂移。"""
+    r = st.compute_returns(
+        {"total_pnl": 50.0, "buy_amount": 400.0, "sell_amount": 400.0},
+        peak_exposure=500.0, n_days=25, max_cash_used=10.0)
+    assert r["annualized_return"] == pytest.approx(0.1 * 252 / 25)
+
+
+def test_empty_result_carries_zero_cash():
+    s = st._empty("US.NVDA", 30)["summary"]
+    assert s["max_cash_used"] == 0.0
+    assert s["returns"]["cash_return"] is None
+
+
+# ---- 组合层面的现金汇总 ----
+def _mk2(code, cur, pnl, turnover, peak, cash, n_days=30):
+    return {"code": code, "currency": cur, "n_days": n_days,
+            "summary": {"total_pnl": pnl,
+                        "returns": {"turnover": turnover, "peak_exposure": peak,
+                                    "max_cash_used": cash}}}
+
+
+def test_aggregate_sums_cash_within_currency():
+    out = st.aggregate_returns([
+        _mk2("US.NVDA", "USD", 100.0, 1000.0, 400.0, 300.0),
+        _mk2("US.TSLA", "USD", 50.0, 500.0, 100.0, 200.0),
+    ])
+    g = out[0]
+    assert g["max_cash_used"] == 500.0
+    assert g["returns"]["cash_return"] == pytest.approx(150.0 / 500.0)
+
+
+def test_aggregate_cash_none_when_all_naked_short():
+    out = st.aggregate_returns([
+        _mk2("HK.09988", "HKD", 3755.0, 46893.0, 38430.0, 0.0),
+    ])
+    assert out[0]["returns"]["cash_return"] is None
+
+
+def test_aggregate_tolerates_missing_cash_key():
+    """老结构（无 max_cash_used）汇总时按 0 处理，不抛 KeyError。"""
+    out = st.aggregate_returns([
+        _mk("US.NVDA", "USD", 100.0, 1000.0, 500.0),
+    ])
+    assert out[0]["max_cash_used"] == 0.0
+
+
+def test_cash_low_point_is_trough_not_final_balance():
+    """实际垫付 = 累计余额的**最低点**，不是期末余额。
+
+    典型场景：先连买三天（余额一路下探）再卖回，期末余额可能已转正，
+    但你确实垫付过最低点那笔钱——用期末余额会严重低估资金需求。
+    """
+    # 手工重演 run_strategy 里的累计逻辑（该逻辑本身依赖库，此处只验口径）
+    fills = [(-100.0,), (-100.0,), (-100.0,), (+250.0,), (+120.0,)]
+    cash = 0.0
+    min_cash = 0.0
+    for (d,) in fills:
+        cash += d
+        min_cash = min(min_cash, cash)
+    assert cash == pytest.approx(70.0)        # 期末为正
+    assert max(0.0, -min_cash) == pytest.approx(300.0)   # 但垫付过 300
+
+    r = st.compute_returns({"total_pnl": 70.0, "buy_amount": 300.0,
+                            "sell_amount": 370.0}, 300.0, 5,
+                           max_cash_used=max(0.0, -min_cash))
+    # 用期末余额 70 当分母会得到 100%，用真实垫付 300 才是 23.3%
+    # abs=1e-6：返回值按 6 位小数舍入（见 compute_returns 的 _r(..., 6)）
+    assert r["cash_return"] == pytest.approx(70.0 / 300.0, abs=1e-6)
