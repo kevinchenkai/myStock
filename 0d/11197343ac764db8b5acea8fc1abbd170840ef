@@ -1,0 +1,40 @@
+mystock/ml/strategy.py
+  s_45d4bc7b28dd8d::t_3a613b9e0bed93 16-32
+  s_45d4bc7b28dd8d::t_636d5f81aade44 84,111-114,129-140,148,155-189,199
+  s_45d4bc7b28dd8d::t_76dc57d49afb69 218-258
+mystock/web/static/style.css
+  s_45d4bc7b28dd8d::t_e76c3f4538409b 666-698
+docs/ML_OVERVIEW.md
+  s_45d4bc7b28dd8d::t_b8dd6426d7e629 274-290,302-307
+  s_45d4bc7b28dd8d::t_472052ea7ef319 308
+docs/项目接手指南.html
+  s_45d4bc7b28dd8d::t_1863be971e8833 1087
+  s_45d4bc7b28dd8d::t_9d4d1b62bfad29 664,668-675
+  s_45d4bc7b28dd8d::t_2894077fe241d2 676
+CLAUDE.md
+  s_45d4bc7b28dd8d::t_568cf5a9ac96f0 60
+tests/test_ml_strategy.py
+  s_45d4bc7b28dd8d::t_f72cc5b64ba7d1 62-179
+mystock/web/static/app.js
+  s_45d4bc7b28dd8d::t_a52f58d630cfc9 1633-1650,1656,1658-1659,1665-1669
+  s_45d4bc7b28dd8d::t_5a073d26a48d2c 1554-1560,1584,1612-1618
+  s_45d4bc7b28dd8d::t_8c752c9356f791 1619
+mystock/web/app.py
+  s_45d4bc7b28dd8d::t_48a1bbbe3e3afc 238-240,249,269,274-276
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "0d11197343ac764db8b5acea8fc1abbd170840ef",
+  "prompts": {},
+  "sessions": {
+    "s_45d4bc7b28dd8d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a26c1486-53f1-4587-ad74-b35699749e24",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
