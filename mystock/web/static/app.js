@@ -1551,6 +1551,13 @@ function renderDetailDeals(deals) {
 let mlData = null;
 let mlCur = 0;
 
+/** 比率(0.0514) → "+5.14%"。null/undefined 表示"分母不存在"，显示 — 而非 0.00%。 */
+function fmtPct(v, digits = 2) {
+  if (v === null || v === undefined || isNaN(Number(v))) return "—";
+  const n = Number(v) * 100;
+  return (n > 0 ? "+" : "") + n.toFixed(digits) + "%";
+}
+
 /** 净持仓漂移折线：仓位单向漂移是这个策略最关键的风险，值得画出来。 */
 function mlDrift(rows) {
   const w = 700, h = 90, pad = 26;
@@ -1574,6 +1581,7 @@ function mlPanel(r) {
     return `<div class="muted ml-msg">${esc(r.code)}：该窗口无可用数据（缺预测留档或 1h K 线）。</div>`;
   }
   const s = r.summary;
+  const q = s.returns || {};
   // 表格按交易日倒序（最新在上）——最近发生的不该滚到底部才看到。
   // 只在展示层倒序：r.rows 的升序是净持仓/权益累计的计算前提，且漂移图依赖它，
   // 故用 slice() 复制后再 reverse，不就地改数组。
@@ -1601,6 +1609,14 @@ function mlPanel(r) {
         <span>期末净持仓</span></div>
       <div class="ml-st"><b>${fmtSigned(s.mark_value)}</b><span>持仓折算 @${fmtNum(s.last_close)}</span></div>
     </div>
+    <div class="ml-stats ml-ret">
+      <div class="ml-st"><b class="${plClass(q.turnover_return)}">${fmtPct(q.turnover_return)}</b>
+        <span>成交额收益率<i>÷ 平均单边成交额 ${fmtNum(q.turnover, 0)}</i></span></div>
+      <div class="ml-st"><b class="${plClass(q.capital_return)}">${fmtPct(q.capital_return)}</b>
+        <span>占款收益率<i>÷ 峰值占款 ${fmtNum(q.peak_exposure, 0)}</i></span></div>
+      <div class="ml-st"><b class="${plClass(q.annualized_return)}">${fmtPct(q.annualized_return)}</b>
+        <span>线性年化<i>占款收益 × ${q.trading_days_per_year}/${r.n_days}</i></span></div>
+    </div>
     <div class="ml-drift">
       <div class="muted ml-dlab">净持仓漂移（${s.min_pos} ~ ${s.max_pos} 股，每手 ${r.lot} 股）</div>
       ${mlDrift(r.rows)}
@@ -1614,19 +1630,43 @@ function mlPanel(r) {
       限价卖在首根 high ≥ Ĥ 的 bar 成交、成交价 max(Ĥ, open)。本页为离线数据分析，不构成投资建议。</div>`;
 }
 
+/** 组合汇总条：每个币种一行——USD/HKD 不相加（全站口径）。 */
+function mlTotals(totals) {
+  if (!totals || !totals.length) return "";
+  const rows = totals.map((g) => {
+    const q = g.returns || {};
+    const names = g.codes.map((c) => c.split(".")[1] || c).join(" + ");
+    return `<div class="ml-total">
+      <div class="ml-tl"><b>${esc(g.currency)}</b>
+        <span class="muted">${esc(names)}（${g.n_days} 个交易日）</span></div>
+      <div class="ml-tv"><b class="${plClass(g.total_pnl)}">${fmtSigned(g.total_pnl)}</b><span>合计盈亏</span></div>
+      <div class="ml-tv"><b class="${plClass(q.turnover_return)}">${fmtPct(q.turnover_return)}</b><span>成交额收益率</span></div>
+      <div class="ml-tv"><b class="${plClass(q.capital_return)}">${fmtPct(q.capital_return)}</b><span>占款收益率</span></div>
+      <div class="ml-tv"><b class="${plClass(q.annualized_return)}">${fmtPct(q.annualized_return)}</b><span>线性年化</span></div>
+    </div>`;
+  }).join("");
+  return `<div class="ml-totals"><div class="ml-tt">组合收益率（按币种，不跨币种相加）</div>${rows}</div>`;
+}
+
 function renderMl() {
   if (!mlData) return;
   const rs = mlData.results;
   const tabs = rs.map((r, i) => {
     const t = r.summary.total_pnl;
+    const cr = (r.summary.returns || {}).capital_return;
     const val = r.n_days
-      ? `<span class="ml-r ${plClass(t)}">${fmtSigned(t, "")}</span>` : "";
+      ? `<span class="ml-r ${plClass(t)}">${fmtSigned(t, "")}</span>` +
+        `<span class="ml-rp ${plClass(cr)}">${fmtPct(cr, 1)}</span>` : "";
     return `<div class="subtab ${i === mlCur ? "active" : ""}" data-ml="${i}">
       ${esc(r.code)}${val}</div>`;
   }).join("");
   document.getElementById("ml-body").innerHTML = `
     <div class="ml-warn"><b>注意口径</b>：净持仓可为负（裸空）——只有在「持仓充足」假设下才成立。
-      总盈亏 = 现金流净额（卖−买） + 期末净持仓按最后收盘折算。${esc(mlData.note || "")}</div>
+      总盈亏 = 现金流净额（卖−买） + 期末净持仓按最后收盘折算。
+      本策略<b>无预设本金</b>，收益率须先声明分母：<b>成交额收益率</b> = 总盈亏 ÷ 平均单边成交额（每做 1 元生意赚几分，跨标的可比）；
+      <b>占款收益率</b> = 总盈亏 ÷ 峰值占款（|净持仓|×当日收盘的窗口最大值，最接近直觉本金）。
+      年化为线性折算（×252/天数），样本仅数十天，<b>不可当预期收益</b>。${esc(mlData.note || "")}</div>
+    ${mlTotals(mlData.totals)}
     <div class="subtabs ml-subtabs">${tabs}</div>
     ${mlPanel(rs[mlCur])}`;
   document.querySelectorAll("[data-ml]").forEach((el) => {

@@ -57,7 +57,7 @@ bash scripts/server.sh    # 启动 Web（127.0.0.1:8888），仅读库
 conda activate mk && python -m pytest tests/ -q
 ```
 
-测试需在 `mk` 环境（base anaconda python 无 yfinance 会报 YFError）。当前 `tests/`：`test_code_map.py`、`test_db.py`、`test_pnl.py`。`pnl.py` 与 `code_map.py` 是纯函数，新逻辑优先写成可单测的纯函数。
+测试需在 `mk` 环境（base anaconda python 无 yfinance 会报 YFError）。当前 `tests/` 共 16 个文件、157 条用例：web 侧 `test_code_map` / `test_db` / `test_pnl` / `test_capital_flow` / `test_futu_funds` / `test_yf_client`，ML 侧 `test_ml_*`（calibrator / cv / fetch / nan_guard / offline_rl / policy / review / signal_eval / simulator / strategy）。`pnl.py` 与 `code_map.py` 是纯函数，新逻辑优先写成可单测的纯函数。
 
 前端无构建工具，改动后用 `node --check mystock/web/static/app.js` 做语法检查。
 

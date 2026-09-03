@@ -13,6 +13,23 @@
   mark      = 期末净持仓 × 最后收盘（净持仓可为负=裸空，折算为负）
   total     = cash_flow + mark
 未扣佣金/印花税/平台费/融券成本/滑点——如实标注，勿当净收益。
+
+收益率口径（compute_returns）：
+  这个策略**没有天然的本金**——不预设初始现金，净持仓还会单向漂移（可为负=裸空），
+  所以「收益率」必须先声明分母，否则是个无意义的数。这里给三个各自回答不同问题的分母：
+
+    turnover_return = total / ((buy_amount + sell_amount) / 2)
+        —— 单位成交额的赚钱效率。回答「每做 1 块钱生意赚几分」，与仓位规模无关，
+           跨标的可比性最好，也最接近"手续费能不能覆盖"这个实际问题。
+    capital_return  = total / peak_exposure
+        —— peak_exposure = max(|净持仓| × 当日收盘)，即整个窗口里被占用的最大资金
+           （多头=买入占款，空头=保证金/融券市值）。回答「压上的钱回报几何」，
+           是最接近直觉「本金收益率」的一个，但对单日极端仓位敏感。
+    annualized      = capital_return 按 252 交易日线性年化
+        —— 仅供横向比较量级；样本仅 days 天，不可当预期收益。
+
+  三者都不含融资成本与费用；capital_return 的分母是**峰值**占款而非平均占款，
+  故偏保守（真实占款更少 → 真实收益率更高）。分母为 0（无任何成交）时返回 None。
 """
 from __future__ import annotations
 
@@ -64,6 +81,7 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
         lot = lot_for(code)
         pos = 0
         cash = 0.0
+        peak_exposure = 0.0
         buy_amt = sell_amt = 0.0
         n_buy = n_sell = n_both = n_none = 0
         rows = []
@@ -90,6 +108,10 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
             n_none += not b_filled and not s_filled
             bar = dmap[day]
             close = _f(bar["close"])
+            # 峰值占款：|净持仓| 按当日收盘折算——多头是买入占款，空头是融券市值/保证金。
+            # 用当日收盘（而非成交价）是因为占款是逐日盯市的，不是建仓那一刻定死的。
+            if close is not None:
+                peak_exposure = max(peak_exposure, abs(pos) * close)
             rows.append({
                 "as_of": as_of, "date": day,
                 "l_hat": _r(L), "h_hat": _r(H),
@@ -104,6 +126,18 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
 
         last_close = _f(dmap[rows[-1]["date"]]["close"]) or 0.0
         mark = pos * last_close
+        summary = {
+            "n_buy": n_buy, "n_sell": n_sell,
+            "n_both": n_both, "n_none": n_none,
+            "buy_amount": _r(buy_amt), "sell_amount": _r(sell_amt),
+            "cash_flow": _r(cash),
+            "end_pos": pos, "last_close": _r(last_close),
+            "mark_value": _r(mark),
+            "total_pnl": _r(cash + mark),
+            "min_pos": min(r["pos"] for r in rows),
+            "max_pos": max(r["pos"] for r in rows),
+        }
+        summary["returns"] = compute_returns(summary, peak_exposure, len(rows))
         return {
             "code": code,
             "currency": "USD" if code.startswith("US.") else "HKD",
@@ -111,21 +145,46 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
             "n_days": len(rows),
             "start": rows[0]["date"], "end": rows[-1]["date"],
             "rows": rows,
-            "summary": {
-                "n_buy": n_buy, "n_sell": n_sell,
-                "n_both": n_both, "n_none": n_none,
-                "buy_amount": _r(buy_amt), "sell_amount": _r(sell_amt),
-                "cash_flow": _r(cash),
-                "end_pos": pos, "last_close": _r(last_close),
-                "mark_value": _r(mark),
-                "total_pnl": _r(cash + mark),
-                "min_pos": min(r["pos"] for r in rows),
-                "max_pos": max(r["pos"] for r in rows),
-            },
+            "summary": summary,
         }
     finally:
         if own_conn:
             conn.close()
+
+
+TRADING_DAYS_PER_YEAR = 252
+
+
+def compute_returns(summary: dict, peak_exposure: float, n_days: int) -> dict:
+    """把绝对盈亏折成收益率。纯算术，不碰库，便于单测。
+
+    分母的选择见模块 docstring。两个分母都可能为 0（窗口内一次没成交，
+    或成交后净持仓始终为 0 → 从未占款），此时对应收益率返回 None，
+    而不是 0.0 —— 「没有本金可言」和「本金收益为零」是两回事，
+    前端要能区分着显示（显示 — 而非 0.00%）。
+    """
+    total = summary.get("total_pnl") or 0.0
+    buy_amt = summary.get("buy_amount") or 0.0
+    sell_amt = summary.get("sell_amount") or 0.0
+
+    # 平均单边成交额：买卖各算一次会把同一笔来回重复计数，故取均值
+    turnover = (buy_amt + sell_amt) / 2.0
+    turnover_return = (total / turnover) if turnover > 0 else None
+    capital_return = (total / peak_exposure) if peak_exposure > 0 else None
+
+    # 线性年化（非复利）：样本太短，复利年化会把噪声放大成荒谬的数字
+    annualized = None
+    if capital_return is not None and n_days > 0:
+        annualized = capital_return * TRADING_DAYS_PER_YEAR / n_days
+
+    return {
+        "turnover": _r(turnover),
+        "peak_exposure": _r(peak_exposure),
+        "turnover_return": _r(turnover_return, 6),
+        "capital_return": _r(capital_return, 6),
+        "annualized_return": _r(annualized, 6),
+        "trading_days_per_year": TRADING_DAYS_PER_YEAR,
+    }
 
 
 def _empty(code: str, days: int) -> dict:
@@ -137,6 +196,7 @@ def _empty(code: str, days: int) -> dict:
             "buy_amount": 0.0, "sell_amount": 0.0, "cash_flow": 0.0,
             "end_pos": 0, "last_close": None, "mark_value": 0.0,
             "total_pnl": 0.0, "min_pos": 0, "max_pos": 0,
+            "returns": compute_returns({}, 0.0, 0),
         },
     }
 
@@ -153,6 +213,47 @@ def _f(v) -> Optional[float]:
 
 def _r(v, nd: int = 2):
     return None if v is None else round(float(v), nd)
+
+
+def aggregate_returns(results: list[dict]) -> list[dict]:
+    """把多支标的汇总成「组合收益率」，**按币种分组**。
+
+    跨币种不相加（项目通用口径：USD 与 HKD 是两种钱，混加无意义）——
+    所以返回的是一个 list，每个币种一条，而不是一个总数。
+
+    组合分母同样取「各标的之和」：
+      turnover      = Σ 各标的平均单边成交额
+      peak_exposure = Σ 各标的峰值占款
+    注意 Σ 峰值 ≥ 组合真实峰值（各标的的峰值未必同一天出现），
+    故组合口径比单票更保守——这是有意为之，宁可低估收益率。
+    """
+    by_cur: dict[str, dict] = {}
+    for r in results:
+        if not r.get("n_days"):
+            continue
+        s, q = r["summary"], r["summary"]["returns"]
+        g = by_cur.setdefault(r["currency"], {
+            "currency": r["currency"], "codes": [], "n_days": 0,
+            "total_pnl": 0.0, "turnover": 0.0, "peak_exposure": 0.0,
+        })
+        g["codes"].append(r["code"])
+        g["n_days"] = max(g["n_days"], r["n_days"])   # 各票窗口长度可能不一
+        g["total_pnl"] += s["total_pnl"] or 0.0
+        g["turnover"] += q["turnover"] or 0.0
+        g["peak_exposure"] += q["peak_exposure"] or 0.0
+
+    out = []
+    for g in by_cur.values():
+        rt = compute_returns(
+            {"total_pnl": g["total_pnl"],
+             # compute_returns 用 (buy+sell)/2 求平均单边额，这里已是平均额，
+             # 故两边各传一份，除以 2 后还原回 g["turnover"]
+             "buy_amount": g["turnover"], "sell_amount": g["turnover"]},
+            g["peak_exposure"], g["n_days"])
+        g["total_pnl"] = _r(g["total_pnl"])
+        g["returns"] = rt
+        out.append(g)
+    return sorted(out, key=lambda x: x["currency"])
 
 
 def run_many(codes: list[str], days: int = 30, db_path=None) -> list[dict]:

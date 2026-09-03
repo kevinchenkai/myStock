@@ -663,6 +663,39 @@ th.sortable .arrow { font-size: 9px; color: var(--accent); margin-left: 3px; }
 .ml-st { display: flex; flex-direction: column; gap: 2px; }
 .ml-st b { font-size: 18px; font-variant-numeric: tabular-nums; line-height: 1.2; }
 .ml-st span { font-size: 11px; color: var(--muted); letter-spacing: .03em; }
+/* 收益率一排：与绝对盈亏那排区分开——用 accent 描边，避免看成同一组数 */
+.ml-ret { border-color: var(--accent-soft); border-left: 3px solid var(--accent); }
+.ml-st i {
+  display: block; font-style: normal; font-size: 10px;
+  color: var(--muted); opacity: .8; margin-top: 1px;
+}
+.subtab .ml-rp {
+  font-size: 10px; margin-left: 4px; opacity: .75;
+  font-variant-numeric: tabular-nums;
+}
+.subtab.active .ml-rp { color: #fff; }
+
+/* 组合汇总：按币种一行 */
+.ml-totals {
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--panel-2); padding: 12px 16px; margin-bottom: 14px;
+}
+.ml-tt {
+  font-size: 11px; color: var(--muted); letter-spacing: .04em;
+  margin-bottom: 8px;
+}
+.ml-total {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 18px;
+  padding: 8px 0; border-top: 1px dashed var(--border);
+}
+.ml-total:first-of-type { border-top: 0; padding-top: 0; }
+.ml-tl { min-width: 190px; display: flex; align-items: baseline; gap: 8px; }
+.ml-tl b { font-size: 14px; letter-spacing: .04em; }
+.ml-tl span { font-size: 11px; }
+.ml-tv { display: flex; flex-direction: column; gap: 1px; }
+.ml-tv b { font-size: 16px; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.ml-tv span { font-size: 10.5px; color: var(--muted); letter-spacing: .03em; }
+
 .ml-drift { margin-bottom: 12px; color: var(--text-soft); }
 .ml-dlab { font-size: 11px; margin-bottom: 2px; }
 .ml-svg { width: 100%; height: auto; font: 10px sans-serif; display: block; }

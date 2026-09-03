@@ -235,6 +235,9 @@ def api_ml_strategy():
     策略：基准日 T 收盘后拿到 [L̂, Ĥ] → 次一交易日同时挂限价买 L̂ / 限价卖 Ĥ，
     各一手（美股 10 股 / 港股 100 股）。撮合走 1h K 线，假设现金与持仓充足。
 
+    收益率没有天然本金，故给两个分母：成交额收益率（total/平均单边成交额）与
+    占款收益率（total/峰值 |净持仓|×收盘），另附线性年化。口径详见 ml/strategy.py。
+
     参数：codes=逗号分隔富途代码（默认 4 支）、days=回溯交易日数（默认 30，上限 400）。
     计算在 mystock.ml.strategy（纯函数）里，本处只做参数校验与透传。
 
@@ -243,7 +246,7 @@ def api_ml_strategy():
     """
     try:
         from ..ml import config as mlcfg
-        from ..ml.strategy import run_many
+        from ..ml.strategy import aggregate_returns, run_many
     except ImportError as e:  # ML 子包依赖缺失
         return jsonify({"error": f"ML 模块不可用: {e}"}), 503
 
@@ -263,11 +266,14 @@ def api_ml_strategy():
         days = 30
     days = max(1, min(days, ML_MAX_DAYS))
 
+    results = run_many(codes, days)
     return jsonify({
         "days": days,
         "codes": codes,
         "targets": list(mlcfg.TARGETS),
-        "results": run_many(codes, days),
+        "results": results,
+        # 组合收益率按币种分组（USD/HKD 不相加，同资产趋势口径）
+        "totals": aggregate_returns(results),
         "note": ("盈亏未扣佣金/印花税/平台费/融券成本/滑点；"
                  "假设现金与持仓充足，净持仓可为负（裸空）。"),
     })

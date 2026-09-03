@@ -59,3 +59,121 @@ def test_empty_result_hk_currency_and_lot():
     r = st._empty("HK.00700", 30)
     assert r["currency"] == "HKD"
     assert r["lot"] == 100
+
+
+# ---- 收益率口径（compute_returns，纯算术）----
+def test_turnover_return_uses_average_one_way_amount():
+    """分母是 (买+卖)/2 —— 买卖各算一次会把同一笔来回重复计数。"""
+    r = st.compute_returns(
+        {"total_pnl": 10.0, "buy_amount": 100.0, "sell_amount": 100.0}, 0.0, 10)
+    assert r["turnover"] == 100.0            # 不是 200
+    assert r["turnover_return"] == pytest.approx(0.1)
+
+
+def test_capital_return_divides_by_peak_exposure():
+    r = st.compute_returns(
+        {"total_pnl": 50.0, "buy_amount": 400.0, "sell_amount": 400.0}, 500.0, 10)
+    assert r["capital_return"] == pytest.approx(0.1)
+    assert r["peak_exposure"] == 500.0
+
+
+def test_annualized_is_linear_not_compounded():
+    """线性年化：样本太短，复利会把噪声放大成荒谬的数字。"""
+    r = st.compute_returns(
+        {"total_pnl": 50.0, "buy_amount": 400.0, "sell_amount": 400.0}, 500.0, 25)
+    # 0.1 * 252 / 25 = 1.008，而非 (1.1)**(252/25)-1 ≈ 1.6
+    assert r["annualized_return"] == pytest.approx(1.008)
+
+
+def test_zero_denominator_returns_none_not_zero():
+    """「没有本金可言」≠「本金收益为零」——前端要能区分显示 — 而非 0.00%。"""
+    r = st.compute_returns({"total_pnl": 0.0, "buy_amount": 0.0,
+                            "sell_amount": 0.0}, 0.0, 30)
+    assert r["turnover_return"] is None
+    assert r["capital_return"] is None
+    assert r["annualized_return"] is None
+
+
+def test_capital_return_none_when_never_held_position():
+    """成交了但净持仓始终为 0（买卖同日抵消）→ 从未占款。"""
+    r = st.compute_returns(
+        {"total_pnl": 5.0, "buy_amount": 100.0, "sell_amount": 105.0}, 0.0, 10)
+    assert r["turnover_return"] is not None   # 有成交额
+    assert r["capital_return"] is None        # 但无占款
+    assert r["annualized_return"] is None
+
+
+def test_negative_pnl_gives_negative_returns():
+    r = st.compute_returns(
+        {"total_pnl": -30.0, "buy_amount": 300.0, "sell_amount": 300.0}, 200.0, 10)
+    assert r["turnover_return"] == pytest.approx(-0.1)
+    assert r["capital_return"] == pytest.approx(-0.15)
+
+
+def test_missing_summary_keys_default_to_zero():
+    """_empty() 传空 dict 进来也不能炸。"""
+    r = st.compute_returns({}, 0.0, 0)
+    assert r["turnover"] == 0.0
+    assert r["turnover_return"] is None
+
+
+def test_empty_result_carries_returns_block():
+    """无数据时也要有 returns，前端不做特判。"""
+    q = st._empty("US.NVDA", 30)["summary"]["returns"]
+    assert q["capital_return"] is None
+    assert q["trading_days_per_year"] == 252
+
+
+# ---- 组合汇总（aggregate_returns）----
+def _mk(code, cur, pnl, turnover, peak, n_days=30):
+    return {"code": code, "currency": cur, "n_days": n_days,
+            "summary": {"total_pnl": pnl,
+                        "returns": {"turnover": turnover, "peak_exposure": peak}}}
+
+
+def test_aggregate_groups_by_currency_never_sums_across():
+    """USD 与 HKD 是两种钱，混加无意义——必须分成两组。"""
+    out = st.aggregate_returns([
+        _mk("US.NVDA", "USD", 100.0, 1000.0, 500.0),
+        _mk("HK.00700", "HKD", 200.0, 2000.0, 1000.0),
+    ])
+    assert [g["currency"] for g in out] == ["HKD", "USD"]   # 按币种排序
+    assert [g["total_pnl"] for g in out] == [200.0, 100.0]
+
+
+def test_aggregate_sums_within_same_currency():
+    out = st.aggregate_returns([
+        _mk("US.NVDA", "USD", 100.0, 1000.0, 400.0),
+        _mk("US.TSLA", "USD", 50.0, 500.0, 100.0),
+    ])
+    assert len(out) == 1
+    g = out[0]
+    assert g["total_pnl"] == 150.0
+    assert g["returns"]["turnover"] == 1500.0
+    assert g["returns"]["peak_exposure"] == 500.0
+    # 组合成交额收益率 = 150 / 1500，而非各票收益率的平均
+    assert g["returns"]["turnover_return"] == pytest.approx(0.1)
+    assert g["returns"]["capital_return"] == pytest.approx(0.3)
+
+
+def test_aggregate_skips_empty_results():
+    out = st.aggregate_returns([
+        _mk("US.NVDA", "USD", 100.0, 1000.0, 500.0),
+        st._empty("US.TSLA", 30),
+    ])
+    assert len(out) == 1
+    assert out[0]["codes"] == ["US.NVDA"]
+
+
+def test_aggregate_of_nothing_is_empty_list():
+    assert st.aggregate_returns([]) == []
+    assert st.aggregate_returns([st._empty("US.NVDA", 30)]) == []
+
+
+def test_aggregate_uses_longest_window_for_annualization():
+    """各票窗口长度可能不一，年化取最长的那个（更保守）。"""
+    out = st.aggregate_returns([
+        _mk("US.NVDA", "USD", 100.0, 1000.0, 500.0, n_days=20),
+        _mk("US.TSLA", "USD", 0.0, 500.0, 500.0, n_days=30),
+    ])
+    assert out[0]["n_days"] == 30
