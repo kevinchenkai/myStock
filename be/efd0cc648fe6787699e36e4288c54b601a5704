@@ -1,0 +1,20 @@
+README.md
+  s_7f7116297cfabc::t_2b26d788d59dae 435
+  s_7f7116297cfabc::t_5ebbbd3168a558 336-357,376
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "beefd0cc648fe6787699e36e4288c54b601a5704",
+  "prompts": {},
+  "sessions": {
+    "s_7f7116297cfabc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4234f358-6fb9-4005-af79-be2f8b037cad",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
