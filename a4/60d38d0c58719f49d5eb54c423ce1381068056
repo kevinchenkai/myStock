@@ -1,0 +1,25 @@
+README.md
+  s_7f7116297cfabc::t_fdf3f9cbed1ca8 443-444
+docs/COLLABORATION.md
+  s_7f7116297cfabc::t_81e524d3196dea 1-115
+CLAUDE.md
+  s_7f7116297cfabc::t_05ffd7f4a9eefc 77-87
+docs/OPEN_ITEMS.md
+  s_7f7116297cfabc::t_7bb0e999809566 1-62
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "a460d38d0c58719f49d5eb54c423ce1381068056",
+  "prompts": {},
+  "sessions": {
+    "s_7f7116297cfabc": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4234f358-6fb9-4005-af79-be2f8b037cad",
+        "model": "claude-opus-5"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
