@@ -18,6 +18,7 @@ import pandas as pd
 from ..code_map import futu_market_of, futu_to_yf
 from . import config as mlcfg
 from . import db as mldb
+from . import sessions
 
 try:
     import yfinance as yf
@@ -62,7 +63,7 @@ def fetch_daily(futu_code: str, now: str, max_retries: int = 3,
             "splits": _f(r, "Stock Splits"),
             "synced_at": now,
         }
-        if _ohlc_ok(row):   # 丢弃 NaN/不完整行（防脏数据进库污染回测）
+        if _ohlc_ok(row) and sessions.daily_final(futu_code, row, sessions.utc(now)):
             rows.append(row)
     return rows
 
@@ -101,7 +102,7 @@ def fetch_hourly(futu_code: str, now: str, max_retries: int = 3,
             "volume": _f(r, "Volume"),
             "synced_at": now,
         }
-        if _ohlc_ok(row):   # 丢弃 NaN/不完整行（同上，1h 撮合 bars 也须干净）
+        if _ohlc_ok(row) and sessions.hourly_final(futu_code, row, sessions.utc(now)):
             rows.append(row)
     return rows
 
@@ -179,11 +180,7 @@ def _ohlc_ok(row: dict) -> bool:
     None；若写进库，回测 mark_next 取到 NaN → 净值曲线整条被污染 → 报告总览显示
     nan。故在采集层就地丢弃——宁可当天少一根，也不让脏行进库（DATA.md §4）。
     """
-    for k in ("open", "high", "low", "close"):
-        v = row.get(k)
-        if v is None or v != v or v <= 0:   # None / NaN / 非正
-            return False
-    return True
+    return sessions.ohlc_ok(row)
 
 
 def _latest_date(conn, sym: str) -> str | None:
@@ -243,9 +240,28 @@ def run(full: bool = False) -> None:
     mldb.init_ml_db()
     conn = mldb.get_ml_connection()
     now = mldb.now_str()
+    failures = []
+    outcomes = []
+    warnings = sessions.calendar_warnings(sessions.utc(now))
     try:
+        for warning in warnings:
+            print(f"Calendar warning: {warning}")
+            mldb.log_sync(conn, 'calendar', status=warning['status'], message=str(warning))
         for code in mlcfg.TARGETS:
             sym = futu_to_yf(code)
+            try:
+                st = sessions.state(code, sessions.utc(now))
+            except sessions.Unavailable as e:
+                detail = str(e)
+                outcomes.append(dict(code=code, status=e.status, detail=detail))
+                failures.append(f'{sym}:{e.status}: {detail}')
+                mldb.log_sync(conn, 'session', symbol=sym, status=e.status, message=detail)
+                print(f'  {sym}: {e.status}: {detail}')
+                continue
+            outcomes.append(dict(code=code, **st))
+            if st["status"] != "ready":
+                mldb.log_sync(conn, "session", symbol=sym, status=st["status"])
+                continue
             # 日线与 1h 各自按缺口挑窗（互不牵连；--full 一律全量）
             d_period = None if full else _period_for(_gap_days(_latest_date(conn, sym)), D_TIERS)
             h_period = None if full else _period_for(_gap_days(_latest_date_1h(conn, sym)), H_TIERS)
@@ -254,25 +270,29 @@ def run(full: bool = False) -> None:
             # 日线
             try:
                 rows = fetch_daily(code, now, period=d_period)
+                if not rows: failures.append(f"{sym}:empty_daily")
                 n = mldb.upsert(conn, "ml_quotes_1d", rows)
                 rng = (rows[0]["date"], rows[-1]["date"]) if rows else ("", "")
                 mldb.log_sync(conn, "yf_1d", symbol=sym, range_start=rng[0],
-                              range_end=rng[1], row_count=n, message=f"{d_tag} {n} daily rows")
+                              range_end=rng[1], row_count=n, status="ok" if n else "empty", message=f"{d_tag} {n} daily rows")
                 print(f"  [1d/{d_tag}] {sym}: {n} rows {rng[0]}..{rng[1]}")
             except Exception as e:  # noqa: BLE001
                 mldb.log_sync(conn, "yf_1d", symbol=sym, status="error", message=str(e))
+                failures.append(f"{sym}:daily_error")
                 print(f"  [1d] {sym}: ERROR {e}")
 
             # 1h
             try:
                 rows = fetch_hourly(code, now, period=h_period)
+                if not rows: failures.append(f"{sym}:empty_hourly")
                 n = mldb.upsert(conn, "ml_quotes_1h", rows)
                 rng = (rows[0]["ts_utc"], rows[-1]["ts_utc"]) if rows else ("", "")
                 mldb.log_sync(conn, "yf_1h", symbol=sym, range_start=rng[0],
-                              range_end=rng[1], row_count=n, message=f"{h_tag} {n} hourly rows")
+                              range_end=rng[1], row_count=n, status="ok" if n else "empty", message=f"{h_tag} {n} hourly rows")
                 print(f"  [1h/{h_tag}] {sym}: {n} rows {rng[0]}..{rng[1]}")
             except Exception as e:  # noqa: BLE001
                 mldb.log_sync(conn, "yf_1h", symbol=sym, status="error", message=str(e))
+                failures.append(f"{sym}:hourly_error")
                 print(f"  [1h] {sym}: ERROR {e}")
 
         # 交易事实快照（只读生产库）
@@ -282,11 +302,21 @@ def run(full: bool = False) -> None:
                   f"positions={counts['ml_positions']}")
         else:
             print(f"  [prod] 跳过：生产库 {mlcfg.PROD_DB_PATH} 不存在（H20 上无需）")
+    except Exception as e:
+        failures.append(f'{type(e).__name__}: {e}')
+        raise
     finally:
         conn.close()
+        from .pipeline import write_data_status
+        write_data_status(outcomes, failures, warnings)
+    if failures: raise RuntimeError(";".join(failures))
     print(f"完成 → {mlcfg.ML_DB_PATH}")
 
 
 if __name__ == "__main__":
     import sys
-    run(full="--full" in sys.argv)
+    try:
+        run(full="--full" in sys.argv)
+    except RuntimeError as e:
+        print(f'采集未完成：{e}', file=sys.stderr)
+        raise SystemExit(1)

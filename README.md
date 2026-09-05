@@ -10,7 +10,7 @@
 | **二、ML（预测与回测）** | 预测次日高低区间（分位回归 + CQR 校准）、1h K 线模拟撮合、规则/bandit 历史对照；人工生成 HTML 报告，按需发布 | `bash scripts/ml.sh data` → `train` → 按需 `publish` | `data/ml/mystock_ml.db`（独立库） |
 
 **ML 报告对外页面（公网，人工运行并发布后更新）**：<https://g.ismayday.com/mystock/>
-（首页 = 最新报告，`.../<date>/` = 历史归档）
+（当前 publish 仅覆盖首页 index.html；新报告按 run 在本地归档，不再上传日期目录）
 
 - 一处汇总：持仓、历史订单、历史成交、每日行情、账户资金、资金流向、美元汇率。
 - 数据本地化：抓取一次后离线可查，支持增量更新。
@@ -20,7 +20,7 @@
 
 > 单用户、单机、无需登录鉴权。市场范围：**仅 HK 与 US**。
 
-## 当前升级状态（2026-09-04）
+## 当前升级状态（2026-09-05）
 
 核心目标：预测指定股票下一交易日的低价／高价，辅助人类低买高卖，并在明确本金、库存和费用后比较周期权益。风险覆盖区间与执行报价分开评估；系统不自动下单。
 
@@ -28,12 +28,12 @@
 | --- | --- |
 | 升级前备份 | 已备份 Web、ML、完整 data、配置与 Git 历史；137 个文件解压哈希和两库 integrity_check 通过。[备份记录与恢复说明](docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md) |
 | 执行负责人 | **Codex Astra**，在 `codex/ml-upgrade-20260904` 隔离工作树及数据副本实施。[执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md) |
-| 已观察到的进展 | 执行分支已有第一批提交 `c84ac9e`：session 守卫、只读路径、人工管线状态；分支日志记录首轮回归 176 passed、1 deselected。本次 README 同步未独立复测或完成代码验收 |
-| 后续范围 | 不可覆盖预测版本与基线 → 小模型消融 → 受约束库存回溯与 Web 联动；各批按工单验收，模型无增益也继续交付回溯可用性 |
+| 已观察到的进展 | 四批工程已实现：session 守卫、不可覆盖版本、E0–E5 实验、受约束回放与 `/ml-next`；历史副本已补齐 20/60/120 session。Claude 合并前修复及验证见 [修复回执](docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md) |
+| 后续范围 | Claude 复核、部署副本迁移演练及合并；E0–E5 无候选达模型晋级门槛，证券规则历史与快照保留策略等继续跟踪 |
 | 运行边界 | **升级分支尚未合入 main，当前服务和原数据库未切换**；近期人工触发，自动调度后议；前向 shadow 与生产切换另行进行 |
 | 方案／讨论 | [Codex v1.4](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)、[Claude 合并稿 v0.2.1](docs/ML_CLAUDE_UPGRADE_MERGED.md)、[Claude 原方案](docs/ML_UPGRADE_PLAN.md) |
 
-以下功能说明以当前 main 的既有实现为准。升级分支上的实现与测试结果不等于生产已生效；详细执行日志和实验结果随该分支交付。
+以下说明以本升级分支代码为准，保留 main `885e8f7` 的已核实限制。分支实现与测试结果不等于生产已生效；详细执行日志和实验结果随分支交付。
 
 ---
 
@@ -199,9 +199,9 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 > 一页速览见 [`docs/ML_OVERVIEW.md`](docs/ML_OVERVIEW.md)；完整方案与决策记录见 [`docs/ML_PLAN.md`](docs/ML_PLAN.md)。
 > 代码在 [`mystock/ml/`](mystock/ml/)，独立库 `data/ml/mystock_ml.db`，与 Web 生产库分库。
 
-升级已经进入 Astra 隔离分支实施，进度与备份入口见文首状态表。当前 main 尚无完整收盘／发布守卫及不可覆盖预测留档；具体修复与验收见 [执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md)。
+升级已经进入 Astra 隔离分支实施，进度与备份入口见文首状态表。本分支已提供收盘／发布守卫及不可覆盖预测留档，尚未切换生产；具体修复与验收见 [执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md)。
 
-**对外页面**：<https://g.ismayday.com/mystock/>（人工运行并发布报告后更新；首页 = 最新报告，`.../<date>/` = 历史归档）
+**对外页面**：<https://g.ismayday.com/mystock/>（人工运行并发布报告后更新；当前 publish 仅更新首页；新历史归档留在本地 reports/runs/）
 
 ## 2.1 要解决的问题与设计
 
@@ -231,7 +231,7 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 - 美股（USD）：**NVDA 英伟达 / TSLA 特斯拉 / PDD 拼多多**
 - 港股（HKD）：**HK.00700 腾讯 / HK.09988 阿里 / HK.01810 小米**
 
-独立库 `data/ml/mystock_ml.db`（已 gitignore），七张表（见 [`mystock/ml/schema.sql`](mystock/ml/schema.sql)）：
+独立库 `data/ml/mystock_ml.db`（已 gitignore），八张表（见 [`mystock/ml/schema.sql`](mystock/ml/schema.sql)）：
 
 | 表 | 覆盖 | 用途 |
 | --- | --- | --- |
@@ -240,7 +240,8 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 | `ml_deals` 成交快照 | 2025-01 起 | 撮合校准 + human 回放基线 |
 | `ml_orders` 委托快照 | 2025-01 起 | 撮合吻合率校准 |
 | `ml_positions` 持仓快照 | 若干快照日 | 当前状态 |
-| `ml_predictions` 预测留档 | 2026-06-22 起，存在缺口及多种 source；同 code/as_of 可被覆盖 | 既有报告复盘；不可覆盖版本表尚未合入 main |
+| `ml_predictions` 旧版投影 | 保留已有多来源历史；后续仅有效 live 写入／更新 | 旧 Tab 逐行显示来源，不能据此证明发布时间 |
+| `ml_prediction_versions` 不可覆盖版本 | 同 run 同值幂等、冲突拒绝；旧数据为审计记录 | v2、有效 live 报告复盘与显式离线重建 |
 | `ml_sync_log` | — | 采集日志 |
 
 行情来自 yfinance（`auto_adjust=False`，留 close + adj_close，指标用 adj_close）；
@@ -273,16 +274,16 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 | `report.py` | 每日 HTML 报告（自包含、零 JS、红涨绿跌） |
 | `review.py` | 预测 vs 次日实际的对齐与命中判定（纯函数） |
 | `backfill.py` | 预测留档回填 / 缺口重算补齐（幂等） |
-| `strategy.py` | 按预测区间挂单的查询与回溯，供 Web `/api/ml/strategy`；数据库级只读保证在升级分支修复 |
+| `strategy.py` | 按预测区间挂单的查询与回溯，供 Web `/api/ml/strategy`；数据库连接只读 |
 | `offline_rl.py` | 离线 RL（Discrete CQL，需 d3rlpy/GPU；**已验证为负结果**） |
 
 **一个入口 `ml.sh` 搞定三件事**。S0/预测/回测/报告全是 CPU 算法，**本机 `mk` 环境即可，无需 GPU**（仅离线 RL 需 GPU）：
 
 ```bash
 bash scripts/ml.sh data       # ① 例行更新数据（增量优先）
-bash scripts/ml.sh train      # ② 训练/评估：撮合校准 → 预测 → 回测 → 生成报告
-bash scripts/ml.sh publish    # ③ 发布 HTML 报告到公网
-bash scripts/ml.sh all        # 三步一条龙（默认；包含公网发布）
+bash scripts/ml.sh train      # ② 冻结输入、回测与预测、生成报告；打印回执路径
+bash scripts/ml.sh publish "data/ml/receipts/<train-run-id>.json"  # ③ 使用 train 打印的真实路径
+bash scripts/ml.sh all        # 显式选择三步执行，包含公网发布；无参数仅帮助
 ```
 
 > **增量缓存**：`data` 采集增量优先——库中最新日期距今 ≤5 天则只抓短窗（日线近 1 月 / 1h 近 5 天），UPSERT 与全量历史在库内合并，不重抓 5 年（例行从 ~30s 降到 ~11s）。日线 / 1h **各按自身缺口挑档**，避免 1h 连续失败时被日线新鲜度掩盖成永久空洞。首次或补全历史用 `python -m mystock.ml.fetch --full`。
@@ -295,7 +296,9 @@ bash scripts/ml.sh train      # 使用更新后的数据训练、评估并生成
 ```
 
 **发布目标**可用环境变量覆盖：`PUB_HOST`、`PUB_DIR`、`MYSTOCK_ML_ENV`。
-当前代码尚无完整收盘守卫，盘中运行可能把未收盘价格标为收盘；按目标市场确认收盘并更新数据后再生成报告。拟议的按市场跳过、缓存确认和发布截止检查见 [升级方案 §5.1](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)。`scripts/ml.sh` 中的 cron 注释属于旧示例，不表示已配置自动任务。
+本分支按市场守卫：盘中跳过，训练只取已确认收盘数据；US 截止为当地 09:30，HK 为 09:00。迁移后须先 `data` 再 `train`，无时区旧缓存可能报 `awaiting_final_data`；最新特征不完整报 `feature_gap`，需补齐输入。日历覆盖至 2027-12-31，剩余不足 60 日写日志和回执预警，越界拒绝并提示更新日历。
+
+`train` 打印回执路径，可在另一个终端执行 `ml.sh publish <该路径>`；也可显式设置 `MYSTOCK_ML_RECEIPT`，若设置 `MYSTOCK_ML_RUN_ID` 则必须匹配。不会自动选择最新文件。只有 generated/partial 且哈希匹配、未过截止的产物可发布。`all_skipped` 不上传旧报告。数据回执为 `<run>.data.json`，不能用于发布；目前任一标的采集空值或失败仍会让 `all` 整步停止。没有配置自动调度。
 
 `publish` 会把本地报告推到公网服务器，**须由用户自己执行**（报告含真实交易信息）；自动发布调度暂不配置。
 
@@ -344,11 +347,11 @@ bash scripts/ml.sh train      # 使用更新后的数据训练、评估并生成
 
 与每日 HTML 报告的分工 —— **报告是当日快照**（人工运行产出、可发布、可离线存档）；**Web 端是实时查询**，参数一改立刻按当前库重算，适合调参与临时探查。入口在 `bash scripts/server.sh` 起的页面（:8888）「ML 挂单回溯」Tab。
 
-- **策略**：使用基准日 T 的 `[L̂, Ĥ]`，在下一条已有日线对应日期同时模拟限价买 L̂／卖 Ĥ。main 当前每笔按 `LOT_BY_MARKET` 固定 **US 10 股／HK 100 股**；这是代码参数，不是经核实的港股统一交易单位。
+- **策略**：使用基准日 T 的 `[L̂, Ĥ]`，在下一市场 session 同时模拟限价买 L̂／卖 Ĥ。旧版每笔按 `LOT_BY_MARKET` 固定 **US 10 股／HK 100 股**；这是代码参数，不是经核实的港股统一交易单位。
 - **撮合**复用 `simulator.match_limit_order`（1h K 线），可处理跨 bar 触达和开盘跳空；同 bar 内高低先后及真实排队成交仍不确定。
 - **盈亏** = 现金流净额（卖 − 买）+ 期末净持仓按最后收盘折算。
 - **接口**：`GET /api/ml/strategy?codes=US.NVDA,HK.00700&days=30`，返回逐日 `results` + 按币种分组的组合 `totals`。
-- **窗口限制**：main 先筛选可用预测／行情，再取 N 条，缺失日可能被隐藏；目前的 days=30 不能解释为完整最近 30 个市场 session。升级分支会保留逐日缺口。
+- **窗口限制**：按最近 N 个市场 session 展示，缺日线／预测／小时线保留状态行。逐行 source 区分离线重建、历史回填和 live 留档；旧 live 标签不等于有效发布时间证明。
 
 ### 收益率：先声明分母，否则是个无意义的数
 
@@ -373,6 +376,10 @@ bash scripts/ml.sh train      # 使用更新后的数据训练、评估并生成
 
 > **已知局限**：2026-09-04 调研中，六股各自最近 30 个可用预测日均没有双边同时触达，结果可能含负库存与期末未平仓。当前模拟未落实现金／可售库存约束，也未扣佣金、税费、融券成本及滑点，不能当作人类已实现净收益。不同窗口的结果需共同展示，不能挑收益最好的窗口当验证成绩。
 
+### v2 研究页面 `/ml-next`
+
+复用全站主题，提供 20/60/120 session 回放及本金、库存、lot/tick、费用等参数。默认展示已标注的历史重建；下一目标日预测卡片只读有效 live，所以历史完整仍可能显示缺 live。API 为 `/api/ml/v2/{latest,review,compare,facts}`，仍为只读计算。证券规则尚未自动接入页面，港股 lot 需核验并填写，不能统一假设 100 股。有效预测保存在版本表，离线重建不能当作前向 shadow。
+
 ## 2.7 ML 侧测试
 
 ```bash
@@ -389,7 +396,7 @@ conda activate mk && python -m pytest tests/ -q
 | `test_ml_simulator.py` | 1h 限价撮合（先触低 / 先触高、未成交、跨 bar） |
 | `test_ml_policy.py` | S0 规则与 LinUCB（含 ε 探索） |
 | `test_ml_strategy.py` | 挂单回溯的手数分档、现金流与净持仓折算；四个收益率口径（含分母为 0 返回 None、现金最低点非期末余额、纯裸空、按币种组合汇总） |
-| `test_ml_review.py` | 命中判定、按已有日线对齐次日、上破／下破／双破分类；正式市场日历测试在升级分支补齐 |
+| `test_ml_review.py` | 命中判定、按已有日线对齐次日、上破／下破／双破分类；正式市场日历见 sessions 测试 |
 | `test_ml_fetch.py` | 增量窗按表独立挑档、脏 OHLC 行拦截 |
 | `test_ml_nan_guard.py` | NaN 三层防护回归（移除第 ② 层即 FAIL，证明是真守卫） |
 | `test_ml_offline_rl.py` | 离线 RL 数据构造（无 GPU 时跳过训练） |
@@ -410,7 +417,9 @@ myStock/
 │   ├── mystock.db                  # Web 生产库（运行时生成，.gitignore）
 │   └── ml/
 │       ├── mystock_ml.db           # ML 独立库（.gitignore）
-│       └── reports/<date>/         # 每日 HTML 报告归档
+│       ├── runs/<run-id>/          # 私有 input.db + manifest，当前逐次完整冻结
+│       ├── receipts/               # train 回执与独立 data 回执
+│       └── reports/runs/<run-id>/   # 本地 HTML 报告；latest.html 为副本
 ├── scripts/
 │   ├── {init,update,server}.sh     # Web：初始化 / 增量 / 起服务
 │   └── ml.sh                       # ML：data|train|publish|all 统一入口
@@ -506,7 +515,7 @@ PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/ -q -p no:cacheprovider --ignor
 - **历史成交为空**：确认 `trd_env: REAL`（成交接口仅支持实盘）。
 - **某些股票没有行情**：退市 / yfinance 无数据的标的会进入 `quote_skiplist` 跳过名单，属正常；个股详情页会提示「行情数据不足」，不影响其交易记录展示。
 - **`init.sh` / `update.sh` 可重复执行**：写库幂等，重复运行不会产生重复数据；当天数据按覆盖处理。
-- **ML 页面 / `/api/ml/strategy` 返回 503**：ML 库不存在或 ML 依赖缺失，先跑 `bash scripts/ml.sh data`。其余页面不受影响。
+- **ML 页面返回 503**：检查 ML 库路径、schema 和数据；新库按部署次序初始化并 `data`。缺库可隔离为接口错误，但依赖缺失不同：Web 顶层加载 ML API → service → pandas/numpy，缺这些包可能让整个 Web 无法启动，应先安装环境依赖。
 - **ML 报告某列显示「—」**：可能为数据不足、非有限值或指标分母不可用；应结合输入日期和日志排查，不能只凭显示「—」认定整条管线数据有效。
 - **升级功能为何还没出现在当前页面**：Astra 正在独立分支实施，main 和当前运行服务尚未切换；分支测试完成后仍需代码审查、数据迁移演练及切换步骤。
 

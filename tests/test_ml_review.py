@@ -153,8 +153,8 @@ def test_parse_report_html_ignores_unrelated():
     assert backfill.parse_report_html("<p>无预测内容</p>") == []
 
 
-def test_collect_dedups_by_latest_report(tmp_path):
-    """同一 as_of 出现在多份报告 → 取报告日期最大的那份。"""
+def test_collect_preserves_each_report_version(tmp_path):
+    """同一 as_of 的每份原始报告保留独立版本。"""
     for day, h in (("2026-08-14", "230.00"), ("2026-08-15", "240.00")):
         d = tmp_path / day
         d.mkdir()
@@ -162,8 +162,10 @@ def test_collect_dedups_by_latest_report(tmp_path):
             "<b>US.NVDA</b> 截至 2026-08-13 收盘 225.30 → 次日预测区间 "
             f"<b>220.62</b> ~ <b>{h}</b>", encoding="utf-8")
     rows = backfill.collect(tmp_path)
-    assert len(rows) == 1
-    assert rows[0]["h_hat"] == pytest.approx(240.00)   # 后一份覆盖
+    assert len(rows) == 2
+    assert rows[0]["h_hat"] == pytest.approx(230.00)
+    assert rows[1]["h_hat"] == pytest.approx(240.00)
+    assert rows[0]["generated_at"] is None
     assert rows[0]["source"] == "backfill"
 
 

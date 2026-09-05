@@ -1,35 +1,42 @@
-"""实验 B（docs/ML_UPGRADE_PLAN.md §3.3 原脚本，只读）：用留档预测看挂单经济性——单边成交后的 1/5 日后续收益（逆向选择）、多日轮回完成率。"""
+"""Conditional event diagnostics only: overlapping events are not portfolio returns.
+Mature 1/5 target sessions; unknown horizons stay pending, never clipped to last row.
+"""
+import argparse
+import json
+from pathlib import Path
 import numpy as np
-from mystock.ml import config as mlcfg, data as mldata, db as mldb
+from mystock.ml import config, data, db, sessions
 from mystock.ml.simulator import match_limit_order, BUY, SELL
-conn = mldb.get_ml_connection()
-for code in mlcfg.TARGETS:
-    daily = mldata.load_daily(code); dates = list(daily["date"]); idx = {d:i for i,d in enumerate(dates)}
-    close = daily["close"].values
-    bars = mldata.intraday_bars_by_day(code)
-    preds = {p["as_of"]: p for p in mldb.load_predictions(conn, code)}
-    buys, sells, rt = [], [], []
-    for as_of, p in sorted(preds.items()):
-        i = idx.get(as_of)
-        if i is None or i+1 >= len(dates) or not bars.get(dates[i+1]): continue
-        d1 = dates[i+1]
-        fb = match_limit_order(BUY, p["l_hat"], bars[d1]); fs = match_limit_order(SELL, p["h_hat"], bars[d1])
-        if fb.filled:
-            r1 = close[i+1]/fb.fill_price-1; r5 = (close[min(i+5,len(close)-1)]/fb.fill_price-1)
-            buys.append((r1, r5))
-            # 多日轮回：买入后逐日用「当日预测 Ĥ」挂卖，直到成交（上限 20 交易日）
-            done = None
-            for k in range(i+1, min(i+21, len(dates)-1)):
-                pk = preds.get(dates[k]); nb = bars.get(dates[k+1])
-                if pk and nb:
-                    f = match_limit_order(SELL, pk["h_hat"], nb)
-                    if f.filled: done = (k+1-(i+1), f.fill_price/fb.fill_price-1); break
-            rt.append(done)
-        if fs.filled:
-            r1 = fs.fill_price/close[i+1]-1; r5 = fs.fill_price/close[min(i+5,len(close)-1)]-1
-            sells.append((r1, r5))
-    b = np.array(buys) if buys else np.zeros((0,2)); s = np.array(sells) if sells else np.zeros((0,2))
-    comp = [x for x in rt if x]
-    print(f"{code}: 买成 {len(b)} 次 → 当日收盘相对成交 {b[:,0].mean()*100 if len(b) else float('nan'):+.2f}% / 5日 {b[:,1].mean()*100 if len(b) else float('nan'):+.2f}% ; "
-          f"卖成 {len(s)} 次 → 成交相对当日收盘 {s[:,0].mean()*100 if len(s) else float('nan'):+.2f}% / 5日 {s[:,1].mean()*100 if len(s) else float('nan'):+.2f}% ; "
-          f"多日轮回完成 {len(comp)}/{len(rt)}，均 {np.mean([c[0] for c in comp]) if comp else float('nan'):.1f} 天、毛利 {np.mean([c[1] for c in comp])*100 if comp else float('nan'):+.2f}%")
+
+def run(path):
+    out=[]
+    with db.get_ml_connection_readonly(path) as conn:
+        for code in config.TARGETS:
+            daily=data.load_daily(code,path); dmap=daily.set_index('date').to_dict('index');bars=data.intraday_bars_by_day(code,path)
+            rows=[]
+            for p in db.load_predictions(conn,code):
+                target=sessions.next_session(code,p['as_of'])
+                if not bars.get(target):continue
+                horizon=sessions.session_days(code,target,sessions.END)[:5]
+                for side,key in [(BUY,'l_hat'),(SELL,'h_hat')]:
+                    f=match_limit_order(side,p[key],bars[target])
+                    if not f.filled:continue
+                    r=dict(side=side,target=target,source=p.get('source'),timing='unverified_legacy',r1=None,r5=None,status='pending')
+                    for h,day in [(1,target),(5,horizon[-1])]:
+                        actual=dmap.get(day)
+                        if actual and sessions.daily_final(code,dict(date=day,**actual),sessions.utc('2026-09-05T06:00:00Z')):
+                            close=actual['close'];r['r'+str(h)]=close/f.fill_price-1 if side==BUY else f.fill_price/close-1
+                    if r['r5'] is not None:r['status']='mature'
+                    rows.append(r)
+            out.append(dict(code=code,events=len(rows),pending=sum(r['status']=='pending' for r in rows),
+                            diagnostics={side:{'n':sum(r['side']==side for r in rows),
+                                              'mean_r1':mean([r['r1'] for r in rows if r['side']==side]),
+                                              'mean_r5':mean([r['r5'] for r in rows if r['side']==side])} for side in [BUY,SELL]}))
+    return out
+
+def mean(values):
+    values=[v for v in values if v is not None and np.isfinite(v)]
+    return float(np.mean(values)) if values else None
+if __name__=='__main__':
+    p=argparse.ArgumentParser();p.add_argument('--db',required=True);p.add_argument('--out',required=True);a=p.parse_args()
+    Path(a.out).write_text(json.dumps(run(a.db),indent=2,allow_nan=False))

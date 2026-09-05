@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS ml_quotes_1h (
     close           REAL,
     volume          REAL,
     synced_at       TEXT,
+    data_source     TEXT NOT NULL DEFAULT 'yfinance',
+    source_ref      TEXT,                 -- SHA256 of original fallback-provider evidence
     PRIMARY KEY (symbol, ts_utc)
 );
 
@@ -117,3 +119,27 @@ CREATE INDEX IF NOT EXISTS idx_ml_q1d_futu ON ml_quotes_1d(futu_code);
 CREATE INDEX IF NOT EXISTS idx_ml_q1h_futu ON ml_quotes_1h(futu_code);
 CREATE INDEX IF NOT EXISTS idx_ml_deals_code ON ml_deals(code);
 CREATE INDEX IF NOT EXISTS idx_ml_orders_code ON ml_orders(code);
+
+-- Immutable prediction content. Lifecycle timestamps may be attached separately.
+CREATE TABLE IF NOT EXISTS ml_prediction_versions (
+    prediction_id TEXT PRIMARY KEY,
+    run_id TEXT NOT NULL,
+    code TEXT NOT NULL,
+    as_of TEXT NOT NULL,
+    target_session TEXT NOT NULL,
+    source TEXT NOT NULL,
+    status TEXT NOT NULL,
+    generated_at TEXT,
+    decision_at TEXT,
+    published_at TEXT,
+    manifest_path TEXT,
+    payload_json TEXT NOT NULL,
+    content_hash TEXT NOT NULL,
+    UNIQUE(run_id, code, as_of, target_session)
+);
+CREATE INDEX IF NOT EXISTS idx_ml_versions_target ON ml_prediction_versions(code,target_session);
+CREATE TRIGGER IF NOT EXISTS ml_versions_no_content_update
+BEFORE UPDATE OF prediction_id,run_id,code,as_of,target_session,source,generated_at,decision_at,manifest_path,payload_json,content_hash
+ON ml_prediction_versions BEGIN SELECT RAISE(ABORT, 'immutable prediction content'); END;
+CREATE TRIGGER IF NOT EXISTS ml_versions_no_delete BEFORE DELETE ON ml_prediction_versions
+BEGIN SELECT RAISE(ABORT, 'immutable prediction history'); END;

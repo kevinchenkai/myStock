@@ -1,19 +1,37 @@
-# ML 升级调研用实验脚本（只读，非生产管线）
+# ML 实验与历史修复工具
 
-与 [`docs/ML_UPGRADE_PLAN.md`](../../docs/ML_UPGRADE_PLAN.md) §3.1 / §3.3 及
-[`docs/ML_CLAUDE_UPGRADE_MERGED.md`](../../docs/ML_CLAUDE_UPGRADE_MERGED.md) 对应的原始脚本，
-原样入库供复现（Codex v1.3 §2.4 的复现前提）。两者都只读 `data/ml/mystock_ml.db`，
-不写库、不抓取、不改模型；数字随库内增量数据微动，2026-09-04 快照的结果已固化在上述文档。
+这些工具不属于每日生产管线。研究输入应使用已冻结的 ML 数据库副本；产物放在忽略目录 `data/upgrade-output/`，不提交真实账户数据。模型实验与历史重建都不能追认当时的 live 预测，也不能作为前向 shadow。
+
+## 只读研究入口
+
+在 `mk` 环境、仓库根目录执行，把占位路径替换为实际冻结副本：
 
 ```bash
 conda activate mk
-PYTHONPATH=. python scripts/ml_experiments/exp_a_baseline.py          # 实验 A：模型 vs 朴素波动率基线 vs 加特征（约 45 s）
-PYTHONPATH=. python scripts/ml_experiments/exp_b_touch_economics.py   # 实验 B：留档预测的触价经济性与多日轮回（约 5 s）
+export MYSTOCK_EXPERIMENT_DB=/absolute/path/to/frozen-input.db
+mkdir -p data/upgrade-output/research
+python -m scripts.ml_experiments.exp_a_baseline
+python -m scripts.ml_experiments.exp_b_touch_economics --db "$MYSTOCK_EXPERIMENT_DB" --out data/upgrade-output/research/touch.json
+python -m scripts.ml_experiments.upgrade_matrix --db "$MYSTOCK_EXPERIMENT_DB" --out data/upgrade-output/research/matrix --seeds 0,1,2
+python -m scripts.ml_experiments.strategy_validation --db "$MYSTOCK_EXPERIMENT_DB" --out data/upgrade-output/research/strategy.json
 ```
 
-- 实验 A 切分：`cv.purged_walk_forward(n_folds=4, min_train=250)`；分位按 `config.alpha_for`；CQR 关。
-  `naive_vol` = 训练集 `quantile(y / vol_20d, α) × 测试日 vol_20d`。`lgb_extra_x` 同时改了特征与容量，
-  是探索性组合而非单机制消融（Codex 已指出，第三批按 E1→E5 拆开）。
-- 实验 B 的「多日轮回」= 买成后逐日用当日留档 Ĥ 挂卖，最多 20 个交易日；不含费用、不设库存上限。
-- 注意：实验 B 里 `mldb.get_ml_connection` 是可写连接（沿用现网 `strategy.py` 的口径）；脚本本身不执行任何写操作。
-  第一批交付后应改为只读连接。
+- A 必须设置 `MYSTOCK_EXPERIMENT_DB`，只读输入，结果打印到终端。purged walk-forward、CQR 关；`naive_vol` 是训练集的收益/波动率分位乘测试日波动率。原 `lgb_extra_x` 同时变更容量和特征，是探索性组合；独立消融用 `upgrade_matrix`。
+- B 现在要求 `--db`、`--out`；只读连接。统计旧版留档触价后的 1/5 session 条件事件收益，重叠事件不是账户收益；成熟性截止固定为 2026-09-05T06:00Z，未成熟项保留 pending。已不执行旧版最多 20 日轮回逻辑。
+- `upgrade_matrix` 写实验文件但不改输入库；E0–E5 结果为负，不支持模型晋级。
+- `strategy_validation` 使用固定历史窗口和合成账户；HK lot=100 是 fixture 参数，不能当作所有港股的真实交易单位。
+
+## 显式写入／补采工具
+
+| 工具 | 行为与参数 |
+| --- | --- |
+| `archive_development` | `--db` 指定可写副本、`--input` 冻结输入、`--matrix` 实验矩阵；追加 recomputed 版本，不能写运行库或覆盖 live |
+| `rebuild_history audit` | `--db --out --end`；只读审计 20/60/120 session 的日线、小时线和预测覆盖 |
+| `rebuild_history repair` | 同上；联网补采到显式副本，保存修复证据 |
+| `rebuild_history rebuild` | 同上；逐日截断／拟合后追加历史预测和 manifest，不生成新 live |
+| `import_futu_hourly` | `--db --csv --code --date --receipt`；验证富途小时桶、日线及重叠数据后导入显式副本，并保留来源证据 |
+| `freeze_calendar` | `--end 2027-12-31`；改写仓库内两份 CSV，需 PMC 5.1.3 / exchange-calendars 4.11.1 隔离工具环境；更新年份先核验交易所公告并同步常量和测试 |
+
+回溯重建只进不可覆盖版本表，旧版投影仅新增经时间验证的 live。已有旧版重建数据继续保留并标注来源。新的 gap 检查同时查询有效版本表，避免因重建不再写旧表而重复计算。
+
+完整执行证据见 [历史修复记录](../../docs/ML_HISTORY_REFRESH_2026-09-05.md)、[升级实验结果](../../docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md)及 [Claude 修复回执](../../docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md)。

@@ -11,7 +11,6 @@ import html
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import backfill as mlbackfill
 from . import config as mlcfg
 from . import data as mldata
 from . import db as mldb
@@ -509,35 +508,65 @@ def _mode_banner(cfg: BTConfig) -> str:
 
 
 def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
-                 rcfg: _ReportCfg | None = None) -> Path:
+                 rcfg: _ReportCfg | None = None, *, db_path=None, clock=None) -> Path | None:
+    from . import sessions
+    from .pipeline import write_status
+    clock = clock or sessions.utc_now
+    statuses = []
+    warnings = sessions.calendar_warnings(clock())
+    from . import runs, versions
+    run_manifest = manifest_path = None
     rcfg = rcfg or _ReportCfg()
     cfg = cfg or BTConfig(
         conformal=rcfg.conformal, target_coverage=rcfg.target_coverage,
     )
     today = dt.date.today().isoformat()
-    out_dir = out_dir or (mlcfg.REPORTS_DIR / today)
-    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # 预测留档：建表 → 首次自动回填历史 HTML（表非空则跳过，见 backfill.run_if_empty）
-    # 每次生成报告都执行，保证 ml.sh 跑一次数据就同步一次，无需人工干预。
-    mldb.init_ml_db()
-    mlbackfill.run_if_empty()
+    # 冻结本次输入；历史 HTML 仅经显式离线导入，不混入 live 留档。
+    mldb.init_ml_db(db_path)
+    with mldb.get_ml_connection(db_path) as conn:
+        for warning in warnings:
+            print(f"Calendar warning: {warning}")
+            mldb.log_sync(conn, 'calendar', status=warning['status'], message=str(warning))
+    run_manifest, manifest_path = runs.start(db_path)
+    run_manifest['warnings'] = warnings
+    input_db = run_manifest["input_path"]
+    run_manifest['seed'] = cfg.seed
+    out_dir = out_dir or (mlcfg.REPORTS_DIR / 'runs' / run_manifest['run_id'])
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     sections, summary_rows, pred_rows = [], "", []
     for code in mlcfg.TARGETS:
-        daily = mldata.load_daily(code)
+        try:
+            daily = sessions.prepare_daily(mldata.load_daily(code, input_db), code, clock())
+        except sessions.Unavailable as e:
+            statuses.append({'code':code, 'status':e.status, 'detail':str(e)})
+            continue
         # 按股自适应 CQR 目标覆盖率（收窄区间；与 ALPHA_BY_CODE 同模式）
         cov = mlcfg.coverage_for(code)
         cfg_i = cfg if cfg.target_coverage == cov else replace(cfg, target_coverage=cov)
-        bt = run_backtest(code, cfg_i)
+        try:
+            bt = run_backtest(code, cfg_i, db_path=input_db, daily=daily)
+        except Exception as e:
+            statuses.append({'code':code,'status':'failed','error':type(e).__name__})
+            continue
         if "error" in bt:
+            statuses.append({"code":code,"status":"failed","error":str(bt["error"])})
             continue
         lo_a, hi_a = mlcfg.alpha_for(code)  # 按股自适应分位（收窄区间）
-        pred = predict_next_day(daily, seed=cfg.seed,
-                                high_alpha=hi_a, low_alpha=lo_a,
-                                conformal=cfg.conformal, target_coverage=cov)
+        try:
+            pred = predict_next_day(daily, seed=cfg.seed, code=code, clock=clock,
+                                    high_alpha=hi_a, low_alpha=lo_a,
+                                    conformal=cfg.conformal, target_coverage=cov)
+        except sessions.Unavailable as e:
+            statuses.append({'code':code,'status':e.status, 'detail':str(e)})
+            continue
+        except Exception as e:
+            statuses.append({'code':code,'status':'failed','error':type(e).__name__})
+            continue
+        statuses.append({'code':code,'status':'generated','target_session':pred['target_session']})
         sections.append(_stock_section(code, bt, pred))
-        # 本次预测留档（PK code+as_of，当天重跑覆盖）——供后续报告做复盘对照
+        # 本次预测按 run 追加；同日多版本并存。
         pred_rows.append({
             "code": code, "as_of": pred["as_of"], "close": pred["close"],
             "l_hat": pred["L_hat"], "h_hat": pred["H_hat"],
@@ -546,6 +575,9 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
             "conformal": int(bool(pred["conformal"])), "q_ret": pred["q_ret"],
             "target_coverage": pred["target_coverage"],
             "backend": bt["backend"], "source": "live",
+            "target_session": pred["target_session"],
+            "run_id": run_manifest["run_id"], "manifest_path": str(manifest_path.resolve()),
+            "generated_at": clock().isoformat(), "decision_at": clock().isoformat(),
         })
         fe = bt["final_equity"]
         b, bh = fe.get("bandit"), fe.get("buy_hold")
@@ -563,7 +595,22 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
 
     # 写入本次预测 + 读回全部留档做复盘（写在渲染前，故当日预测也进表，
     # 但其次日尚未走出 → review 判为 pending，不进复盘表、不污染命中率）
-    conn = mldb.get_ml_connection()
+    # Recheck all targets after all markets trained; never shift stale targets.
+    expired = {p['code'] for p in pred_rows if clock() >= sessions.session(p['code'],p['target_session'])['deadline']}
+    for st in statuses:
+        if st['code'] in expired: st['status']='missed_deadline'
+    pred_rows = [p for p in pred_rows if p['code'] not in expired]
+    if expired:
+        import re
+        for code in expired: summary_rows = re.sub(r"<tr><td>" + re.escape(code) + r"</td>.*?</tr>", "", summary_rows)
+    if expired: sections = [section for section in sections if not any(c in section for c in expired)]
+    with mldb.get_ml_connection(db_path) as status_conn:
+        for st in statuses: mldb.log_sync(status_conn,'prediction_guard',symbol=st['code'],status=st['status'],message=st.get('detail',''))
+    if not pred_rows:
+        runs.finish(run_manifest, manifest_path, pred_rows, statuses)
+        write_status(statuses, None, db_path, warnings=warnings)
+        return None
+    conn = mldb.get_ml_connection(db_path)
     try:
         if pred_rows:
             mldb.upsert_predictions(conn, pred_rows)
@@ -571,7 +618,7 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
                           range_end=today)
         reviews = {
             code: mlreview.review_predictions(
-                mldb.load_predictions(conn, code), mldata.load_daily(code))
+                versions.load(conn, code, source="live"), mldata.load_daily(code, db_path))
             for code in mlcfg.TARGETS
         }
     finally:
@@ -588,6 +635,7 @@ body{{font:14px/1.6 -apple-system,sans-serif;max-width:840px;margin:24px auto;pa
 h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}
 {_REVIEW_CSS}</style></head><body>
 <h1>myStock ML 回测报告 · {today}</h1>
+<p>本次状态：{statuses}</p>
 <p style="color:#888">3 美股(USD) + 3 港股(HKD)，各股独立账户本币计价 · 目标=最大化达成交易净值 · 红涨绿跌 · 离线产物（不碰 web）</p>
 <p style="color:#666;font-size:12px">口径：{_mode_banner(cfg)}</p>
 {_metrics_guide()}
@@ -612,10 +660,17 @@ h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}
     # latest.html 指向最新
     latest = mlcfg.REPORTS_DIR / "latest.html"
     latest.write_text(page, encoding="utf-8")
+    import hashlib
+    run_manifest['artifact_path'] = str(index.resolve())
+    run_manifest['artifact_sha256'] = hashlib.sha256(index.read_bytes()).hexdigest()
+    runs.finish(run_manifest, manifest_path, pred_rows, statuses)
+    write_status(statuses, index, db_path, warnings=warnings)
     return index
 
 
 if __name__ == "__main__":
     p = build_report()
-    print(f"报告已生成：{p}")
+    print(f"报告结果：{p or 'all_skipped'}")
+    from .pipeline import exit_code
+    if exit_code(): raise SystemExit(1)
     print(f"最新副本：{mlcfg.REPORTS_DIR / 'latest.html'}")

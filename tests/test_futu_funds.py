@@ -89,6 +89,7 @@ def test_snapshot_fields_extracts_pan_mian():
     assert set(r0.keys()) == {
         "futu_code", "turnover_rate", "amplitude",
         "week52_high", "week52_low", "snap_synced_at",
+        "lot_size", "price_spread", "rules_effective_from",
     }
     assert r0["futu_code"] == "HK.00700"
     assert r0["turnover_rate"] == 0.399

@@ -19,6 +19,7 @@ from __future__ import annotations
 from typing import Iterable, Optional
 
 import pandas as pd
+from . import sessions
 
 
 def _f(v) -> Optional[float]:
@@ -100,7 +101,7 @@ def review_predictions(preds: Iterable[dict], daily: pd.DataFrame) -> list[dict]
     out = []
     for p in preds:
         as_of = str(p.get("as_of"))
-        nd = nxt.get(as_of)
+        nd = p.get("target_session") or (sessions.next_session(p["code"], as_of) if p.get("code") else nxt.get(as_of))
         out.append(review_one(p, nd, act.get(nd) if nd else None))
     return sorted(out, key=lambda r: str(r["as_of"]))
 

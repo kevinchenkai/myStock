@@ -20,10 +20,8 @@ from ..code_map import futu_to_yf
 
 
 def _conn(db_path: Optional[str] = None) -> sqlite3.Connection:
-    path = str(db_path or mlcfg.ML_DB_PATH)
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    return conn
+    from .db import get_ml_connection_readonly
+    return get_ml_connection_readonly(db_path)
 
 
 def load_daily(symbol_or_code: str, db_path: Optional[str] = None) -> pd.DataFrame:
@@ -31,7 +29,7 @@ def load_daily(symbol_or_code: str, db_path: Optional[str] = None) -> pd.DataFra
     sym = futu_to_yf(symbol_or_code) if "." in symbol_or_code else symbol_or_code
     with _conn(db_path) as c:
         df = pd.read_sql_query(
-            "SELECT date, open, high, low, close, adj_close, volume, dividends, splits "
+            "SELECT date, open, high, low, close, adj_close, volume, dividends, splits, synced_at "
             "FROM ml_quotes_1d WHERE symbol=? ORDER BY date",
             c, params=(sym,),
         )
@@ -44,7 +42,7 @@ def load_hourly(symbol_or_code: str, db_path: Optional[str] = None) -> pd.DataFr
     sym = futu_to_yf(symbol_or_code) if "." in symbol_or_code else symbol_or_code
     with _conn(db_path) as c:
         df = pd.read_sql_query(
-            "SELECT ts_utc, ts_et, open, high, low, close, volume "
+            "SELECT ts_utc, ts_et, open, high, low, close, volume, synced_at "
             "FROM ml_quotes_1h WHERE symbol=? ORDER BY ts_utc",
             c, params=(sym,),
         )
@@ -82,3 +80,30 @@ def load_orders(code: str, db_path: Optional[str] = None) -> pd.DataFrame:
             c, params=(code,),
         )
     return df
+
+
+def complete_bars(code, bars, now=None):
+    """Accept full regular-session coverage on exchange or Yahoo's anchored grid.
+
+    HK Yahoo hourly buckets can straddle lunch (12:30 contains 13:00–13:30).
+    Entirely inactive buckets are excluded; partial/missing sets stay unavailable.
+    """
+    from . import sessions
+    from datetime import timedelta
+    if not bars: return False
+    day=bars[0].get('ts_et','')[:10]
+    try:
+        s=sessions.session(code,day)
+        if not all(sessions.hourly_final(code,b,now) for b in bars):return False
+        stamps=[sessions.utc(b['ts_utc'].replace(' ','T')+'+00:00') for b in bars]
+        expected=[];t=s['open']
+        while t<s['close']:
+            end=min(t+timedelta(hours=1),s['close'])
+            if not s.get('break_start') or not (t>=s['break_start'] and end<=s['break_end']):expected.append(t)
+            t+=timedelta(hours=1)
+        segmented=[]
+        periods=[(s['open'],s['break_start']),(s['break_end'],s['close'])] if s.get('break_start') else [(s['open'],s['close'])]
+        for t,end in periods:
+            while t<end:segmented.append(t);t+=timedelta(hours=1)
+        return len(stamps)==len(set(stamps)) and (set(stamps)==set(expected) or set(stamps)==set(segmented)) and sessions.utc(now or sessions.utc_now())>=s['final_at']
+    except (sessions.Unavailable, ValueError, KeyError):return False

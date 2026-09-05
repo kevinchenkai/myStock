@@ -6,7 +6,7 @@
 撮合复用 simulator.match_limit_order（1h K 线），能判断盘中先触低还是先触高——
 拿日线 low/high 直接比会把"先冲高后砸低"与反过来混为一谈，成交价也不对。
 
-手数按市场分档（LOT_BY_MARKET）：美股 10 股、港股 100 股（港股按板块最小单位）。
+手数按市场分档（LOT_BY_MARKET）：美股 10 股、港股 100 股（仅为旧版模拟参数，非证券实际交易单位）。
 
 盈亏口径：
   cash_flow = 卖出额 − 买入额（已实现现金流）
@@ -47,6 +47,7 @@ from typing import Optional
 
 from . import data as mldata
 from . import db as mldb
+from . import sessions
 from .simulator import BUY, SELL, match_limit_order
 
 # 每次操作的股数（按市场）。港股 100 股 = 常见板块最小交易单位。
@@ -70,23 +71,18 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
     conn 可复用（Web 场景避免反复开库）；不传则自建并在结束时关闭。
     """
     own_conn = conn is None
-    conn = conn or mldb.get_ml_connection(db_path)
+    conn = conn or mldb.get_ml_connection_readonly(db_path)
     try:
         daily = mldata.load_daily(code, db_path)
         if daily.empty:
             return _empty(code, days)
         bars_by_day = mldata.intraday_bars_by_day(code, db_path)
         dates = [str(d) for d in daily["date"]]
-        nxt = _next_day_map(dates)
         dmap = {str(r["date"]): r for _, r in daily.iterrows()}
         preds = {p["as_of"]: p for p in mldb.load_predictions(conn, code)}
 
-        # 只取「次日已走出 + 有 1h bars」的基准日；取最近 days 个
-        usable = [a for a in sorted(preds)
-                  if a in nxt and bars_by_day.get(nxt[a])]
-        usable = usable[-days:]
-        if not usable:
-            return _empty(code, days)
+        targets = sessions.window(code, dates[-1], days)
+        usable = [sessions.window(code, targets[0], 2)[0], *targets[:-1]]
 
         lot = lot_for(code)
         pos = 0
@@ -97,9 +93,20 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
         n_buy = n_sell = n_both = n_none = 0
         rows = []
         for as_of in usable:
+            day = sessions.next_session(code, as_of)
+            status = ('missing_daily' if day not in dmap else
+                      'missing_prediction' if as_of not in preds else
+                      'missing_bars' if not bars_by_day.get(day) else 'ok')
+            if status != 'ok':
+                close = _f(dmap.get(day, {}).get('close'))
+                rows.append(dict(as_of=as_of, date=day, status=status, pos=pos, cash=cash,
+                                 source=preds.get(as_of, {}).get('source', 'unknown'),
+                                 equity=cash+pos*close if close else None, close=close,
+                                 l_hat=None,h_hat=None,low=None,high=None,buy_price=None,sell_price=None))
+                continue
             p = preds[as_of]
             L, H = p["l_hat"], p["h_hat"]
-            day = nxt[as_of]
+            day = sessions.next_session(code, as_of)
             bars = bars_by_day[day]
             fb = match_limit_order(BUY, L, bars) if L is not None else None
             fs = match_limit_order(SELL, H, bars) if H is not None else None
@@ -127,7 +134,8 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
             if close is not None:
                 peak_exposure = max(peak_exposure, abs(pos) * close)
             rows.append({
-                "as_of": as_of, "date": day,
+                "as_of": as_of, "date": day, "status": "ok",
+                "source": p.get('source', 'unknown'),
                 "l_hat": _r(L), "h_hat": _r(H),
                 "low": _r(_f(bar["low"])), "high": _r(_f(bar["high"])),
                 "close": _r(close),
@@ -139,7 +147,7 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
                 "equity": _r(cash + pos * close) if close is not None else None,
             })
 
-        last_close = _f(dmap[rows[-1]["date"]]["close"]) or 0.0
+        last_close = next((_f(r["close"]) for r in reversed(rows) if _f(r["close"]) is not None), 0.0)
         mark = pos * last_close
         summary = {
             "n_buy": n_buy, "n_sell": n_sell,
@@ -291,7 +299,7 @@ def aggregate_returns(results: list[dict]) -> list[dict]:
 
 def run_many(codes: list[str], days: int = 30, db_path=None) -> list[dict]:
     """批量回溯（复用同一连接）。"""
-    conn = mldb.get_ml_connection(db_path)
+    conn = mldb.get_ml_connection_readonly(db_path)
     try:
         return [run_strategy(c, days, conn=conn, db_path=db_path) for c in codes]
     finally:

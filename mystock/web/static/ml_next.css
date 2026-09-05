@@ -1,0 +1,45 @@
+/* Page layout only: colors, typography, header and tables come from style.css. */
+.ml-next .tabs a { text-decoration: none; }
+.ml-next .page-heading { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 4px 0 8px; }
+.ml-next h2 { font-size: 18px; margin: 0 0 14px; }
+.ml-next .page-heading h2 { margin: 0; }
+.ml-next h3 { font-size: 14px; margin: 20px 0 12px; }
+.ml-next main > .muted { margin: 0 0 18px; }
+.ml-next .panel { margin: 18px 0; }
+.ml-next .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.ml-next .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); padding: 16px; overflow-wrap: anywhere; }
+.ml-next .card strong { display: block; font-size: 16px; margin-bottom: 8px; }
+.ml-next .card p { color: var(--text-soft); margin: 12px 0 8px; }
+.ml-next .card small { color: var(--muted); line-height: 1.8; }
+.ml-next .fields { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+.ml-next label { display: flex; flex-direction: column; gap: 5px; color: var(--text-soft); font-size: 12px; font-weight: 600; min-width: 0; }
+.ml-next input, .ml-next select, .ml-next button { font: inherit; }
+.ml-next input, .ml-next select { width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--panel); color: var(--text); }
+.ml-next input { color-scheme: light; }
+[data-theme="dark"] .ml-next input { color-scheme: dark; }
+.ml-next main button { border: 1px solid transparent; border-radius: 999px; background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #fff; padding: 9px 18px; min-height: 40px; cursor: pointer; font-weight: 600; font-size: 13px; }
+.ml-next main button:hover { filter: brightness(1.06); }
+.ml-next main button.secondary { background: var(--panel-2); color: var(--text-soft); border-color: var(--border-strong); }
+.ml-next :is(button, a, input, select):focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; box-shadow: var(--ring); }
+.ml-next .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.ml-next .notice { padding: 11px 14px; border-left: 3px solid var(--accent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0; background: var(--accent-soft); color: var(--text-soft); font-size: 12px; line-height: 1.7; overflow-wrap: anywhere; }
+.ml-next .scroll { overflow-x: auto; }
+.ml-next table { font-size: 12px; font-variant-numeric: tabular-nums; }
+.ml-next td button { padding: 4px 10px; min-height: 32px; color: var(--accent); background: var(--accent-soft); font-size: 12px; }
+.ml-next .positive { color: var(--up); }
+.ml-next .negative { color: var(--down); }
+.ml-next #chart { height: 320px; min-width: 0; }
+.ml-next #status { min-height: 24px; color: var(--text-soft); }
+.ml-next #status.error { color: var(--up); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .ml-next input { color-scheme: dark; }
+}
+@media (max-width: 720px) {
+  .ml-next .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ml-next .fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .ml-next .cards { grid-template-columns: 1fr; }
+  .ml-next #chart { height: 260px; }
+  .ml-next .actions button { width: 100%; }
+}

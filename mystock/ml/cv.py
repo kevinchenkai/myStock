@@ -50,7 +50,7 @@ def purged_walk_forward(n: int, cfg: PurgedConfig | None = None) -> list[tuple[l
     fold = max(20, (n - first_te) // max(1, cfg.n_folds))
     for k in range(cfg.n_folds):
         te_start = first_te + k * fold
-        te_end = min(te_start + fold, n)
+        te_end = n if k == cfg.n_folds - 1 else min(te_start + fold, n)
         if te_start >= n or te_end <= te_start:
             break
         # purge：训练段尾部 purge_w 行（与 test 边界重叠/高度相似），剔除

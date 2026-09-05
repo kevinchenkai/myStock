@@ -63,6 +63,7 @@ def collect(reports_dir: Path | None = None) -> list[dict]:
     if not reports_dir.is_dir():
         return []
     dedup: dict[tuple, dict] = {}
+    from .versions import digest
     for sub in sorted(p for p in reports_dir.iterdir() if p.is_dir()):
         f = sub / "index.html"
         if not f.is_file():
@@ -73,14 +74,17 @@ def collect(reports_dir: Path | None = None) -> list[dict]:
             continue
         for row in parse_report_html(text):
             row["source"] = "backfill"
-            row["generated_at"] = f"{sub.name} 00:00:00"  # 以报告日期为准（原始时间已不可考）
-            dedup[(row["code"], row["as_of"])] = row
+            row["generated_at"] = None
+            row["report_date"] = sub.name
+            row["report_sha256"] = digest(text)
+            row["status"] = "audit_unknown_timing"
+            row["run_id"] = "html-" + digest(text)
+            dedup[(sub.name, row["code"], row["as_of"])] = row
     return [dedup[k] for k in sorted(dedup)]
 
 
 def run(reports_dir: Path | None = None, db_path=None) -> int:
-    """回填入库。返回写入行数。已存在的 (code, as_of) 会被覆盖为 HTML 版本，
-    故仅在**首次**建表后跑一次即可；重复跑无害（同源同值）。"""
+    """HTML 追加到审计版本，不覆盖 legacy 或 live；同源同值重跑幂等。"""
     rows = collect(reports_dir)
     if not rows:
         return 0
@@ -95,13 +99,16 @@ def run(reports_dir: Path | None = None, db_path=None) -> int:
 
 
 def missing_dates(conn, code: str, daily, since: str = "") -> list[str]:
-    """该标的在 daily 里、但 ml_predictions 中没有留档的交易日（升序）。
+    """该标的在 daily 里、但 legacy / 有效版本中没有留档的交易日（升序）。
 
     末日也算缺口——那天确实可以预测（次日未知不影响"给出预测"这个动作），
     复盘时会因无次日而判 pending，不进命中率统计。
     """
     have = {r[0] for r in conn.execute(
         "SELECT as_of FROM ml_predictions WHERE code=?", (code,))}
+    have.update(r[0] for r in conn.execute(
+        "SELECT as_of FROM ml_prediction_versions WHERE code=? "
+        "AND status IN ('generated','published','recomputed')", (code,)))
     dates = [str(d) for d in daily["date"]]
     return [d for d in dates if d not in have and (not since or d >= since)]
 
@@ -121,11 +128,15 @@ def recompute_gaps(since: str = "", db_path=None, *, verbose: bool = True) -> in
     与 live 行的区别只在 source='recomputed'——诚实标注"这条是事后补的，
     不是当天真的跑出来的"，便于日后甄别。
     """
+    from . import runs, sessions
+    mldb.init_ml_db(db_path)
+    manifest, manifest_path = runs.start(db_path, protocol='recomputed-gap-v1')
     conn = mldb.get_ml_connection(db_path)
     total = 0
+    all_rows = []
     try:
         for code in mlcfg.TARGETS:
-            daily = mldata.load_daily(code)
+            daily = mldata.load_daily(code, manifest["input_path"])
             if daily.empty:
                 continue
             gaps = missing_dates(conn, code, daily, since)
@@ -137,7 +148,8 @@ def recompute_gaps(since: str = "", db_path=None, *, verbose: bool = True) -> in
             cov = mlcfg.coverage_for(code)
             rows = []
             for as_of in gaps:
-                sub = daily[daily["date"] <= as_of]
+                sub = daily[daily["date"] <= as_of].copy()
+                sub.attrs["code"] = code
                 # 特征需要 ~20 行热身 + CQR 校准集，样本太少直接跳过（宁缺勿造）
                 if len(sub) < 60:
                     continue
@@ -157,8 +169,12 @@ def recompute_gaps(since: str = "", db_path=None, *, verbose: bool = True) -> in
                     "conformal": int(bool(p["conformal"])), "q_ret": p["q_ret"],
                     "target_coverage": p["target_coverage"],
                     "backend": _backend(), "source": "recomputed",
+                    "target_session": sessions.next_session(code,p["as_of"]),
+                    "generated_at": sessions.utc_now().isoformat(),
+                    "run_id": manifest["run_id"], "manifest_path": str(manifest_path.resolve()),
                 })
             if rows:
+                all_rows.extend(rows)
                 total += mldb.upsert_predictions(conn, rows)
                 if verbose:
                     print(f"  {code}: 补 {len(rows)} 条（{rows[0]['as_of']} ~ {rows[-1]['as_of']}）")
@@ -166,6 +182,7 @@ def recompute_gaps(since: str = "", db_path=None, *, verbose: bool = True) -> in
             mldb.log_sync(conn, "recompute_predictions", row_count=total)
     finally:
         conn.close()
+    runs.finish(manifest,manifest_path,all_rows,[{"status":"offline_recomputed"}])
     return total
 
 
@@ -173,7 +190,7 @@ def _predict(sub, lo_a: float, hi_a: float, cov: float) -> dict:
     """延迟导入 predictor——它会拖起 lightgbm/sklearn，解析 HTML 那条路径用不上。"""
     from .predictor import predict_next_day
     return predict_next_day(sub, high_alpha=hi_a, low_alpha=lo_a,
-                            conformal=True, target_coverage=cov)
+                            conformal=True, target_coverage=cov, historical=True, code=sub.attrs.get("code"))
 
 
 def _backend() -> str:
@@ -185,14 +202,11 @@ def _backend() -> str:
 
 
 def run_if_empty(db_path=None) -> int:
-    """仅当 ml_predictions 为空时回填（供 ml.sh 每次执行安全调用）。
-
-    表非空说明已回填过 / 已有实时留档 —— 此时不该再用历史 HTML 覆盖，
-    否则会把字段齐全的 live 行退化成字段稀疏的 backfill 行。
-    """
+    """仅当 legacy 与版本表均为空时显式导入 HTML；ml.sh 不自动调用。"""
     conn = mldb.get_ml_connection(db_path)
     try:
-        n = conn.execute("SELECT COUNT(*) FROM ml_predictions").fetchone()[0]
+        n = conn.execute("SELECT (SELECT COUNT(*) FROM ml_predictions) + "
+                         "(SELECT COUNT(*) FROM ml_prediction_versions)").fetchone()[0]
     finally:
         conn.close()
     return 0 if n else run(db_path=db_path)

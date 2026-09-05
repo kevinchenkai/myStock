@@ -1592,7 +1592,8 @@ function mlPanel(r) {
       : `<b class="up">${fmtNum(x.sell_price)}</b>`;
     // 净持仓：负=裸空（红），正=多头（绿）——沿用红涨绿跌
     const pc = x.pos < 0 ? "up" : (x.pos > 0 ? "down" : "muted");
-    return `<tr><td class="text">${esc(x.date)}</td>
+    const source = ({live: "live 留档", recomputed: "离线重建", backfill: "历史报告回填"})[x.source] || "来源未知";
+    return `<tr><td class="text">${esc(x.date)}<br><small class="muted">${esc(source)}</small></td>
       <td>${fmtNum(x.l_hat)} ~ ${fmtNum(x.h_hat)}</td>
       <td>${fmtNum(x.low)} ~ ${fmtNum(x.high)}</td>
       <td>${b}</td><td>${sl}</td>
@@ -1628,6 +1629,7 @@ function mlPanel(r) {
         <th>买成交</th><th>卖成交</th><th>净持仓</th></tr></thead>
       <tbody>${body}</tbody></table></div>
     <div class="muted ml-note">窗口 ${esc(r.start || "—")} ~ ${esc(r.end || "—")}，共 ${r.n_days} 个交易日。
+      本页沿用旧版留档，来源逐行标注；历史重建与回填不代表当时已生成，旧 live 标签也不证明发布时间。
       撮合规则同 ML 回测：限价买在首根 low ≤ L̂ 的 bar 成交、成交价 min(L̂, open)；
       限价卖在首根 high ≥ Ĥ 的 bar 成交、成交价 max(Ĥ, open)。本页为离线数据分析，不构成投资建议。</div>`;
 }

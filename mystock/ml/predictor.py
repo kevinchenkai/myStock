@@ -21,6 +21,7 @@ import pandas as pd
 from .features import FEATURE_COLS, build_features
 from . import calibrator as calib
 from . import signal_eval as sig
+from . import sessions
 from .cv import PurgedConfig, purged_walk_forward
 
 
@@ -54,7 +55,7 @@ def _fit_quantile(X, y, alpha: float, seed: int = 0):
         m = lgb.LGBMRegressor(
             objective="quantile", alpha=alpha, n_estimators=300,
             learning_rate=0.03, num_leaves=15, min_child_samples=30,
-            subsample=0.8, colsample_bytree=0.8, random_state=seed, verbose=-1,
+            subsample=0.8, subsample_freq=0, colsample_bytree=0.8, random_state=seed, verbose=-1, n_jobs=1,
         )
     else:
         m = GradientBoostingRegressor(
@@ -178,7 +179,7 @@ def walk_forward_eval(
         split_pairs = []
         for k in range(n_folds):
             tr_end = min_train + k * fold_size
-            te_end = min(tr_end + fold_size, n)
+            te_end = n if k == n_folds - 1 else min(tr_end + fold_size, n)
             if tr_end >= n or te_end <= tr_end:
                 break
             split_pairs.append((df.iloc[:tr_end], df.iloc[tr_end:te_end]))
@@ -204,8 +205,8 @@ def walk_forward_eval(
         hits.append(hit); hits_raw.append(hit_raw)
         width_pct_raw.append(float(np.mean(hi_raw - lo_raw)) * 100)
         width_pct_cal.append(float(np.mean(hi_ret - lo_ret)) * 100)
-        pin_h.append(pinball_loss(y_hi, hi_ret, high_alpha))
-        pin_l.append(pinball_loss(y_lo, lo_ret, low_alpha))
+        pin_h.append(pinball_loss(y_hi, hi_raw, high_alpha))
+        pin_l.append(pinball_loss(y_lo, lo_raw, low_alpha))
         mae_h.append(float(np.mean(np.abs(y_hi - hi_ret))))
         mae_l.append(float(np.mean(np.abs(y_lo - lo_ret))))
         # 借鉴③：折内信号 IC（宽度主 / 中点次）
@@ -243,21 +244,39 @@ def walk_forward_eval(
 def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
                      high_alpha: float = 0.9, low_alpha: float = 0.1,
                      conformal: bool = False, target_coverage: float = 0.8,
-                     cal_frac: float = 0.25) -> dict:
+                     cal_frac: float = 0.25, code: str | None = None, clock=None,
+                     historical: bool = False) -> dict:
     """用全历史 fit，对最新交易日预测次日 [L_hat, H_hat]。供推理/报告用。
 
     conformal=True 时启用 CQR（从训练末尾切 cal_frac 校准，ret 空间半宽 q 应用到次日）。
     """
+    if code is None:
+        code = daily.attrs.get('code')
+    if code is None and not historical:
+        raise sessions.Unavailable('unavailable', 'code required for live session guard')
+    clock = clock or sessions.utc_now
+    expected_as_of = str(daily['date'].max()) if not daily.empty else None
+    if code:
+        daily = sessions.prepare_daily(daily, code, clock(), live=not historical)
+        if not historical:
+            expected_as_of = str(daily['date'].iloc[-1])
     df = build_features(daily)
+    df = df.replace([float('inf'), float('-inf')], float('nan'))
     train = df.dropna(subset=FEATURE_COLS + ["y_high_ret", "y_low_ret"])
-    last = df.dropna(subset=FEATURE_COLS).iloc[[-1]]  # 最新一行（标签 NaN，用于推理）
+    valid = df.dropna(subset=FEATURE_COLS)
+    if valid.empty or str(valid.iloc[-1]['date']) != expected_as_of:
+        raise sessions.Unavailable('feature_gap', f'No complete features for {expected_as_of}; repair input gaps first')
+    last = valid.iloc[[-1]]
     model = IntervalModel(
         seed=seed, high_alpha=high_alpha, low_alpha=low_alpha,
         conformal=conformal, target_coverage=target_coverage, cal_frac=cal_frac,
     ).fit(train)
     L, H = model.predict_prices(last)
     close = float(last["close"].iloc[0])
+    target = sessions.next_session(code, str(last['date'].iloc[0])) if code else None
+    if code and not historical: sessions.check_deadline(code, target, clock())
     return {
+        'target_session': target,
         "as_of": str(last["date"].iloc[0]),
         "close": round(close, 4),
         "L_hat": round(float(L[0]), 4),
@@ -276,7 +295,11 @@ if __name__ == "__main__":
     import os
     do_cqr = os.environ.get("MYSTOCK_ML_CQR", "1") != "0"
     for code in mlcfg.TARGETS:
-        daily = mldata.load_daily(code)
+        try:
+            daily = sessions.prepare_daily(mldata.load_daily(code), code)
+        except sessions.Unavailable as e:
+            print(f'{code}: {e.status}')
+            continue
         lo_a, hi_a = mlcfg.alpha_for(code)  # 与回测/报告同口径（按股自适应分位）
         target = mlcfg.coverage_for(code)
         res = walk_forward_eval(daily, code, high_alpha=hi_a, low_alpha=lo_a,

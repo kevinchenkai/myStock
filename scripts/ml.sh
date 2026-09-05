@@ -1,99 +1,52 @@
 #!/usr/bin/env bash
-# myStock ML 统一入口。三件事，一个脚本，用子命令组织：
-#
-#   bash scripts/ml.sh data       # 例行更新数据（采集 5 年日线 + 2 年 1h + 生产库只读快照）
-#   bash scripts/ml.sh train      # 本地 Mac 训练/评估（P1 校准 → P2 预测 → P3 回测 → 生成报告）
-#   bash scripts/ml.sh publish    # 发布 HTML 报告到展示服务器（www，公网）
-#   bash scripts/ml.sh all        # data → train → publish 一条龙（供 cron）
-#
-# 默认子命令 = all。S0/P1/P2/P3.x/报告全是 CPU 算法，本机 mk 环境即可（P4 RL 才需 GPU，见 ml_setup_h20.sh）。
-#
-# cron 示例（工作日早 8 点北京时间，约对应前一晚美股收盘后）：
-#   0 8 * * 1-5  cd /Users/kk/Work/Workpace/GitHub/Seattle/myStock && bash scripts/ml.sh all >> data/ml/cron.log 2>&1
-set -uo pipefail   # 不用 -e：单步失败要记录但尽量继续
-
+# Manual only. No scheduler installed. No argument prints usage.
+# train performs guarded report training; standalone diagnostics are offline tools.
+set -euo pipefail
 cd "$(dirname "$0")/.."
-ENV_NAME="${MYSTOCK_ML_ENV:-mk}"
-
-# 展示服务器（可用环境变量覆盖）
+CMD="${1:-help}"
+if [ "$CMD" = publish ] && [ -n "${2:-}" ]; then
+  export MYSTOCK_ML_RECEIPT="$2"
+fi
+# Standalone publish consumes an explicit receipt; never invent a fresh run or
+# silently choose an older report. The Python validator still checks hash/time.
+if [ "$CMD" = publish ] && [ -z "${MYSTOCK_ML_RECEIPT:-}" ]; then
+  echo 'Usage: ml.sh publish <receipt.json> (use the receipt printed by train)' >&2
+  exit 2
+fi
+PYTHON="${MYSTOCK_ML_PYTHON:-python}"
+if [ -z "${MYSTOCK_ML_PYTHON:-}" ] && [ "$CMD" != help ]; then
+  if command -v conda >/dev/null 2>&1; then
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+    set +u; conda activate "${MYSTOCK_ML_ENV:-mk}"; set -u
+  fi
+fi
+if [ "$CMD" != publish ]; then
+  export MYSTOCK_ML_RUN_ID="${MYSTOCK_ML_RUN_ID:-$(date -u +%Y%m%dT%H%M%S)-$$}"
+  export MYSTOCK_ML_RECEIPT="${MYSTOCK_ML_RECEIPT:-data/ml/receipts/${MYSTOCK_ML_RUN_ID}.json}"
+fi
 PUB_HOST="${PUB_HOST:-ubuntu@211.159.177.55}"
 PUB_DIR="${PUB_DIR:-/www/wwwroot/g.ismayday.mobi/mystock}"
-REPORTS_DIR="data/ml/reports"
-TODAY="$(date +%Y-%m-%d)"
-SSH_OPTS="-o StrictHostKeyChecking=no -o ConnectTimeout=20"
-
-CMD="${1:-all}"
-PREFIX="[ml $(date '+%Y-%m-%d %H:%M:%S')]"
-
-activate_env() {
-  if ! command -v conda >/dev/null 2>&1; then
-    echo "✗ 未检测到 conda。" >&2; exit 1
-  fi
-  # shellcheck disable=SC1091
-  source "$(conda info --base)/etc/profile.d/conda.sh"
-  if ! conda env list | grep -qE "^\s*${ENV_NAME}\s"; then
-    echo "✗ conda 环境 '${ENV_NAME}' 不存在。" >&2; exit 1
-  fi
-  set +u; conda activate "${ENV_NAME}"; set -u   # activate 钩子在 set -u 下会报错
-}
-
-run_step() {
-  local name="$1"; shift
-  echo "${PREFIX} ──> ${name}"
-  if "$@"; then
-    echo "${PREFIX}     ✓ ${name}"
-  else
-    echo "${PREFIX}     ✗ ${name} 失败（rc=$?），继续后续步骤" >&2
-    return 1
-  fi
-}
-
-# ---- 子命令实现 ----
-do_data() {
-  run_step "采集数据（fetch）" python -m mystock.ml.fetch
-}
-
+do_data() { "$PYTHON" -m mystock.ml.fetch; }
 do_train() {
-  run_step "P1 撮合校准（calibrate）" python -m mystock.ml.calibrate
-  run_step "P2 预测器（predictor）"   python -m mystock.ml.predictor
-  run_step "P3/P3.1 回测（backtest）" python -m mystock.ml.backtest
-  # report 内部会：建表 → 首次自动回填历史预测 → 写入当日预测 → 渲染「近期预测复盘」。
-  # 即每跑一次 train，ml_predictions 就同步一次，无需额外步骤/人工干预。
-  run_step "生成 HTML 报告（report）" python -m mystock.ml.report
+  "$PYTHON" -m mystock.ml.report
+  printf 'Train receipt: %s\nPublish before target deadline: bash scripts/ml.sh publish %q\n' "$MYSTOCK_ML_RECEIPT" "$MYSTOCK_ML_RECEIPT"
 }
-
 do_publish() {
-  if [ ! -f "${REPORTS_DIR}/latest.html" ]; then
-    echo "✗ 未找到 ${REPORTS_DIR}/latest.html，请先 train。" >&2; return 1
-  fi
-  # latest → 首页 index.html
-  scp ${SSH_OPTS} "${REPORTS_DIR}/latest.html" "${PUB_HOST}:${PUB_DIR}/index.html"
-  # 当日归档（便于回溯）
-  if [ -d "${REPORTS_DIR}/${TODAY}" ]; then
-    ssh ${SSH_OPTS} "${PUB_HOST}" "mkdir -p ${PUB_DIR}/${TODAY}"
-    scp ${SSH_OPTS} -r "${REPORTS_DIR}/${TODAY}/." "${PUB_HOST}:${PUB_DIR}/${TODAY}/"
-  fi
-  echo "已发布： https://g.ismayday.mobi/mystock/  （当日： .../${TODAY}/）"
+  local artifact
+  artifact="$("$PYTHON" -m mystock.ml.pipeline)" || return $?
+  scp -o ConnectTimeout=20 "$artifact" "${PUB_HOST}:${PUB_DIR}/index.html" || return $?
+  "$PYTHON" -m mystock.ml.pipeline --record-published
 }
-
-echo "${PREFIX} 开始 [${CMD}]"
-case "${CMD}" in
-  data)    activate_env; do_data ;;
-  train)   activate_env; do_train ;;
-  publish) run_step "发布到服务器（publish）" do_publish ;;
-  all)
-    activate_env
-    do_data
-    do_train
-    run_step "发布到服务器（publish）" do_publish
-    ;;
-  *)
-    echo "用法: bash scripts/ml.sh {data|train|publish|all}" >&2
-    echo "  data    例行更新数据"
-    echo "  train   本地训练/评估 + 生成报告"
-    echo "  publish 发布 HTML 到 www"
-    echo "  all     三步一条龙（默认）"
-    exit 1
-    ;;
+case "$CMD" in
+ data) do_data ;;
+ train) do_train ;;
+ publish) do_publish ;;
+ all)
+   do_data
+   do_train
+   # All skipped: no artifact, no stale report publication.
+   if "$PYTHON" -c 'import json,os,sys; r=json.load(open(os.environ["MYSTOCK_ML_RECEIPT"])); sys.exit(0 if r["artifact"] else 1)'; then do_publish; fi
+   ;;
+ help) echo 'Manual usage: ml.sh {data|train|all}; ml.sh publish <receipt.json>. Train prints the receipt; publish checks its artifact hash and target deadline. No automatic receipt selection.' ;;
+ *) exit 2 ;;
 esac
-echo "${PREFIX} 结束 [${CMD}]"

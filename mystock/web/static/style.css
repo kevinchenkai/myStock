@@ -147,6 +147,7 @@ header .sub .down { font-weight: 700; }
 
 /* 主题切换按钮（跟随系统 / 浅 / 深 三态） */
 .theme-toggle {
+  flex-shrink: 0; white-space: nowrap;
   margin-left: auto;
   display: inline-flex; align-items: center; gap: 7px;
   padding: 7px 13px;

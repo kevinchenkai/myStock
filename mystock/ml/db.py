@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -13,7 +13,7 @@ from . import config as mlcfg
 
 
 def now_str() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(timezone.utc).isoformat()
 
 
 def get_ml_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
@@ -25,9 +25,17 @@ def get_ml_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
     return conn
 
 
-def get_prod_connection_readonly() -> sqlite3.Connection:
+def get_ml_connection_readonly(db_path=None):
+    path = Path(db_path or mlcfg.ML_DB_PATH).resolve()
+    conn = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA query_only=ON')
+    return conn
+
+
+def get_prod_connection_readonly(db_path=None) -> sqlite3.Connection:
     """生产库**只读**连接（URI mode=ro，写操作会直接报错）。"""
-    uri = f"file:{mlcfg.PROD_DB_PATH}?mode=ro"
+    uri = Path(db_path or mlcfg.PROD_DB_PATH).resolve().as_uri() + "?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn
@@ -39,6 +47,11 @@ def init_ml_db(db_path: Optional[str] = None) -> None:
     try:
         with open(mlcfg.SCHEMA_PATH, "r", encoding="utf-8") as f:
             conn.executescript(f.read())
+        columns = {r[1] for r in conn.execute('PRAGMA table_info(ml_quotes_1h)')}
+        if 'data_source' not in columns:
+            conn.execute("ALTER TABLE ml_quotes_1h ADD COLUMN data_source TEXT NOT NULL DEFAULT 'yfinance'")
+        if 'source_ref' not in columns:
+            conn.execute('ALTER TABLE ml_quotes_1h ADD COLUMN source_ref TEXT')
         conn.commit()
     finally:
         conn.close()
@@ -46,6 +59,8 @@ def init_ml_db(db_path: Optional[str] = None) -> None:
 
 def upsert(conn: sqlite3.Connection, table: str, rows: Iterable[dict]) -> int:
     """通用 UPSERT（按表主键冲突时覆盖）。返回写入行数。"""
+    if table in ("ml_predictions", "ml_prediction_versions"):
+        raise ValueError("Use the versioned prediction write entry")
     rows = list(rows)
     if not rows:
         return 0
@@ -66,18 +81,19 @@ PRED_COLS = [
 
 
 def upsert_predictions(conn: sqlite3.Connection, rows: Iterable[dict]) -> int:
-    """写入次日区间预测（PK code+as_of，重复生成覆盖）。缺列补 None。
-
-    统一补齐 PRED_COLS 再走通用 upsert——回填行（历史 HTML 只能解析出
-    close/l_hat/h_hat）与实时行（字段齐全）列集不同，不补齐会因 executemany
-    的列名取自首行而错位。
-    """
-    norm = []
+    """按 run 追加不可覆盖预测版本；仅有效 live 同步到旧表投影。"""
+    from .versions import append, digest
+    rows = [dict(r) for r in rows]
+    if not rows: return 0
+    # Imports/backfills use deterministic source identity, live reports supply run.
+    total = 0
     for r in rows:
-        r = dict(r)
-        r.setdefault("generated_at", now_str())
-        norm.append({c: r.get(c) for c in PRED_COLS})
-    return upsert(conn, "ml_predictions", norm)
+        rid = r.pop('run_id', None)
+        manifest_path = r.pop('manifest_path', None)
+        if rid is None:
+            rid = 'import-' + digest(r)
+        total += append(conn, [r], run_id=rid, manifest_path=manifest_path)
+    return total
 
 
 def load_predictions(

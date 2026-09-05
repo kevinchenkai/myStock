@@ -5,29 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>myStock · 我的港美股</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
-  <script>
-    // 首屏即应用主题，避免深/浅切换闪烁（FOUC）。
-    // localStorage 存 'light' / 'dark' / 'system'（或未设置=跟随系统）。
-    (function () {
-      try {
-        var t = localStorage.getItem("mystock-theme");
-        if (t === "light" || t === "dark") {
-          document.documentElement.setAttribute("data-theme", t);
-        }
-      } catch (e) {}
-    })();
-  </script>
+  {% include '_theme_head.html' %}
 </head>
 <body>
-  <header>
-    <span class="brand">M</span>
-    <h1>myStock</h1>
-    <span class="sub">个人港美股持仓 / 交易 / 行情（本地）· <span class="up">红涨</span> <span class="down">绿跌</span></span>
-    <button class="theme-toggle" id="theme-toggle" type="button" title="切换主题：跟随系统 / 浅色 / 深色">
-      <span class="tt-icon" id="tt-icon">🖥️</span>
-      <span id="tt-label">跟随系统</span>
-    </button>
-  </header>
+  {% include '_site_header.html' %}
 
   <div class="tabs">
     <div class="tab active" data-tab="positions">我的持仓</div>
@@ -157,6 +138,7 @@
         按每日预测区间挂单：<b class="down">下沿 L̂ 限价买</b> / <b class="up">上沿 Ĥ 限价卖</b>，
         美股每次 10 股、港股每次 100 股。撮合走 1h K 线，假设现金与持仓充足。
       </div>
+      <p><a href="/ml-next">打开 v2 预测 / 受约束库存回溯（独立研究预览） →</a></p>
       <div id="ml-body"></div>
     </div>
   </div>

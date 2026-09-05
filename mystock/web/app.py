@@ -35,6 +35,8 @@ from .. import db as dbmod
 from ..pnl import compute_pnl, analyze_stock, yearly_finance
 
 app = Flask(__name__)
+from .ml_api import bp as ml_blueprint
+app.register_blueprint(ml_blueprint)
 
 # stock_profiles 列名 -> 前端展示用中文标签（顺序即展示顺序）
 _PROFILE_LABELS = [
@@ -63,12 +65,13 @@ _PROFILE_LABELS = [
 
 
 def get_db() -> sqlite3.Connection:
-    path = CONFIG.db_path
+    path = app.config.get("DB_PATH", CONFIG.db_path)
     if not Path(path).exists():
         raise FileNotFoundError(
             f"数据库不存在: {path}。请先运行 `bash scripts/init.sh` 初始化。"
         )
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
+    conn.execute("PRAGMA query_only=ON")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -83,6 +86,11 @@ def handle_no_db(e):
 
 
 # ---------------- 页面 ----------------
+@app.route("/ml-next", strict_slashes=False)
+def ml_next():
+    return render_template("ml_next.html")
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -245,13 +253,24 @@ def api_ml_strategy():
     延迟导入 ml 模块：它会拖起 pandas/ml 依赖链，且 ML 库可能未初始化——
     放模块顶层会让整个 web 应用在没跑过 ml.sh 的环境里起不来。
     """
+    if request.args.get("mode", "legacy") == "inventory":
+        from .ml_api import compare
+        try:
+            return compare()
+        except ValueError as e:
+            return jsonify({'schema_version':2,'error':str(e)}),400
+        except (FileNotFoundError, sqlite3.OperationalError):
+            return jsonify({'schema_version':2,'error':'ML database/schema unavailable'}),503
+    if request.args.get("mode", "legacy") != "legacy":
+        return jsonify({"error":"invalid mode"}),400
     try:
         from ..ml import config as mlcfg
         from ..ml.strategy import aggregate_returns, run_many
     except ImportError as e:  # ML 子包依赖缺失
         return jsonify({"error": f"ML 模块不可用: {e}"}), 503
 
-    if not Path(mlcfg.ML_DB_PATH).exists():
+    ml_path = app.config.get("ML_DB_PATH", mlcfg.ML_DB_PATH)
+    if not Path(ml_path).exists():
         return jsonify({
             "error": f"ML 数据库不存在: {mlcfg.ML_DB_PATH}。"
                      f"请先运行 `bash scripts/ml.sh data`。"
@@ -260,15 +279,19 @@ def api_ml_strategy():
     raw = request.args.get("codes", "")
     want = [c.strip().upper() for c in raw.split(",") if c.strip()]
     # 只接受 TARGETS 内的代码——库里没有其他标的的预测与 1h bars，放行只会得到空结果
-    codes = [c for c in want if c in mlcfg.TARGETS] or ML_DEFAULT_CODES
+    if any(c not in mlcfg.TARGETS for c in want):
+        return jsonify({"error": "invalid code"}), 400
+    codes = list(dict.fromkeys(want)) or ML_DEFAULT_CODES
     try:
         days = int(request.args.get("days", 30))
     except ValueError:
-        days = 30
-    days = max(1, min(days, ML_MAX_DAYS))
+        return jsonify({"error": "invalid days"}), 400
+    if not 1 <= days <= ML_MAX_DAYS:
+        return jsonify({"error": "days out of range"}), 400
 
-    results = run_many(codes, days)
+    results = run_many(codes, days, db_path=ml_path)
     return jsonify({
+        "schema_version": 1, "mode": "legacy",
         "days": days,
         "codes": codes,
         "targets": list(mlcfg.TARGETS),
