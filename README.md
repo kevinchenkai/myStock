@@ -186,6 +186,8 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 
 **升级讨论（2026-09-04，尚未实施）**：[Codex 方案 v1.4](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)包含核心目标、合并反馈共识、收盘／发布守卫、四批交付、历史重算及 API 特征调研；讨论输入见 [Claude 合并稿 v0.2.1](docs/ML_CLAUDE_UPGRADE_MERGED.md)与 [Claude 原方案](docs/ML_UPGRADE_PLAN.md)。近期人工触发，自动调度后议；收盘守卫尚未实现，以下现有功能不代表升级已经完成。
 
+**执行入口**：[升级执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md)已获授权，交给 Codex Sol 在隔离工作树实施；[升级前备份](docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md)已通过文件哈希、解压恢复及数据库完整性检查。当前运行目录尚未切换到升级版。
+
 **对外页面**：<https://g.ismayday.com/mystock/>（人工运行并发布报告后更新；首页 = 最新报告，`.../<date>/` = 历史归档）
 
 ## 2.1 要解决的问题与设计
