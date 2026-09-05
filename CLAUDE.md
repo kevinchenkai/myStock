@@ -6,4 +6,4 @@
 
 ## Claude 专属
 
-- Claude 创建的 Git 提交保留用户配置的 author／committer，并附且仅附一次：`Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`（对应 AGENTS.md 中 Codex 的同类规则）。
+- Claude 创建的 Git 提交保留用户配置的 author／committer，并附且仅附一次：`Co-Authored-By: <实际执行模型> <noreply@anthropic.com>`（对应 AGENTS.md 中 Codex 的同类规则）。署名写实际执行的模型，不写死某一版本；模型身份无法确认时写 `Claude`，不猜测版本。
