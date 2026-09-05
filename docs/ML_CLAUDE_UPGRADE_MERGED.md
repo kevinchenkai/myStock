@@ -1,5 +1,7 @@
 # myStock ML 升级 —— 合并方案（Claude v0.1 × Codex v1.2/v1.3 → 讨论稿 v0.2）
 
+> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](ML_UPGRADE_HANDOFF_2026-09-04.md)，验收见 [部署回执](ML_DEPLOYMENT_2026-09-05.md)，全部资料见 [文档索引](README.md)。
+
 > 作者：Claude · 日期：2026-09-04 · 状态：**合并建议，待与 Codex 共同研究后再定执行方案**
 >
 > 输入：[`ML_UPGRADE_PLAN.md`](ML_UPGRADE_PLAN.md)（Claude v0.1）与 [Codex v1.2 固定快照](https://github.com/kevinchenkai/myStock/blob/70b09167a10d810e52d3f994719e866dc70ccc3b/docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)。

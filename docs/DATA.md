@@ -1,17 +1,16 @@
 # myStock 数据文档（数据字典）
 
-> 本文档面向**数据分析与模型训练**。它描述 myStock 本地 SQLite 库（`data/mystock.db`）中
-> 全部数据表的字段、含义、取值特征、已知坑点，以及做分析 / 建模前必须知道的口径与陷阱。
+> 更新：2026-09-05；核对基线 `a460d38` / `main`，本轮仅同步文档。本文面向**数据分析与模型训练**，覆盖生产库 `data/mystock.db` 和独立 ML 库 `data/ml/mystock_ml.db`。第 1–9 节保留早期字段与统计背景，第 10–12 节补齐当前表、迁移列、预测版本及建模约束；原文的行数、时间跨度与“当前仅几天”均指 2026-06-22 快照，不是当前库存量。
 >
 > - 数据来源：**富途 OpenD**（持仓 / 订单 / 成交）+ **yfinance**（日线行情 / 公司通用信息）。
 > - 市场范围：**仅 HK（港股）与 US（美股）**。
 > - 单用户、单机、个人真实交易数据 —— **属隐私数据，`data/`、`*.db` 已 gitignore，切勿外泄或提交**。
 > - 文档中的统计快照取自 **2026-06-22** 的库（用于说明量级与分布，会随更新变化）。
->   定义见 schema：[`mystock/schema.sql`](../mystock/schema.sql)；代码映射见 [`mystock/code_map.py`](../mystock/code_map.py)。
+>   当前结构须同时看 [生产 schema](../mystock/schema.sql)、[生产列迁移](../mystock/db.py)、[ML schema](../mystock/ml/schema.sql) 与 [ML 迁移](../mystock/ml/db.py)。导航见 [文档索引](README.md)。
 
 ---
 
-## 0. 速览
+## 0. 早期生产数据快照（2026-06-22）
 
 | 表 | 用途 | 主键 | 行数* | 时间跨度* | 来源 |
 | --- | --- | --- | --- | --- | --- |
@@ -58,7 +57,7 @@
 
 **坑点 / 注意**
 
-- ⚠️ **`cost_price` 可能 ≤ 0**：观测到 7 只美股成本价为负（如 `US.AAPL` = -1233.96、`US.BA` = -713.04）。这是富途对**超卖 / 融券 / 历史记账**产生的会计产物，**不是真实成本**。建模时 `cost_price <= 0` 应视为**缺失**，不可直接当成本用（pnl.py 即如此处理 → 记入 uncovered）。
+- ⚠️ **`cost_price` 可能 ≤ 0**：早期快照曾出现负成本（合成示例：`cost_price=-10`）。这是富途对**超卖 / 融券 / 历史记账**产生的会计产物，**不是真实成本**。建模时 `cost_price <= 0` 应视为**缺失**，不可直接当成本用（pnl.py 即如此处理 → 记入 uncovered）。
 - `pl_ratio` 是百分比（不是小数）；异常大的值（数千 %）通常对应近 0 成本，需结合 cost_price 一起清洗。
 - 当前库只有 2 天快照（06-21、06-22）。**持仓时序分析需要先积累足够天数的快照**；历史快照不可回填（富途只给"当前"）。
 - 同一只股票每个快照日一行；做面板数据时按 `(code, snapshot_date)` 对齐。
@@ -145,7 +144,7 @@
 | `futu_code` | TEXT | 对应富途代码 | **跨表 JOIN 用这个** |
 | `date` | TEXT | 交易日 | `YYYY-MM-DD`，仅交易日 |
 | `open` `high` `low` `close` | REAL | 开/高/低/收 | 原始价（未复权），本币；无 NULL |
-| `adj_close` | REAL | 复权收盘价 | **回测 / 收益率计算应优先用此列**（已含分红拆股调整） |
+| `adj_close` | REAL | 复权收盘价 | 可用于一致复权口径的收益率特征；限价撮合用未复权价格与显式分红／拆股，见第 12 节 |
 | `volume` | REAL | 成交量 | 股数 |
 | `dividends` | REAL | 当日每股分红 | 多数为 0；观测 70 行 >0 |
 | `stock_splits` | REAL | 当日拆股比例 | 多数为 0；观测 3 行 ≠0 |
@@ -278,7 +277,7 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
 1. **币种归一**：所有金额按 `currency` 换汇到统一货币，或分 HK / US 两套模型。deals 表无 currency，用 market 推断。
 2. **代码统一**：跨表用 `futu_code`；只有 quotes/profiles 暴露 `yf_symbol`。
 3. **成本异常**：`positions.cost_price <= 0` → 缺失处理。
-4. **收益率用复权价**：`daily_quotes.adj_close`，不要用 `close`。
+4. **区分收益率特征与撮合价格**：一致复权收益可用 `adj_close`；实际限价和库存回放使用未复权 OHLC，显式处理公司行动，勿混用或重复计分红（见第 12 节）。
 5. **行情对齐**：各标的交易日不等长，按 date 显式对齐 / 取交集；剔除 skiplist 中稀疏标的或单独处理。
 6. **时区**：成交/订单时间为交易所当地时区且无时区标记；跨市场排序前先统一。
 7. **数据量级**：deals 873 条 / 34 只股、行情 ~358 天 —— **样本偏小**。复杂模型注意过拟合；优先稳健、可解释的方法，必要时引入外部行情扩样本。
@@ -300,8 +299,94 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
 
 ## 9. 获取数据的方式
 
-- **直接读库**（推荐分析用）：`sqlite3 data/mystock.db` 或 `pandas.read_sql`。
+- **直接只读库**（推荐分析用）：`sqlite3 -readonly data/mystock.db`；Python 使用 SQLite URI `mode=ro` 并设 `PRAGMA query_only=ON` 后再传给 `pandas.read_sql`。
 - **只读 JSON API**（Web 层提供，见 [`mystock/web/app.py`](../mystock/web/app.py)）：`/api/positions`、`/api/orders`、`/api/deals`、`/api/quotes`、`/api/stock/<code>`、`/api/stock/<code>/profile`、`/api/stock/<code>/analysis`、`/api/pnl`。
 - 刷新数据：`bash scripts/update.sh`（需富途 OpenD 已登录）。
 
 > 数据会随每日更新变化；本文档中的统计数字是 2026-06-22 的快照，结构稳定、数字会变。
+
+
+## 10. 当前生产库补充（2026-09-05）
+
+生产库共 10 张业务／运维表（不计 SQLite 内部表），另有独立 ML 库 8 张表。上面的 8 表速览是 6 月快照，缺少以下两张生产表；字段定义以 schema 与代码迁移合并为准。
+
+### 10.1 account_funds — 每日账户资金快照
+
+主键 `snapshot_date`（TEXT），来源富途账户资金查询，重复抓取覆盖当天。历史资金快照不能从当前账户状态回填。
+
+| 字段 | 类型 | 含义 |
+| --- | --- | --- |
+| `snapshot_date` | TEXT | 快照日期 |
+| `report_currency` | TEXT | 综合账户记账币种，当前 HKD |
+| `total_assets` / `market_val` | REAL | 账户净资产／证券市值 |
+| `cash` / `frozen_cash` / `avl_withdrawal_cash` | REAL | 现金／冻结现金／可提取现金 |
+| `power` | REAL | 购买力，不等于无杠杆可用现金 |
+| `hkd_assets` / `hk_cash` | REAL | 港币侧资产／现金 |
+| `usd_assets` / `us_cash` | REAL | 美元侧资产／现金，不与港币字段直接求和 |
+| `risk_status` / `updated_at` | TEXT | 风险状态／入库时间 |
+
+该表不是每股库存模拟的隐式本金来源；v2 的每股初始现金仍由场景显式输入。
+
+### 10.2 capital_flow — 日频资金流向
+
+主键 `(code, date)`，均为 TEXT，来源富途；每股每天一行。`in_flow`、`main_in_flow`、`super_in_flow`、`big_in_flow`、`mid_in_flow`、`sml_in_flow` 为 REAL，分别为整体／主力／超大／大／中／小单净流入；`synced_at` 为 TEXT。
+
+金额为标的本币；主力约为超大 + 大单，不能把所有字段相加。现有采集按近一年窗口回补；它不自动构成多年可用的 point-in-time 特征，新特征实验需单独核验历史覆盖和信息可用时间。
+
+### 10.3 stock_profiles 的盘面与规则列
+
+该表是随更新覆盖的横截面快照，不能把今天的值填回历史训练日。
+
+| 字段 | 类型 | 来源／限制 |
+| --- | --- | --- |
+| `turnover_rate` / `amplitude` | REAL | 富途快照的换手率／振幅百分数 |
+| `week52_high` / `week52_low` | REAL | 52 周高／低，本币价格 |
+| `snap_synced_at` | TEXT | 富途盘面字段的入库时间，独立于 yfinance 的 synced_at |
+| `lot_size` | INTEGER | 富途证券交易单位，通过 `db.py` 列迁移加入 |
+| `price_spread` | REAL | 富途快照价格档差，通过迁移加入；不是完整历史价格阶梯规则 |
+| `rules_effective_from` | TEXT | 当前采集代码写入快照日期；会随刷新覆盖，不证明规则真正的历史生效起点 |
+
+规则历史版本／变化检测及 v2 自动预填仍待实现。回放场景里的 `tick_size` 需显式核验，不能把最新 `price_spread` 当成全历史常量，HK lot=100 也不是普遍规则。
+
+## 11. 当前 ML 库与预测版本
+
+ML 只读生产事实再写入自己的数据库；Web 连接只读 ML 库。数据表定义见 [ML schema](../mystock/ml/schema.sql)。
+
+| 表 | 主键 | 内容与边界 |
+| --- | --- | --- |
+| `ml_quotes_1d` | `(symbol, date)` | yfinance 日线：OHLC、adj_close、volume、dividends、splits、futu_code、synced_at |
+| `ml_quotes_1h` | `(symbol, ts_utc)` | 小时 OHLCV、futu_code、ts_et、synced_at、data_source、source_ref |
+| `ml_deals` | `deal_id` | 生产成交副本：订单、代码、市场、方向、价量、成交时间、snapshot_taken_at |
+| `ml_orders` | `order_id` | 生产订单快照：订单状态、价量、成交价量、创建／更新时间与 snapshot_taken_at |
+| `ml_positions` | `(snapshot_date, market, code)` | 生产持仓快照副本：数量／可卖量、成本、名义价、盈亏比例与 snapshot_taken_at |
+| `ml_sync_log` | `id` | ML 专属采集来源、范围、行数、状态及运行时间 |
+| `ml_predictions` | `(code, as_of)` | 旧兼容投影，包含 l_hat／h_hat、分位与 CQR 参数、来源及生成时间；已有混合来源需逐行识别 |
+| `ml_prediction_versions` | `prediction_id` | 新版本证据，另有 `(run_id, code, as_of, target_session)` 唯一约束；内容不可覆盖或删除 |
+
+小时 `ts_utc` 是统一主键时间。`ts_et` 名称不能用于推断市场：读取时结合代码及 session 规则；当前采集按相应市场本地时间组织日期。`data_source` 默认 yfinance；已审查的 Futu 不复权补采为 `futu_none`，`source_ref` 保存原始证据 SHA256。不要插值伪造缺失小时。日线日期也是各自市场交易日，不应把 HK 行按美东日期解释。
+
+### 11.1 ml_prediction_versions 字段
+
+| 字段（均 TEXT） | 含义 |
+| --- | --- |
+| `prediction_id` / `run_id` | 单条预测标识／生成运行标识 |
+| `code` / `as_of` / `target_session` | 富途代码／信息基准日／目标交易日 |
+| `source` / `status` | live、backfill、recomputed 等来源与有效／审计状态；有效性还需时间证据校验 |
+| `generated_at` / `decision_at` / `published_at` | 生成时间／决策截止／真实公网发布时间，各自独立，不互相追认 |
+| `manifest_path` | 私有运行 manifest 路径 |
+| `payload_json` | 预测价格、校准参数及其他版本内容 |
+| `content_hash` | 不可覆盖内容的摘要 |
+
+数据库触发器禁止内容字段更新和历史删除，生命周期 status／published_at 可按协议附加。新 backfill／recomputed 只进版本表；后续只有经时间核验的 generated live 才投影到旧表。旧 live 标签不证明真正发布时间，未知时间只作审计。
+
+`data/ml/runs/<id>/input.db` 冻结本次输入，manifest 保存 SHA256、Git SHA、依赖、特征、seed、日历及训练／校准截止。`reports/runs/<id>/` 是报告归档，`receipts/` 是训练／发布回执，`.data.json` 只描述采集。数据库内版本和文件证据互有关联，不得独立删除快照或整库覆盖。
+
+## 12. 当前建模与回溯口径补充
+
+- **价格与公司行动**：复权收益率特征与未复权限价分开。库存回放使用未复权 OHLC，显式处理拆股和分红；付款日未知只计应收，不把应收当可下单现金，不同时重复计算复权收益和分红。
+- **时间与信息可用性**：训练／校准标签截止不得晚于 as_of；目标日必须晚于 as_of。行情日期完整不等于已经收盘确认，synced_at／generated_at／published_at 各需独立核验。当前日历覆盖 2020–2027，详见日历说明。
+- **特征可用性**：最新 profiles 不能当作历史值。成交后 N 日收益是事后标签／诊断，不能作为下单时输入特征；订单状态和撤单耗时同样不能穿越其可用时点。
+- **历史与前向证据**：2026-09-05 的 720 条重建是事后历史研究；不等于 720 次当时发布。live、HTML 回填与 recomputed 分开，缺口显式保留。
+- **窗口与权益**：20／60／120 是各市场 session 数，每个窗口独立初始化。各股独立本币账户；费用未填标 gross，不把 legacy 成交额收益率与库存初始权益收益率直接比较。
+- **真实订单边界**：只有订单快照，缺完整生命周期；事实通过 `/api/ml/v2/review?selected=YYYY-MM-DD` 返回，没有独立 facts 路由。不把事后替换订单当作真实可执行收益。
+- **只读与写入**：分析和 Web 只读；采集、修复、迁移、重建均有写入边界，应先备份并明确目标库。历史 repair／rebuild 命令见 [历史补齐记录](ML_HISTORY_REFRESH_2026-09-05.md)，部署后的现状以 [部署回执](ML_DEPLOYMENT_2026-09-05.md) 为准。

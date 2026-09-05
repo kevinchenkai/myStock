@@ -1,52 +1,80 @@
 # ML 升级工程交接
 
-四批工程在 `codex/ml-upgrade-20260904` 分支实施，工作树 `/Users/kk/.codex/worktrees/dc66/myStock`。没有合并 main、推送分支、改生产配置、修改原运行库、重启原 Web、发布公网报告或新增调度。
+> 工单起始日：2026-09-04；本交接更新：2026-09-05，核对基线 `a460d38` / `main`，本轮仅同步文档。工程已合入 main、推送并部署，详见 [部署回执](ML_DEPLOYMENT_2026-09-05.md)。当前入口为 [8888 ML 页面](http://127.0.0.1:8888/ml-next/)；原隔离工作树已移除，8896 是历史预览地址。
 
-提交阶段：`c84ac9e` 时间守卫/隔离读/手动管线；`54148b6` 不可覆盖版本/冻结评估；`f701ea7` E0–E5 实验；第四批为本交接文档所在提交。详细证据见[执行日志](ML_UPGRADE_EXECUTION_LOG_2026-09-04.md)和[实验汇总](ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md)。
+## 已交付与未完成的目标
 
-当前预览：[ML v2](http://127.0.0.1:8896/ml-next)。下一目标日卡片只读有时间证据的 live；当前旧库没有这类有效预测，卡片显示 unavailable 是正确结果。回溯区域默认选择“历史回溯（包含离线重建）”，再点击“填入合成测试场景”可审查已有模型的固定策略闭环。后续已完成 720 条逐日重建及默认模式修复，详见 [历史补齐记录](ML_HISTORY_REFRESH_2026-09-05.md)。该按钮写入浏览器表单，不写任何账户/数据库。20/60/120 为独立初始状态的重模拟；每日明细是该次连续回放的切片。
+Codex Astra 在隔离分支完成四批工程，经 Claude 独立审查和合并前修复后，以 `99848c9` 合入 main（含修复 `7d95fc7`）。Web 已从 main 重启；生产 ML 库已迁移、更新行情、追加 720 条历史重建版本、生成并公开发布六股 live 报告。过程保存部署前备份、输入与发布证据，生产账户事实未被该部署流程改写。
 
-## 本地复现
+工程包含 session 守卫、不可覆盖版本、E0–E5 实验、受约束库存回放及只读 `/ml-next`。**没有候选达到模型晋级门槛**，没有独立 holdout／五种子晋级复核／真实 60-session 前向 shadow；不把历史重建算作 live。
 
-以下命令在上述工作树执行，Python 均指向 `/opt/anaconda3/envs/mk/bin/python`。详细数据/模型/订单/截图留在 `data/`，不要提交。
+原四批实施证据见 [执行日志](ML_UPGRADE_EXECUTION_LOG_2026-09-04.md)，模型结果见 [实验汇总](ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md)，生产验收见 [部署回执](ML_DEPLOYMENT_2026-09-05.md)。这些记录中的“未部署”描述属于各自阶段。
+
+## 接手阅读与页面检查
+
+先读 [协作约定](COLLABORATION.md) 与 [未尽事项](OPEN_ITEMS.md)，再读 [当前运行概览](ML_OVERVIEW.md)、[数据字典](DATA.md)、[项目接手指南](项目接手指南.html)，再读 [Claude 修复与剩余待办](ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md)。
+
+1. 确认 checkout、提交、配置和数据库路径，打开现有 8888 服务。已有运行库不需要重新执行 `init.sh`。
+2. 下一目标日卡片只取有效 live，核对目标日、状态及发布时间。卡片 expired／unavailable 不等于历史版本丢失。
+3. 历史回溯默认包含离线重建。检查 20／60／120 session 的缺口及来源；选中日期查看真实订单快照。
+4. 填入明确场景后比较三种固定策略。每个窗口独立初始化；合成账户只用于验证，不代表真实资金／费用／证券规则。
+
+## 人工运行
+
+命令在当前项目根目录执行，Python 使用 conda `mk`。既有数据查看无需刷新；首次安装流程见根 README。
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 /opt/anaconda3/envs/mk/bin/python -m pytest tests/ -q -p no:cacheprovider
+# 仅在需要更新生产账户事实时：
+bash scripts/update.sh
+# ML 单独采集并确认收盘缓存：
+bash scripts/ml.sh data
+# 生成预测，保留终端打印的 Train receipt 路径：
+bash scripts/ml.sh train
+# 确定需要公开发布后，使用该路径，不自动寻找旧报告：
+bash scripts/ml.sh publish <Train-receipt路径>
+```
+
+`all` 会公开发布；当前全部人工触发，无自动调度。`data` 写 ML 库，读取生产快照；Web 只读两库。`train` 冻结输入并追加版本，`publish` 校验哈希／目标截止，只覆盖公网静态首页。任一标的采集失败仍会阻断 all，不能把旧 latest 当作本轮成功。
+
+## 排错与恢复
+
+| 现象 | 处理 |
+| --- | --- |
+| 盘中跳过／awaiting_final_data | 核对市场时区、收盘确认和 synced_at；收盘后先 data 再 train，不能改时间戳绕过守卫 |
+| feature_gap | 检查所需 as_of、连续 session 与特征缺口；先审计数据，修复有来源证据的行情后再生成新 run |
+| 日历告警／越界 | 当前覆盖至 2027 年末；维护临时停市和后续年份，按日历说明验证后更新，不能用工作日近似替代 |
+| 历史缺预测 | 核对 source 模式；recomputed 模式可用且 live 模式缺失是合法区别。补齐流程见历史记录 |
+| API 400／503 | 400 检查场景／代码／日期；503 检查实际库路径和 schema，迁移先在备份副本演练，Web 不负责建库 |
+| 发布拒绝 | 核对本次回执和产物哈希；过期或全跳过不应重复发布旧产物 |
+
+升级前备份覆盖 Web／ML／完整 data／配置／Git，见 [备份记录](ML_PRE_UPGRADE_BACKUP_2026-09-04.md)。最近一次部署前备份位于忽略目录 `data/deployments/20260905-ml-upgrade/`，保存源码、配置和两库在线备份；恢复应使用与目标切换时间一致的备份，不用 9 月 4 日整库覆盖后来新增交易事实。
+
+回滚时保留新版本、冻结输入、回执与失败日志；在新路径恢复对应备份并检查 SQLite 完整性与旧代码兼容，再切服务配置。代码回滚不会自动回滚数据库或公网 index.html；公网旧首页备份和发布证据见部署目录。不要直接删除不可覆盖版本、整库覆盖生产账户事实，或将旧报告重新包装为当前有效预测。
+
+## 验证与离线复现
+
+合并前修复记录为 **227 passed**。少数既有测试读取本地库并拟合模型，完整测试和实验应在新建的隔离代码／数据副本执行；原 dc66 工作树不再是可用复现目录。
+
+```bash
+# 在已准备的隔离副本根目录：
+conda activate mk
+PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/ -q -p no:cacheprovider
 node --check mystock/web/static/app.js
 node --check mystock/web/static/ml_next.js
 bash -n scripts/ml.sh
 git diff --check
 
-MYSTOCK_EXPERIMENT_DB="$PWD/data/upgrade-input/ml/mystock_ml.db" PYTHONPATH=. /opt/anaconda3/envs/mk/bin/python scripts/ml_experiments/exp_a_baseline.py
-/opt/anaconda3/envs/mk/bin/python -m scripts.ml_experiments.upgrade_matrix --db data/upgrade-input/ml/mystock_ml.db --out data/upgrade-output/matrix-rerun
-/opt/anaconda3/envs/mk/bin/python -m scripts.ml_experiments.exp_b_touch_economics --db data/upgrade-input/ml/mystock_ml.db --out data/upgrade-output/exp-b-rerun.json
-/opt/anaconda3/envs/mk/bin/python -m scripts.ml_experiments.strategy_validation --db data/ml/mystock_ml.db --out data/upgrade-output/strategy-rerun.json
-
-# 若需把新矩阵归档到另一个临时副本，只追加 recomputed，不会升级为 live：
-# python -m scripts.ml_experiments.archive_development --db <可写临时副本> --input data/upgrade-input/ml/mystock_ml.db --matrix data/upgrade-output/matrix-rerun
-
-# 当前8896已运行；仅进程退出后手动启动（或另选空闲端口）：
-/opt/anaconda3/envs/mk/bin/python -m scripts.ml_preview --db data/mystock.db --ml-db data/ml/mystock_ml.db --port 8896
+# 输入路径需指向已备份的隔离 ML 数据库：
+python -m scripts.ml_experiments.upgrade_matrix --db data/upgrade-input/ml/mystock_ml.db --out data/upgrade-output/matrix-rerun
+python -m scripts.ml_experiments.strategy_validation --db data/upgrade-input/ml/mystock_ml.db --out data/upgrade-output/strategy-rerun.json
+# 可另选空闲端口查看副本，不占用生产 8888：
+python -m scripts.ml_preview --db data/mystock.db --ml-db data/upgrade-input/ml/mystock_ml.db --port 8896
 ```
 
-冻结输入哈希在 `data/upgrade-output/input-hashes.json`，原依赖版本 `dependencies.json`；报告、矩阵和逐版本 manifest 在各自私有 runs/输出目录。日历生成工具只在隔离 `data/upgrade-runtime` 中使用 PMC5.1.3 / exchange-calendars4.11.1，不要求修改原共享环境；日历CSV已提交，运行时不需要这些生成依赖。
+历史审计／修复／逐日重建的命令与来源要求见 [历史补齐记录](ML_HISTORY_REFRESH_2026-09-05.md)，实验参数见 [实验工具说明](../scripts/ml_experiments/README.md)。audit 仅读；repair 联网写指定 ML 库；rebuild 读取冻结输入、追加 recomputed。不要为验证文档而执行采集、拟合、迁移或发布。
 
-## API 与规则
+## API 与后续维护边界
 
-- `GET /api/ml/strategy` 继续 schema1 legacy；显式 `mode=inventory` 才采用受约束策略。不能直接比较两个模式的收益分母。
-- v2：`latest` 看时间状态；`review` 固定市场session窗口与事实；`compare` 对比三种固定policy。参数缺失/非法为400，缺库/缺schema为503；无数据的session仍返回。
-- 所有库存账户参数均显式输入，费用空白为 gross/费用缺失；合成正费用不是券商费用模型。HK lot=100 是测试值，不能推广到全部港股。
-- 新预测有 run/manifest/input/代码/依赖/特征/seed/训练校准截止；generated、decision、published 独立，发布实际晚于截止的版本排除默认信号。报告按 run 保存原文，latest 只是兼容副本；全跳过不会覆盖旧 latest。
-- ML 不 import Web、不触发在线 API；Web 连接 mode=ro + query_only。旧未知时区时间保守处理，收盘后旧盘中缓存仍 awaiting_final_data。
+`/api/ml/v2/latest` 看时间状态；`review` 看固定 session 和缺口，`selected=日期` 附加订单事实；`compare` 比较三种固定 policy。没有独立 facts 路由。默认 API source 为 live，页面历史区显式允许重建。legacy `/api/ml/strategy` 保留 schema 1；显式 `mode=inventory` 才切受约束回放，收益分母不可混用。
 
-## 后续生产切换（本次未执行）
-
-1. 审查分支、实验负结果和手动流程；本轮没有模型晋级，也不建议据开发样本直接改生产默认。
-2. 在新的部署副本先保存当前运行源码、数据库在线备份、哈希和恢复演练；不得以本次2026-09-04备份覆盖后来新增交易事实。
-3. 明确每股真实历史lot/tick/费用、币种账户初始状态、订单量、库存上限、最大持有以及分红付款信息；更新日历临时停市事件与2027覆盖。
-4. 仅在部署副本演练 `init_ml_db` + `versions.migrate_legacy`、采集最终确认数据、生成版本和独立端口Web验证。确认报告时区/输入/目标日/截止；人工逐日积累60个真实session shadow。
-5. 用户批准切换时再按正常Git审查流程合并/部署，停旧Web并启动新服务；此操作本次没有执行。不要将历史recomputed视为shadow。
-
-回滚：切回切换前代码与配置，把新服务端口撤下、恢复旧服务；如新schema/版本库有兼容问题，使用**切换当时**的ML库备份恢复到新的路径后验证，不直接覆盖持续写入的原交易库。保留新增版本、发布回执与失败日志供审计；版本内容不可覆盖或删除。原运行目录与2026-09-04私有备份目前均保留。
-
-限制：静态日历至2026年底，临时天气中断仍需维护；小时OHLC有路径/排队歧义，使用显式保守次序；真实费用/账户参数未确认；分红付款日期不明只计应收；缺行情的期末估值可能使用标记stale的最后确认价；无独立holdout、五种子晋级复核或真实60-session shadow。E6–E8、RL/TFT/HMM与外部特征未开展。
+所有账户参数显式输入，费用空白为 gross；HK lot=100 只是测试值。日历已延长到 2027，证券规则历史／页面接入、快照保留策略、采集部分失败协议及报告改造尚未完成，详见 [剩余待办](ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md)。小时路径歧义、未知分红付款日、stale 估值仍须在结果中保留。E6–E8、外部特征和 RL／TFT／HMM 未开展。

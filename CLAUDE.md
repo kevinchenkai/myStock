@@ -87,7 +87,7 @@ conda activate mk && python -m pytest tests/ -q
 
 ## ML 升级运行约定
 
-- `/ml-next` 使用共享主题；`/api/ml/v2/{latest,review,compare,facts}` 只读 ML 库。历史回溯默认显示明确标注的重建，下一目标日卡片只取 live；不得把 recomputed 当成当天生成或前向 shadow。
+- `/ml-next` 使用共享主题；`/api/ml/v2/{latest,review,compare}` 只读 ML 库。真实订单事实通过 `review?selected=日期` 附加返回，没有独立 facts 路由。历史回溯默认显示明确标注的重建，下一目标日卡片只取 live；不得把 recomputed 当成当天生成或前向 shadow。
 - `ml_prediction_versions` 按 run 追加不可覆盖版本；`ml_predictions` 为旧版投影，仅后续有效 live 写入，已有混合来源逐行标注。审计迁移不追认历史时间。
 - `data/ml/runs/<id>/` 保存私有冻结 input.db 与 manifest；`receipts/` 保存训练回执和独立 `.data.json` 数据回执；`reports/runs/<id>/` 是本地报告归档。
 - `mystock/ml/calendars/` 为 2020–2027 冻结日历；剩余不足 60 天日志／回执预警，越界拒绝。US 决策截止 09:30 ET，HK 09:00；生成器依赖只在隔离工具环境使用。

@@ -90,7 +90,7 @@
   nav.toc a.sub { padding-left: 22px; font-size: 13px; color: var(--muted); }
 
   main {
-    flex: 1; max-width: 980px; padding: 40px 48px 120px; margin: 0 auto;
+    flex: 1; min-width: 0; width: 100%; max-width: 980px; padding: 40px 48px 120px; margin: 0 auto;
   }
 
   header.hero {
@@ -142,7 +142,7 @@
   th, td { padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); vertical-align: top; }
   th { background: var(--surface-2); font-weight: 600; }
   tr:last-child td { border-bottom: none; }
-  td code, th code { white-space: nowrap; }
+  td code, th code { white-space: normal; overflow-wrap: anywhere; }
 
   .callout {
     border-left: 4px solid var(--accent); background: var(--surface);
@@ -250,6 +250,7 @@
 <header class="hero">
   <span class="badge">PROJECT ONBOARDING</span>
   <h1>myStock · 项目接手指南</h1>
+  <p><strong>更新：2026-09-05 · 核对 a460d38 / main · 仅文档同步</strong> · <a href="README.md">文档索引</a> · <a href="ML_DEPLOYMENT_2026-09-05.md">部署回执</a></p>
   <p>个人港股 / 美股 持仓、交易、行情的本地化数据系统 —— 一份从零到接手的完整导读</p>
   <p style="margin-top:8px;">
     <span class="pill">Python 3.10+</span>
@@ -283,8 +284,11 @@
     <li>跨数据源（富途 + yfinance）的代码、币种、时间口径不统一 —— 本项目用 <code>code_map.py</code> 与 <code>currency</code> 字段统一。</li>
   </ul>
 
+  <div class="callout ok"><span class="tag">当前升级状态</span>
+    ML 工程已合入 main 并部署，入口 <a href="http://127.0.0.1:8888/ml-next/">本地 ML 页面</a>。核心目标是预测下一交易日低价／高价，辅助人类量化下单，并在现金、库存和费用约束下评估周期权益。E0–E5 没有模型达到晋级门槛；工程上线不代表预测准确率或收益已改善。仍人工触发，无自动下单或自动调度。
+  </div>
   <h3>阅读建议</h3>
-  <p>先 §1–§4 建立全局观 → §5–§11 逐模块读源码 → §12–§15 建立数据与口径直觉 → §16+ 了解 ML 扩展与运维。<code>CLAUDE.md</code>、<code>README.md</code>、<code>docs/DATA.md</code> 是权威文档，本指南是它们的导读与索引。</p>
+  <p>先 §1–§4 建立全局观 → §5–§11 逐模块读源码 → §12–§15 建立数据与口径直觉 → §16+ 了解 ML 扩展与运维。<code>CLAUDE.md</code>、<code>README.md</code>、<code>docs/DATA.md</code> 描述当前实现，本指南提供导读；历史方案和阶段回执按日期阅读，当前操作以 <a href="ML_UPGRADE_HANDOFF_2026-09-04.md">工程交接</a> 为准。</p>
 </section>
 
 <!-- ============ 2. 架构与数据流 ============ -->
@@ -302,11 +306,12 @@ yfinance（行情 / 通用信息）──────────────┴
     <thead><tr><th>层</th><th>位置</th><th>职责</th><th>能否离线</th></tr></thead>
     <tbody>
       <tr><td>采集层</td><td><code>mystock/collectors/</code></td><td>从富途 OpenD 与 yfinance 拉数据，清洗后写库</td><td>否（需网络 / OpenD 登录）</td></tr>
-      <tr><td>存储层</td><td><code>data/mystock.db</code> (SQLite)</td><td>10 张表，全部 UPSERT 幂等</td><td>是</td></tr>
+      <tr><td>存储层</td><td><code>data/mystock.db</code> (SQLite)</td><td>生产 10 张表；另有独立 ML 库 8 张表，新预测版本禁止覆盖</td><td>是</td></tr>
       <tr><td>展示层</td><td><code>mystock/web/</code></td><td>Flask 路由 + 原生 JS 前端，只读库</td><td>是</td></tr>
     </tbody>
   </table>
 
+  <p>ML 管线读取生产事实快照，另采集日线／小时线 → <code>data/ml/mystock_ml.db</code> → Web 只读 <code>/api/ml/*</code>。训练另存冻结输入与 run 报告；人工发布只更新公网静态首页，账户 Web 保持本地访问。</p>
   <h3>典型数据流（以"持仓"为例）</h3>
   <ol>
     <li><code>scripts/update.sh</code> → <code>mystock.pipelines.update_load</code></li>
@@ -333,7 +338,8 @@ yfinance（行情 / 通用信息）──────────────┴
     <li>交易密码：推荐用环境变量 <code>export MYSTOCK_FUTU_TRADE_PWD='你的交易密码'</code>，不要写进文件、不要进 git。</li>
   </ul>
 
-  <h3>三步脚本（顺序：init → update → server）</h3>
+  <h3>全新安装：init → update → server</h3>
+  <p>接手现有部署时先核对路径和服务，只读查看即可；不要为阅读或检查页面重复执行全量初始化。任何库迁移先备份并在副本演练。</p>
   <pre><code># 1) 首次全量：建环境 + 建库 + 全量抓取（幂等，可重复）
 bash scripts/init.sh
 
@@ -364,7 +370,8 @@ python -m pytest tests/ -q</code></pre>
 ├── CLAUDE.md                     # Claude Code 工作约定（亦为本指南的母本）
 ├── docs/
 │   ├── DATA.md                   # 数据字典（面向分析/建模，必读）
-│   ├── ML_PLAN.md                # ML 完整方案与决策记录
+│   ├── README.md                 # 当前文档导航与历史资料分类
+│   ├── ML_PLAN.md                # 早期方案（历史记录）
 │   ├── ML_OVERVIEW.md            # ML 速览（一页看懂）
 │   ├── futu-API数据扩展调研.html  # 富途接口可行性实测 + 三期升级计划
 │   └── 项目接手指南.html          # ← 本文件
@@ -391,11 +398,15 @@ python -m pytest tests/ -q</code></pre>
 │       ├── cv.py                 # 借鉴② Purged/Embargo 滚动切分（防泄漏评估地基）
 │       ├── signal_eval.py        # 借鉴③ 信号层 IC/RankIC/ICIR（两级评估）
 │       ├── policy.py             # S0 Rule / S2 LinUCB（regime 软切换已移除）
-│       ├── backtest.py           # 回测引擎 + compute_reward（raw/excess/sharpe/dd）
+│       ├── backtest.py           # 旧回测引擎；与新库存策略区分
 │       ├── simulator.py          # 1h bar 限价单撮合 + Account
 │       ├── offline_rl.py         # S3 离线 RL（CQL，已验证负结果）
-│       └── report.py             # 每日 HTML 报告（_ReportCfg 三开关透传）
-└── tests/                        # pytest 单测（含 test_ml_{calibrator,regime,reward,policy,simulator,...}）
+│       ├── sessions.py / calendars/ # 市场日历、收盘及决策截止
+│       ├── versions.py / runs.py # 不可覆盖版本、冻结输入与 manifest
+│       ├── execution.py / rules.py # 现金库存回放、lot/tick 处理
+│       ├── service.py            # v2 只读服务（Web 由 ml_api.py 接入）
+│       └── report.py / pipeline.py # 按 run 报告、发布回执校验
+└── tests/                        # pytest；合成用例为主，完整验证使用隔离副本
 </div>
 
   <h3>关键文件职责速查</h3>
@@ -413,7 +424,7 @@ python -m pytest tests/ -q</code></pre>
       <tr><td><code>mystock/pipelines/maintenance.py</code></td><td>手动运维：skiplist / reset-skiplist / purge</td></tr>
       <tr><td><code>mystock/pnl.py</code></td><td>盈亏：<code>compute_pnl</code>（移动平均成本）/ <code>analyze_stock</code>（FIFO 回合复盘）/ <code>yearly_finance</code></td></tr>
       <tr><td><code>mystock/web/app.py</code></td><td>Flask 路由（只读 API + 页面）</td></tr>
-      <tr><td><code>mystock/web/static/app.js</code></td><td>前端逻辑（无构建步骤，原生 JS，~1300 行）</td></tr>
+      <tr><td><code>mystock/web/static/app.js</code></td><td>前端逻辑（无构建步骤，原生 JS）</td></tr>
       <tr><td><code>mystock/web/static/theme.js</code></td><td>三态主题切换（跟随系统 / 浅色 / 深色）</td></tr>
       <tr><td><code>mystock/web/static/vendor/</code></td><td>vendored Lightweight-Charts（K 线图，离线）</td></tr>
       <tr><td><code>mystock/ml/predictor.py</code></td><td>S1 分位数回归区间预测（LightGBM），<code>IntervalModel.conformal</code> 套 CQR 校准</td></tr>
@@ -422,7 +433,7 @@ python -m pytest tests/ -q</code></pre>
       <tr><td><code>mystock/ml/backtest.py</code></td><td>回测引擎；<code>compute_reward</code>（raw/excess 纯函数）；<code>BTConfig</code>（CQR + purged 隔离带默认开）</td></tr>
       <tr><td><code>mystock/ml/cv.py</code></td><td>借鉴② Purged/Embargo 滚动切分（防泄漏评估地基，纯函数）</td></tr>
       <tr><td><code>mystock/ml/signal_eval.py</code></td><td>借鉴③ 信号层 IC/RankIC/ICIR（宽度 IC 为主指标，两级评估）</td></tr>
-      <tr><td><code>mystock/ml/report.py</code></td><td>每日 HTML 报告；<code>_ReportCfg</code>（CQR + purged 默认开）；含两级评估块</td></tr>
+      <tr><td><code>mystock/ml/report.py</code></td><td>按 run 生成 HTML 报告、冻结输入、生成回执；旧回测／bandit 展示仍待改造</td></tr>
       <tr><td><code>mystock/ml/config.py</code></td><td>ML 子包配置：<code>TARGETS</code> / <code>ALPHA_BY_CODE</code> / <code>COVERAGE_BY_CODE</code> + <code>coverage_for()</code></td></tr>
     </tbody>
   </table>
@@ -483,7 +494,7 @@ python -m pytest tests/ -q</code></pre>
 <!-- ============ 7. db.py ============ -->
 <section id="db">
   <h2>7 · db.py —— 数据库封装</h2>
-  <p>所有写库走 <strong>UPSERT</strong>（<code>INSERT ... ON CONFLICT(...) DO UPDATE</code>），天然幂等，可重复执行。</p>
+  <p>生产采集主要通过 <strong>UPSERT</strong>（<code>INSERT ... ON CONFLICT(...) DO UPDATE</code>）更新可变事实；持仓快照另有替换逻辑。ML 新预测版本按 run 追加，不能套用覆盖写入规则。</p>
 
   <h3>核心 API</h3>
   <table>
@@ -610,7 +621,7 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
     <li>同一标的按 <code>create_time</code> 升序处理。BUY：累加 <code>held_qty</code> 与 <code>held_cost</code>。</li>
     <li>SELL：先用窗口内持仓（<code>avg = held_cost / held_qty</code>）配平，<code>realized += (price - avg) * matched</code>，按比例扣减基数。</li>
     <li><strong>成本兜底</strong>：抓取起点（<code>start_date</code>）前的建仓买入不在库里 → 卖出量 &gt; 窗口内买入量时，剩余用 <code>positions.cost_price</code> 兜底。</li>
-    <li><strong>兜底成本 ≤ 0 视为不可用</strong>（富途超卖记账产物，如 <code>US.AAPL = -1233.96</code>），对应数量记入 <code>uncovered_sell_qty</code>，<strong>不计入盈亏</strong>，对用户透明。</li>
+    <li><strong>兜底成本 ≤ 0 视为不可用</strong>（此处仅说明异常记账口径），对应数量记入 <code>uncovered_sell_qty</code>，<strong>不计入盈亏</strong>，对用户透明。</li>
     <li>已实现盈亏率：相对"已卖出部分的成本"，避免被未平仓部分稀释。</li>
     <li>默认按 <code>realized_pnl</code> 降序输出。</li>
   </ul>
@@ -641,10 +652,11 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
 
   <h4>页面</h4>
   <ul>
-    <li><code>GET /</code> → <code>templates/index.html</code>（5 个 Tab + 个股下钻浮窗）</li>
+    <li><code>GET /</code> → <code>templates/index.html</code>（账户数据 Tab + 个股下钻浮窗）</li>
   </ul>
 
   <h4>JSON API</h4>
+  <p>ML 新页面：<code>GET /ml-next</code> 与 <code>/ml-next/</code>。新路由在 <code>mystock/web/ml_api.py</code>；表单只触发只读计算。</p>
   <table>
     <thead><tr><th>接口</th><th>说明</th></tr></thead>
     <tbody>
@@ -661,14 +673,17 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
       <tr><td><code>GET /api/stock/&lt;code&gt;/profile</code></td><td>通用信息（公司/估值，读自 <code>stock_profiles</code>）</td></tr>
       <tr><td><code>GET /api/stock/&lt;code&gt;/analysis</code></td><td>单股交易复盘：成交 + FIFO 回合 + 统计 + 客观观察</td></tr>
       <tr><td><code>GET /api/stock/&lt;code&gt;/capital-flow?days=60</code></td><td>该股日频资金流向（主力/超大/大/中/小单净流入，本币）</td></tr>
+      <tr><td><code>GET /api/ml/v2/latest</code></td><td>预测版本及时间状态，API 默认 live</td></tr>
+      <tr><td><code>GET /api/ml/v2/review</code></td><td>固定 session 复盘；<code>source=recomputed</code> 允许重建，<code>selected=YYYY-MM-DD</code> 附加当日真实订单事实；没有独立 facts 路由</td></tr>
+      <tr><td><code>GET /api/ml/v2/compare</code></td><td>显式账户参数下的三种固定策略；各窗口独立初始化</td></tr>
       <tr><td><code>GET /api/ml/strategy?codes=&amp;days=30</code></td><td>ML 预测区间挂单回溯（<strong>只读 ML 库</strong>，实时计算）：<code>results</code> 逐票 + <code>totals</code> 按币种汇总收益率。ML 库缺失返回 503</td></tr>
     </tbody>
   </table>
 
   <div class="callout warn">
     <span class="tag">注意</span>
-    <code>/api/ml/strategy</code> 的<strong>收益率必须先声明分母</strong> —— 该策略无预设本金（不设初始现金，净持仓还会单向漂移、可为负=裸空），
-    直接说"收益率 X%"是没有意义的。故给两个分母：<strong>成交额收益率</strong>（总盈亏 ÷ 平均单边成交额，衡量单位成交额的赚钱效率，跨标的可比）
+    <code>/api/ml/strategy</code> 默认 legacy 模式的<strong>收益率必须先声明分母</strong> —— 该策略无预设本金（不设初始现金，净持仓还会单向漂移、可为负=裸空），
+    直接说"收益率 X%"是没有意义的。故分别列出：<strong>成交额收益率</strong>（总盈亏 ÷ 平均单边成交额，衡量单位成交额的赚钱效率，跨标的可比）
     、<strong>占款收益率</strong>（总盈亏 ÷ 峰值 <code>|净持仓|×当日收盘</code>，最接近直觉本金）
     与<strong>现金收益率</strong>（总盈亏 ÷ <strong>实际垫付现金</strong>，即逐日累计现金余额的<strong>最低点</strong>——真金白银，按成交价算、只算现金方向，
     故<strong>纯裸空时为 0</strong> 表示一分钱没垫），另附<strong>线性</strong>年化（挂在占款口径上，×252/天数，<strong>非复利</strong>）。
@@ -682,6 +697,7 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
     股票代码不含 <code>/</code>，路由必须用 <code>&lt;code&gt;</code>（string 转换器，遇 <code>/</code> 停），<strong>不能用 <code>&lt;path:code&gt;</code></strong> —— 后者会贪婪吞掉 <code>/profile</code>、<code>/analysis</code> 子路径。
   </div>
 
+  <p>显式 <code>mode=inventory</code> 才切受约束回放（schema 2）；它的初始权益收益率与上述 legacy 分母不能直接比较。ML 缺库可返回 503，但 Web 顶层仍依赖 pandas/numpy，缺 Python 依赖可能导致整个服务无法启动。</p>
   <h3>11.2 前端 app.js / theme.js / style.css</h3>
   <ul>
     <li><strong>无构建步骤</strong>，原生 JS。改动后用 <code>node --check mystock/web/static/app.js</code> 做语法检查。</li>
@@ -704,7 +720,7 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
 <!-- ============ 12. 表结构 ============ -->
 <section id="schema">
   <h2>12 · 数据库表结构（schema.sql）</h2>
-  <p>10 张表。完整 DDL 见 <code>mystock/schema.sql</code>；字段级数据字典见 <code>docs/DATA.md</code> 与本指南 §13。</p>
+  <p>生产 10 张表；结构需合看 <code>mystock/schema.sql</code> 与 <code>db.py</code> 列迁移。另有 8 张 ML 表，见 §16；完整数据口径见 <a href="DATA.md">数据字典</a>。</p>
 
   <table>
     <thead><tr><th>表</th><th>用途</th><th>主键</th><th>来源</th></tr></thead>
@@ -745,7 +761,7 @@ account_funds               账户级每日快照，不含 code，无法与个�
   <h3>positions —— 持仓每日快照</h3>
   <ul>
     <li><code>snapshot_date / market / code</code>（主键三件套）、<code>name / qty / can_sell_qty / nominal_price / market_val / pl_val / currency / updated_at</code></li>
-    <li><code>cost_price</code>：<strong>可能 ≤ 0</strong>（富途超卖/融券会计产物，观测 7 只美股为负，如 <code>US.AAPL=-1233.96</code>）。建模时 ≤0 视为缺失。</li>
+    <li><code>cost_price</code>：<strong>可能 ≤ 0</strong>（合成示例：<code>cost_price=-10</code>；不应解释为真实购入成本）。建模时 ≤0 视为缺失。</li>
     <li><code>pl_ratio</code>：<strong>百分比数值</strong>（6364.24 表示 +6364.24%），非小数；异常大值通常对应近 0 成本。</li>
     <li>历史快照<strong>不可回补</strong>（富途只给"当前"），随 <code>update.sh</code> 逐日积累。</li>
   </ul>
@@ -778,6 +794,7 @@ account_funds               账户级每日快照，不含 code，无法与个�
     <li><code>market_cap_mm / trailing_eps / target_mean_price</code> 是<strong>标的本币</strong>（HK→HKD、US→USD），<strong>不是美元</strong>。跨市场比较前必须换汇。</li>
     <li><code>dividend_yield</code> 是<strong>百分比数值</strong>（8.32 表示 8.32%）。</li>
     <li><strong>无历史</strong>：每天覆盖，只有最新值。需要估值时序必须自建快照归档。</li>
+    <li>盘面规则新增 <code>lot_size / price_spread / rules_effective_from</code>，由 db.py 列迁移补齐；当前采集日期不等于真实历史生效日期，规则版本与页面预填仍待完成。</li>
   </ul>
 
   <h3>fx_rates —— 外汇日线</h3>
@@ -816,7 +833,7 @@ account_funds               账户级每日快照，不含 code，无法与个�
 
   <h3>14.3 幂等与覆盖</h3>
   <ul>
-    <li>所有写库用 UPSERT；当天可变数据（持仓快照、行情）以覆盖为准。</li>
+    <li>生产可变事实按主键更新，当天持仓快照可替换；ML 新版本追加且禁止覆盖／删除（见 §16）。</li>
     <li>持仓用 <code>replace_position_snapshot</code>：先 DELETE 当天再 INSERT，保证已清仓标的不残留。</li>
     <li><code>init.sh</code> / <code>update.sh</code> 可重复执行，不会产生重复数据。</li>
   </ul>
@@ -865,7 +882,7 @@ account_funds               账户级每日快照，不含 code，无法与个�
 
   <div class="callout warn">
     <span class="tag">7. 持仓快照稀疏</span>
-    当前库快照日少，时序分析需先积累。历史空缺只能随 <code>update.sh</code> 自然积累，不可回补。
+    快照覆盖应按实际日期审计，早期数据量不能代表当前库存。历史空缺只能随 <code>update.sh</code> 自然积累，不可回补。
   </div>
 
   <div class="callout warn">
@@ -901,129 +918,77 @@ account_funds               账户级每日快照，不含 code，无法与个�
 
 <!-- ============ 16. ML 子系统 ============ -->
 <section id="ml">
-  <h2>16 · ML 子系统概览</h2>
-  <p>独立于 web 生产系统，是后续研究性扩展。完整方案见 <code>docs/ML_PLAN.md</code>，速览见 <code>docs/ML_OVERVIEW.md</code>，新算法建议清单见 <code>docs/ML_ALGORITHM_PROPOSAL.md</code>。</p>
+  <h2>16 · ML 子系统：预测、回溯与版本证据</h2>
+  <p>当前运行说明见 <a href="ML_OVERVIEW.md">ML 概览</a>；实现与后续维护见 <a href="ML_UPGRADE_HANDOFF_2026-09-04.md">工程交接</a>。<a href="ML_PLAN.md">早期 ML 方案</a>及旧 Qlib／算法研究是历史资料，不能直接作为运行工单。</p>
 
-  <h3>核心思路：拆两层</h3>
-  <table>
-    <thead><tr><th>层</th><th>干什么</th><th>方法</th></tr></thead>
-    <tbody>
-      <tr><td>预测层（S1）</td><td>预测次日 [L̂, Ĥ] 区间</td><td>分位数回归 + <strong>CQR 校准</strong>（建议 2）</td></tr>
-      <tr><td>决策层（S2/S3）</td><td>挂什么价、挂多少量</td><td>规则 → bandit → RL；bandit = <strong>超额-LinUCB</strong>（regime/风险调整 reward 复检未过已移除）</td></tr>
-    </tbody>
-  </table>
-
-  <h3>工程解耦（关键边界）</h3>
-  <ul>
-    <li><strong>独立库</strong>：<code>data/ml/mystock_ml.db</code>，与 web 生产库 <code>mystock.db</code> 分库。ML 管线只读生产库快照、绝不写；<strong>web 可只读 ML 库</strong>（2026-08-14 放开，见 <code>/api/ml/strategy</code>），反向依赖仍禁止（<code>mystock/ml/</code> 不得 import <code>mystock/web/</code>）。</li>
-    <li><strong>独立采集脚本</strong>：<code>scripts/ml.sh</code>（data/train/publish/all），<strong>不并入 <code>update.sh</code></strong>。</li>
-    <li><strong>独立 conda env</strong>：<code>mystock-ml</code>（H20 GPU 机器，与 base/vllm/comfyui 隔离）；本机训练用 <code>mk</code>（CPU 算法）。</li>
-    <li><strong>ML 绝不写生产库</strong>；web 侧读 ML 库仅用于展示（不触发训练/抓取，ML 库缺失时相关接口返回 503，不影响其余页面）。</li>
-  </ul>
-
-  <h3>数据扩充</h3>
-  <ul>
-    <li>5 年日线（1255 行/股）→ 预测层样本 ×3.4</li>
-    <li>2 年 1h 线（~5000 行/股）→ 撮合模拟器的盘中真实路径，覆盖全部成交窗口</li>
-    <li>标的：3 美（NVDA/TSLA/PDD）+ 3 港（HK.00700/09988/01810），各股独立账户、本币闭环</li>
-    <li><code>ml_predictions</code> 预测留档（每日 +6 行，随 <code>ml.sh</code> 自然积累）→ 报告「近期预测复盘」的数据源</li>
-  </ul>
-
-  <h3>第一档算法升级（2026-07 落地 → 部分回退）</h3>
-  <div style="margin:12px 0;padding:12px 14px;background:#fff4f4;border-left:4px solid #d33;border-radius:6px">
-    <strong>⚠️ 重要更新（2026-07-18）：建议1 与建议3 已移除。</strong> 借鉴 qlib 的防泄漏切分 + 两级 IC 评估落地后，用可信尺子做<strong>多时段稳健性检验</strong>，发现 <strong>建议1（风险调整 reward）与建议3（HMM regime 软切换）在 6 个历史时段方向翻转、胜率 42%（≈掷硬币）</strong>——所谓"改善"是时段偶然，非真效果。据"打不过就诚实记录"纪律已从代码删除。<strong>建议2（CQR 校准）稳健有效、保留。</strong> 完整证据见 <code>docs/ML_TIER1_ROBUSTNESS.md</code>。当前标准口径：<code>reward=excess · CQR=on(目标70%) · purge=on(隔离带)</code>。下方原始三建议表保留作历史。
+  <h3>预测服务于周期权益</h3>
+  <p>为 NVDA／TSLA／PDD／腾讯／阿里／小米预测下一交易日的低价与高价，由人类决定挂单。当前保留分位回归 + CQR；同时检查上下侧误差、覆盖／宽度及固定执行策略的权益与回撤。覆盖区间不自动等于最优买卖价，也不保证特定市场时段的覆盖或收益。</p>
+  <div class="callout warn"><span class="tag">工程已部署，模型未晋级</span>
+    E0–E5 没有候选达到预设门槛，未进行五种子晋级复核、独立 holdout 或 60 个真实 session 的前向 shadow。旧文档的单窗收益、HMM／reward 初测结论不能作为当前优势证明。详见 <a href="ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md">本次实验负结果</a>与 <a href="ML_TIER1_ROBUSTNESS.md">早期稳健性复检</a>。
   </div>
-  <p>（历史）按 <code>docs/ML_ALGORITHM_PROPOSAL.md</code> 第一档三条建议实施，当时全部 <strong>opt-in 默认开</strong>。</p>
-  <table>
-    <thead><tr><th>建议</th><th>模块</th><th>做什么</th><th>关键设计点</th></tr></thead>
-    <tbody>
-      <tr style="opacity:.6">
-        <td><strong>1 · 风险调整 reward</strong><br><span style="color:#d33;font-size:12px">✗ 已移除（复检未过）</span></td>
-        <td><code>backtest.compute_reward</code>（纯函数）</td>
-        <td>reward 从单一"超额"扩展为 4 模式：<code>raw</code> / <code>excess</code>（旧默认）/ <code>sharpe</code>（减近 20 步波动·scale）/ <code>drawdown_penalized</code>（减深回撤惩罚）</td>
-        <td>惩罚项与 base 同量级，不破坏 LinUCB 的 theta/bonus 平衡；纯函数可单测（<code>test_ml_reward.py</code> 18 例）</td>
-      </tr>
-      <tr>
-        <td><strong>2 · CQR 校准</strong></td>
-        <td><code>calibrator.py</code> + <code>IntervalModel.conformal</code> + <code>config.coverage_for</code></td>
-        <td>在分位数回归外套 split conformal：用训练末尾 <code>cal_frac</code> 算 non-conformity score（Romano 约定 <code>s=max(L̂−y_low, y_high−Ĥ)</code>），取 <code>⌈(n+1)(1−α)⌉</code> 分位得半宽 <code>q</code>，区间扩为 <code>[L̂−q, Ĥ+q]</code></td>
-        <td>有限样本覆盖率保证（标准 QR 只有渐近保证）；<code>q&gt;0</code> 扩展 / <code>q&lt;0</code> 自适应收紧；目标覆盖率按股可调 <code>COVERAGE_BY_CODE</code>，默认 0.70（收窄档）</td>
-      </tr>
-      <tr style="opacity:.6">
-        <td><strong>3 · HMM regime 软切换</strong><br><span style="color:#d33;font-size:12px">✗ 已移除（复检未过）</span></td>
-        <td><code>regime.py</code> + <code>policy.RegimeLinUCB</code> / <code>RegimeRulePolicy</code></td>
-        <td>3 维特征（日对数收益 / 20 日年化波动 / MA20−MA50 趋势展开）fit GaussianHMM（仅训练段）；按 <code>P(regime_t|x_1:t)</code> 软混合各 regime 的 LinUCB 参数（<code>A_mix=Σ p_k·A[k]</code>）选臂 + 加权信用分配</td>
-        <td><strong>无泄漏</strong>：手写前向算法（forward filtering）算 <code>P(z_t|x_1:t)</code>，<strong>不用 hmmlearn 的 <code>predict_proba</code></strong>（那是 forward-backward 平滑，会偷看未来）；<code>hmmlearn</code> 缺失时 graceful 回退 GMM；单测验证篡改未来不改过去概率（drift=0）</td>
-      </tr>
-    </tbody>
-  </table>
-  <p><strong>RegimeRulePolicy 软切换口径</strong>：涨势（<code>mean[ret]</code> 最大的状态）持仓→HOLD（不卖赢家）、空仓→L_hat 买入；下行持仓→H_hat 卖出（借势减仓）、空仓→HOLD（不接飞刀）；不确定（dom 概率 &lt; 0.5）→ 走原 RulePolicy 震荡口径（低买高卖）。</p>
 
-  <h3>区间收窄（与建议 2 配套）</h3>
-  <ul>
-    <li><strong>收窄区间的唯一有效杠杆是 <code>target_coverage</code></strong>：base 分位（<code>ALPHA_BY_CODE</code>）收窄会被 CQR 自适应补偿——CQR 永远把区间扩到目标覆盖率，所以调 base 不改最终宽度，只调 <code>COVERAGE_BY_CODE</code> 才能真正收窄。这点写进 <code>config.py</code> 注释。</li>
-    <li>0.80 → 0.70 实测：宽度 7-13% → 6-11%（收窄 11-15%），命中率 ~82% → ~72-75%（仍守目标 70%）。</li>
-    <li>按股调档示例：<code>COVERAGE_BY_CODE = {"HK.00700": 0.65, "US.PDD": 0.65}</code>（低波动股更激进），无需改代码。</li>
-  </ul>
-
-  <h3>进度与结论（诚实记录）</h3>
-  <ul>
-    <li><strong>P1 撮合校准吻合率 88–93%</strong>（真实 orders 回放）→ 撮合可信。</li>
-    <li><strong>P2 预测层成立</strong>：base 分位命中 ~50%；<strong>CQR 校准后</strong>命中达目标覆盖率（0.70→~72-75%、0.80→~82%），宽度可控（&lt;15%）。</li>
-    <li><strong>P3.1 bandit + 第一档建议 A/B（初测 vs 复检）</strong>：初测（单种子/单窗）曾记 4/6 改善（PDD +34%、NVDA +40%…）；<strong>复检（多时段 6 起点）推翻此结论——建议1+3 全 6 标的方向翻转、胜率 42%</strong>，判定无稳健优势并移除（详见 <code>docs/ML_TIER1_ROBUSTNESS.md</code>）。教训：<strong>单种子单窗的"改善"读不准，需多时段/多种子才可信</strong>。</li>
-    <li><strong>P4 离线 RL（CQL）无效（负结果）</strong>：三支全退化为"全程不动"，conservative_loss &gt; td_loss。符合方案预判 —— 小样本是硬天花板。RL 升级（IQL/Cal-QL）记为第二档。</li>
-    <li><strong>借鉴 qlib ②③（已落地）</strong>：Purged 隔离带切分（<code>cv.py</code>）+ 信号 IC 两级评估（<code>signal_eval.py</code>）——修准了评估尺子，正是它们让上面的复检成为可能。宽度 IC 显示六标的信号跟得住振幅（0.12–0.45），瓶颈在决策层执行而非预测层。</li>
-    <li><strong>go/no-go</strong>：S1+S2 交付（预测层 + CQR + 规则/超额-bandit + 每日报告 + 防泄漏评估）。决策层增强（reward 工程 / regime）复检未过、已回退。</li>
-  </ul>
-
-  <h3>关键洞见</h3>
+  <h3>页面使用顺序</h3>
   <ol>
-    <li>拆两层的设计被验证是对的 —— 预测层稳、可独立交付；避免端到端 RL 黑箱。</li>
-    <li><strong>奖励对齐比换更复杂的模型更管用</strong> —— 仅把奖励改成"相对 buy&hold 超额"，NVDA 就从输变赢；进一步加 DD 惩罚/Sharpe 化继续提升稳定性。</li>
-    <li>小样本是硬天花板，RL 学不出有效策略不是调参问题，是数据量问题。</li>
-    <li>没有单一策略通吃：涨势 buy&hold 难超越；震荡/下行择时才有价值。<strong>regime 感知已落地</strong>（HMM 软切换），下一步 = 按股调 regime 参数 / 扩样本 / IQL。</li>
-    <li><strong>防泄漏是 regime 的命门</strong>：HMM 必须只在训练段 fit，推理必须用前向算法（forward filtering），不能用 forward-backward 平滑——否则回测偷看未来会给出虚高收益。</li>
+    <li>打开 <a href="http://127.0.0.1:8888/ml-next/">8888 /ml-next/</a>，核对下一目标日卡片的 live 来源、时间和状态。</li>
+    <li>历史回溯默认包含离线重建，选择 20／60／120 个市场 session，查看实际高低、预测来源和缺口；选中日期可看真实订单快照。</li>
+    <li>显式填写本金、初始库存及价格、单笔量、库存上限、最大持有天数、lot／tick 和费用，再重新模拟。合成测试按钮只填浏览器表单。</li>
+    <li>比较预测边界、波动率基准、固定偏移三种库存策略。每个窗口从初始状态重新运行，不能把窗口收益相加；各股独立本币账户，USD／HKD 不相加。</li>
   </ol>
+  <p>执行引擎预留现金和库存，DAY 到期释放，禁止裸空或透支。小时 OHLC 无法还原逐笔路径和排队，同柱先后使用显式保守假设。费用空白为 gross；合成费率、HK lot=100 都不是券商或全部港股真实规则。缺付款日的分红记应收，缺行情的期末估值标 stale。订单快照没有完整改单生命周期，不输出替换真实订单的确定假想收益。</p>
 
-  <h3>测试</h3>
-  <p>ML 子包纯函数单测（不依赖 GPU / 可在 <code>mk</code> 跑）：<code>test_ml_calibrator</code>（CQR 符号/有限样本分位/覆盖率按股）、<code>test_ml_cv</code>（借鉴② purged 切分：隔离带/min_train/扩张窗单调/第0折不丢）、<code>test_ml_signal_eval</code>（借鉴③ IC：完美/噪声/RankIC 抗异常/宽度 IC 跟踪振幅）、<code>test_ml_policy</code> / <code>test_ml_simulator</code> / <code>test_ml_nan_guard</code> / <code>test_ml_offline_rl</code> / <code>test_ml_review</code>（预测复盘：命中/上破/下破/双破判定、按交易日历取次日、待结算不计入命中率、NaN 实际值不误判、历史 HTML 解析与去重）。ML 子包合计 81 测试，仓库全量 136（<code>test_ml_regime</code> / <code>test_ml_reward</code> 随建议1+3 移除而删）。</p>
+  <h3>数据与版本</h3>
+  <table>
+    <thead><tr><th>对象</th><th>职责与边界</th></tr></thead>
+    <tbody>
+      <tr><td><code>ml_quotes_1d / ml_quotes_1h</code></td><td>独立日线／小时线；Futu 补采保存 data_source、source_ref，不能静默混源或伪造缺失 bar</td></tr>
+      <tr><td><code>ml_deals / ml_orders / ml_positions</code></td><td>生产交易事实的快照副本，ML 不写生产库</td></tr>
+      <tr><td><code>ml_sync_log</code></td><td>ML 独立采集日志</td></tr>
+      <tr><td><code>ml_prediction_versions</code></td><td>按 run 追加不可覆盖内容，记录 target_session、来源、状态、时间与 manifest；新版本不删除旧证据</td></tr>
+      <tr><td><code>ml_predictions</code></td><td>旧接口兼容投影，后续仅有效 live 投影；已有混合来源保留并标注，不能只信旧 live 标签</td></tr>
+      <tr><td><code>data/ml/runs/&lt;id&gt;/</code></td><td>冻结 input.db、SHA256、代码、依赖、seed、特征及训练／校准截止；全部属于私有产物</td></tr>
+      <tr><td><code>reports/runs/&lt;id&gt;/</code> 与 <code>receipts/</code></td><td>报告原文与训练／发布回执；latest 仅兼容副本，采集 .data.json 不可用于发布</td></tr>
+    </tbody>
+  </table>
+  <p><strong>live／backfill／recomputed 分开：</strong>新 live 需有时间证据；历史 HTML 导入不追认原发布时间；重建仅表示基于截断历史输入的事后研究。2026-09-05 部署验收时六股 20／60／120 session 共 120／360／720 条 ok，无缺行情／预测／小时线；这是验收快照，未来仍需审计。另已生成并发布六股 live，见 <a href="ML_DEPLOYMENT_2026-09-05.md">部署回执</a>。</p>
 
-  <h3>产物</h3>
-  <p>每日生成自包含 HTML 报告，归档 <code>data/ml/reports/&lt;date&gt;/</code>，红涨绿跌、不碰 web。cron 每工作日早 8 点（北京时间）跑 <code>ml.sh all</code>。报告头部口径行透明化当前 reward / CQR / regime 模式。</p>
-  <p><strong>近期预测复盘（2026-08-14 新增）</strong>：报告新增一节，把<strong>过去真实给出的次日区间</strong>与该次日实际高/低逐条对照。预测留档在 <code>ml_predictions</code> 表（PK <code>code+as_of</code>），<code>build_report</code> 每次执行会建表 → 首次自动回填历史 HTML（<code>backfill.run_if_empty</code>，表非空即跳过）→ 写入当日预测，<strong>即每跑一次 <code>ml.sh train</code> 就同步一次</strong>。判定逻辑在 <code>review.py</code>（纯函数）：次日按标的自身交易日历取下一根日线（跳周末/假期/停牌），真实 high ≤ H_hat 且 low ≥ L_hat 才算命中，单边戳出即未命中，区分上破/下破以暴露方向偏置。展示按股 tab 切换、默认最近 7 个交易日倒序、其余可展开，交互全部纯 CSS（保持报告零 JS）。</p>
-  <p><strong>缺口重算</strong>：报告非每个交易日都跑，留档会有洞。<code>python -m mystock.ml.backfill --gaps</code> 把日线<strong>截断到基准日 T</strong> 后重跑 <code>predict_next_day</code>，补出「那天本该给出的预测」——训练集与特征都只到 T，<strong>无未来函数</strong>（已用真实留档对照，差异 &le;0.04 &asymp;0.02%，来自 yfinance 对历史 bar 的微幅修订）。三种来源用 <code>source</code> 列区分：<code>live</code>（当天实时）/ <code>backfill</code>（历史 HTML 解析）/ <code>recomputed</code>（事后重算）。</p>
-  <div class="callout warn">
-    <span class="tag">注意</span>
-    <strong>两个口径别混读</strong>：复盘用的是 <code>predict_next_day</code>（<strong>全历史 fit</strong>）的线上预测，与总览「命中率」（回测 walk-forward 模型，训练截止在很早以前）<strong>不是同一个模型</strong>，线上表现通常更差（实测 36–74% vs 回测 59–75%）。另外报告非每个交易日都生成，复盘序列<strong>有洞</strong>，逐行标注基准日与次日，勿当连续序列读。
-  </div>
+  <h3>时间守卫与当前限制</h3>
+  <ul>
+    <li>冻结交易日历覆盖 2020–2027；US 截止 09:30 ET，HK 截止 09:00 香港时间，不能套用固定北京时间定时。剩余不足 60 天告警，越界拒绝，临时停市仍需维护。</li>
+    <li>日线收盘确认后才能生成；特征末日必须等于所需 as_of，缺口返回 feature_gap。generated／decision／published 时间分开，晚于截止的发布不能进入默认有效信号。</li>
+    <li>证券规则历史与页面预填、冻结快照保留策略、采集部分成功协议及报告改造仍待完成，见 <a href="ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md">修复与延期清单</a>。</li>
+    <li>完整工程测试最近记录为 227 passed；少数测试会读取本地库并拟合，完整测试须在隔离数据副本运行。本文更新不等于重新执行实验。</li>
+  </ul>
 </section>
 
 <!-- ============ 17. 运维 ============ -->
 <section id="ops">
   <h2>17 · 运维与维护</h2>
-
-  <h3>例行流程</h3>
-  <ol>
-    <li>确保富途 OpenD 已启动并登录。</li>
-    <li><code>bash scripts/update.sh</code> 增量更新。</li>
-    <li><code>bash scripts/server.sh</code> 启动 / 重启 Web。</li>
-  </ol>
-
+  <h3>人工流程</h3>
+  <p>只读看页面无需刷新数据库或重启服务。需要更新账户事实时运行 update；ML 单独 data → train → 按需 publish。全部人工触发，无 cron／launchd。</p>
+  <pre><code># 需要更新生产持仓／订单等事实时，先确认 OpenD 已登录：
+bash scripts/update.sh
+# ML 单独采集及收盘确认：
+bash scripts/ml.sh data
+# 生成报告，保存终端打印的 Train receipt：
+bash scripts/ml.sh train
+# 如需公开发布，明确指定本次回执：
+bash scripts/ml.sh publish &lt;Train-receipt路径&gt;
+# 后端代码变更才需要重启；不要另起重复的 8888 进程：
+bash scripts/server.sh</code></pre>
+  <p><code>all</code> 包含公网发布，任一采集失败会中止；全跳过不覆盖旧 latest。publish 校验产物哈希和目标截止，不自动寻找旧报告。公网仅为静态报告首页，本地账户 Web 不对外开放。</p>
   <h3>常见问题</h3>
-  <table>
-    <thead><tr><th>现象</th><th>排查</th></tr></thead>
-    <tbody>
-      <tr><td>页面无数据 / <code>/api/*</code> 返回 503</td><td>数据库不存在，先 <code>bash scripts/init.sh</code></td></tr>
-      <tr><td>富途数据抓取失败</td><td>确认 OpenD 已启动登录、端口与 <code>config.yaml</code> 一致；查 <code>sync_log</code> 的 error 记录</td></tr>
-      <tr><td>历史成交为空</td><td>确认 <code>trd_env: REAL</code>（成交接口仅支持实盘）</td></tr>
-      <tr><td>某些股票没行情</td><td>退市/yfinance 无数据 → 进 <code>quote_skiplist</code>，属正常；个股详情页会提示"行情数据不足"</td></tr>
-      <tr><td>真实持仓被误跳过</td><td>限频批量抓空误伤 → <code>maintenance reset-skiplist [代码...]</code></td></tr>
-      <tr><td>退市清仓想彻底清除</td><td><code>maintenance purge &lt;代码&gt;</code>（不可逆，会改历史盈亏）</td></tr>
-    </tbody>
-  </table>
-
-  <h3>sync_log 用途</h3>
-  <p>每次抓取写一条，含 <code>source / range_start / range_end / row_count / status / message / run_at</code>。增量更新据此取上次同步点；排查时按 <code>status='error'</code> 过滤。</p>
+  <table><thead><tr><th>现象</th><th>排查</th></tr></thead><tbody>
+    <tr><td>页面／API 503</td><td>先核对实际库路径与 schema；全新安装才 init，旧库迁移先在备份副本验证。Web 不建库</td></tr>
+    <tr><td>富途抓取失败</td><td>确认 OpenD 登录和配置端口；查看生产 sync_log 或独立 ml_sync_log</td></tr>
+    <tr><td>awaiting_final_data／feature_gap</td><td>核对收盘、synced_at 与所需 as_of；先审计行情缺口，不能改时间戳绕过守卫</td></tr>
+    <tr><td>历史 live 缺失但重建存在</td><td>检查来源筛选；重建可用于研究，不应伪装成当时生成的预测</td></tr>
+    <tr><td>日历越界／即将到期</td><td>按 <a href="../mystock/ml/calendars/README.md">日历说明</a> 更新并验证休市、半日市及临时事件</td></tr>
+    <tr><td>发布失败／报告过期</td><td>检查本次 train 回执、哈希及截止；旧报告不能重发为当前有效信号</td></tr>
+    <tr><td>真实持仓被 skiplist 跳过</td><td>先核验抓取失败原因，再按维护流程 reset-skiplist；purge 会不可逆地改变历史事实</td></tr>
+  </tbody></table>
+  <h3>备份、恢复与审计</h3>
+  <p><a href="ML_PRE_UPGRADE_BACKUP_2026-09-04.md">升级前备份</a>覆盖 Web／ML／完整 data／配置与 Git。最新部署前备份及验收证据位于私有 <code>data/deployments/20260905-ml-upgrade/</code>。恢复先写新路径，核对哈希、SQLite 完整性与兼容性；不得用旧整库覆盖新增交易事实。回滚代码不自动恢复数据库或公网首页，操作细节见 <a href="ML_UPGRADE_HANDOFF_2026-09-04.md">工程交接</a>。</p>
+  <p>历史 audit 仅读；repair 联网写指定 ML 库；rebuild 追加 recomputed 并冻结输入。恢复和修复保留版本、run 与回执引用，不能直接清理掉历史证据。</p>
 </section>
 
 <!-- ============ 18. 安全 ============ -->
@@ -1041,72 +1006,39 @@ account_funds               账户级每日快照，不含 code，无法与个�
   <ul>
     <li>交易密码只走环境变量或 <code>config.yaml</code>，<strong>绝不硬编码、绝不进 git</strong>。</li>
     <li>提交前确认 diff 与新文件<strong>无密钥 / token / 密码</strong>。</li>
-    <li>ML 产物（报告）含真实交易信息，<code>data/ml/reports/</code> 已被 <code>.gitignore</code> 的 <code>data/</code> 规则覆盖；公网发布须由用户自己执行（不经 Claude，避免数据外泄闸）。</li>
-    <li>H20 为用户私人 GPU 机器，可直接 rsync 真实数据；但产物绝不进公开 git。</li>
+    <li>ML 产物（报告）含真实交易信息，<code>data/ml/reports/</code> 已被 <code>.gitignore</code> 的 <code>data/</code> 规则覆盖；公开发布需明确对应报告与回执；本次经用户授权的发布已完成，见部署回执。不要把数据库、配置或完整本地归档一并上传。</li>
+    <li>本次升级在本地 CPU 环境完成，日常查看与训练不依赖 H20；远端数据同步不是接手或文档维护的默认步骤。</li>
   </ul>
 </section>
 
 <!-- ============ 19. 接手清单 ============ -->
 <section id="onboarding">
   <h2>19 · 接手清单（按顺序勾选）</h2>
-
-  <h3>环境就绪</h3>
+  <h3>先确认现状</h3>
   <ul>
-    <li>☐ 安装 conda，<code>conda env create -f environment.yml</code>（或跑 <code>init.sh</code> 自动建）</li>
-    <li>☐ 安装并登录富途 OpenD（<code>127.0.0.1:11111</code>）</li>
-    <li>☐ <code>cp config.example.yaml config.yaml</code>，按需改端口/市场</li>
-    <li>☐ <code>export MYSTOCK_FUTU_TRADE_PWD='你的交易密码'</code></li>
+    <li>☐ 阅读 <a href="README.md">docs 索引</a>、<a href="COLLABORATION.md">协作约定</a>、<a href="OPEN_ITEMS.md">未尽事项</a>及部署回执，区分历史方案、工程状态与模型验证结果。</li>
+    <li>☐ 核对 main、Git 状态、mk 环境、配置和两库路径；已有部署先打开 8888，只读检查，勿重复 init。</li>
+    <li>☐ 核对最近备份与恢复说明；需要实验时建立新的隔离代码／数据副本，原 dc66 工作树已移除。</li>
+    <li>☐ 全新安装才按 §3 配置环境、OpenD 和初始化；凭据仅保存在本地配置或环境变量。</li>
   </ul>
-
-  <h3>跑通主流程</h3>
+  <h3>读源码与数据契约</h3>
   <ul>
-    <li>☐ <code>bash scripts/init.sh</code> 全量初始化</li>
-    <li>☐ <code>bash scripts/server.sh</code> → 浏览器 <code>http://localhost:8888</code></li>
-    <li>☐ <code>conda activate mk && python -m pytest tests/ -q</code> 全绿</li>
+    <li>☐ config.py → code_map.py → 两份 schema.sql 与 db.py 的列迁移 → <a href="DATA.md">数据字典</a>。</li>
+    <li>☐ collectors → pipelines → pnl.py：采集与展示分离，成本缺口、币种及现金口径明确。</li>
+    <li>☐ web/app.py、ml_api.py、templates/ml_next.html、static/ml_next.js：v2 三条路由与只读边界。</li>
+    <li>☐ ML sessions.py → predictor.py／calibrator.py → versions.py／runs.py → execution.py／service.py → report.py／pipeline.py。</li>
+    <li>☐ cv.py／signal_eval.py 与实验工具：区分 raw 预测、校准覆盖、固定策略权益及真实前向证据。</li>
   </ul>
-
-  <h3>读源码（建议顺序）</h3>
+  <h3>验证与维护</h3>
   <ul>
-    <li>☐ <code>CLAUDE.md</code> + <code>README.md</code>（全局）</li>
-    <li>☐ <code>mystock/config.py</code> + <code>code_map.py</code>（最小、最纯）</li>
-    <li>☐ <code>mystock/schema.sql</code> + <code>docs/DATA.md</code>（数据模型）</li>
-    <li>☐ <code>mystock/db.py</code>（UPSERT 与 skiplist 机制）</li>
-    <li>☐ <code>mystock/collectors/futu_client.py</code>（限频与窗口分段）</li>
-    <li>☐ <code>mystock/collectors/yf_client.py</code>（<code>_end_inclusive</code> 坑）</li>
-    <li>☐ <code>mystock/pipelines/init_load.py</code> + <code>update_load.py</code>（增量起点逻辑）</li>
-    <li>☐ <code>mystock/pnl.py</code>（移动平均 vs FIFO，兜底）</li>
-    <li>☐ <code>mystock/web/app.py</code> + <code>templates/index.html</code> + <code>static/app.js</code></li>
-    <li>☐ <code>mystock/ml/predictor.py</code> + <code>calibrator.py</code>（S1 分位 + CQR）</li>
-    <li>☐ <code>mystock/ml/cv.py</code> + <code>signal_eval.py</code>（借鉴② 防泄漏切分 + 借鉴③ 信号 IC 两级评估）</li>
-    <li>☐ <code>mystock/ml/backtest.py</code>（<code>compute_reward</code> 四模式 + 三开关 <code>BTConfig</code>）</li>
+    <li>☐ 只读检查下一目标日卡片、历史重建来源、20／60／120 窗口、订单事实与场景参数提示。</li>
+    <li>☐ 在隔离副本执行必要测试；最近合并前记录为 227 passed，数量随代码变化，以实际结果为准。</li>
+    <li>☐ 明确 train 回执和 publish 的公开写入行为；仅检查文档时不运行采集、训练或发布。</li>
+    <li>☐ 持续检查日历覆盖与临时停市、行情缺口、费用／证券规则、冻结输入占用和待办。</li>
+    <li>☐ 后端改动后重启服务；前端改动检查 JS 并刷新。金额标币种，涨跌红涨绿跌。</li>
+    <li>☐ 提交 diff 不包含配置、数据库、账户明细、模型或私有回执；不覆盖历史预测证据。</li>
   </ul>
-
-  <h3>动手验证（加深理解）</h3>
-  <ul>
-    <li>☐ <code>sqlite3 data/mystock.db</code> 看几张表的实际数据与行数</li>
-    <li>☐ 在持仓 Tab 点表头排序、切市场筛选、点代码下钻看 K 线、主力资金流向柱图与复盘浮窗</li>
-    <li>☐ <code>python -m mystock.pipelines.maintenance skiplist</code> 看跳过名单</li>
-    <li>☐ 跑一次 <code>bash scripts/update.sh</code>，观察 <code>sync_log</code> 新增记录</li>
-    <li>☐ <code>conda activate mk && python -m pytest tests/ -q</code>（167 测试全过）</li>
-    <li>☐ <code>bash scripts/ml.sh train</code> 跑一次回测 + 报告，看 <code>data/ml/reports/latest.html</code> 头部口径行（reward/CQR/regime）</li>
-    <li>☐ <code>MYSTOCK_ML_TIER1=1 python -m mystock.ml.backtest</code> 看 Tier1 vs 保守口径 A/B（验收门槛）</li>
-  </ul>
-
-  <h3>改动时的检查清单</h3>
-  <ul>
-    <li>☐ 新逻辑优先写成<strong>纯函数</strong>（可单测，参考 <code>pnl.py</code> / <code>code_map.py</code>）</li>
-    <li>☐ 抓取功能 → pipeline；展示功能 → 只读库</li>
-    <li>☐ 涉及金额：标注币种，跨币种不相加</li>
-    <li>☐ 涨跌配色：红涨绿跌</li>
-    <li>☐ 改后端 → 重启 <code>server.sh</code>；改前端 → <code>node --check app.js</code> + 刷新浏览器</li>
-    <li>☐ 提交前确认 diff 无密钥 / 无 <code>data/</code> / 无 <code>*.db</code></li>
-    <li>☐ ML：regime 推理必须用前向算法（forward filtering），<strong>禁止</strong>用 <code>hmmlearn.predict_proba</code>（forward-backward 会偷看未来）；CQR 改覆盖率走 <code>COVERAGE_BY_CODE</code>，别动 base 分位</li>
-  </ul>
-
-  <div class="callout ok">
-    <span class="tag">完成上述清单，你已可独立维护本系统</span>
-    遇到不确定的口径，回到 <code>CLAUDE.md</code> 与 <code>docs/DATA.md</code> —— 它们是权威。
-  </div>
+  <div class="callout ok"><span class="tag">接手结果</span>能够定位数据来源、解释预测和交易回溯口径、按回执发布和恢复，并清楚区分“已部署工程”与“尚未证明的模型收益”。后续任务从 <a href="OPEN_ITEMS.md">未尽事项</a>逐项推进。</div>
 </section>
 
 </main>

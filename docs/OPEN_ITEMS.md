@@ -4,7 +4,7 @@
 > 约定见 [`COLLABORATION.md`](COLLABORATION.md) §4。
 >
 > 关闭一项时**标记完成并写明关闭它的提交／文档，不要删行**——删掉就看不出它曾被判断过。
-> 最后更新：2026-09-05（建立本清单，导入 ML-UPGRADE-20260904 的遗留项）。
+> 最后更新：2026-09-05（导入升级遗留项；文档同步基线 a460d38/main，补正早期概览的模型结论与来源，未实施模型改动）。
 
 ## 状态说明
 
@@ -57,6 +57,6 @@
 
 | 项 | 出处 | 状态 |
 | --- | --- | --- |
-| regime 感知优于堆 RL | [`ML_OVERVIEW.md`](ML_OVERVIEW.md) 实验总结 | 待办（下一步优先级：regime 感知 ＞ 扩样本 ＞ RL） |
-| 离线 RL（P4/CQL） | 同上 | 已判定不修 —— 在当前数据量下为已验证的负结果，**不上线**。要重启需先扩样本 |
+| 早期“regime 感知优于堆 RL”主张 | [早期概览快照](https://github.com/kevinchenkai/myStock/blob/e23bb4e184bdbcfff930d57589a6a368f893bc40/docs/ML_OVERVIEW.md)、[Tier1 复检](ML_TIER1_ROBUSTNESS.md) | 已判定不按该结论推进：现有 HMM 增强已被多时段复检推翻；新 regime 研究只能作为待独立验证的候选，不能沿用未经证明的优先级 |
+| 离线 RL（P4/CQL） | [早期概览快照](https://github.com/kevinchenkai/myStock/blob/e23bb4e184bdbcfff930d57589a6a368f893bc40/docs/ML_OVERVIEW.md)、[当前概览](ML_OVERVIEW.md) | 已判定不修 —— 既有实验为负结果，**不上线**；原因不能单凭结果归于样本量。重启须新工单、数据与独立验证协议 |
 | Tier1 决策层增强（风险调整 reward、HMM regime 软切换） | [`ML_TIER1_ROBUSTNESS.md`](ML_TIER1_ROBUSTNESS.md) | 已判定不修 —— 多时段检验胜率 42%，判为噪声并移除。**不因单次好结果复活** |

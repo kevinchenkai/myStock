@@ -27,11 +27,13 @@
 | 项目 | 当前状态／入口 |
 | --- | --- |
 | 升级前备份 | 已备份 Web、ML、完整 data、配置与 Git 历史；137 个文件解压哈希和两库 integrity_check 通过。[备份记录与恢复说明](docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md) |
-| 执行负责人 | **Codex Astra**，在 `codex/ml-upgrade-20260904` 隔离工作树及数据副本实施。[执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md) |
+| 执行负责人 | **Codex Astra**，已在 `codex/ml-upgrade-20260904` 隔离工作树及数据副本完成实施，后续合入 main。[执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md) |
 | 已观察到的进展 | 四批工程已实现：session 守卫、不可覆盖版本、E0–E5 实验、受约束回放与 `/ml-next`；历史副本已补齐 20/60/120 session。Claude 合并前修复及验证见 [修复回执](docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md) |
 | 后续范围 | 工程已获确认、合入并部署；E0–E5 无候选达模型晋级门槛，证券规则历史与快照保留策略等继续跟踪 |
 | 运行边界 | **已合入 main 并推送，8888 服务已重启，ML 数据／历史重建／训练／公网报告发布验收通过**；仍人工触发，无自动下单或自动任务。[部署回执](docs/ML_DEPLOYMENT_2026-09-05.md) |
 | 方案／讨论 | [Codex v1.4](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)、[Claude 合并稿 v0.2.1](docs/ML_CLAUDE_UPGRADE_MERGED.md)、[Claude 原方案](docs/ML_UPGRADE_PLAN.md) |
+
+接手与维护：[docs 索引](docs/README.md) · [HTML 接手指南](docs/项目接手指南.html) · [当前 ML 概览](docs/ML_OVERVIEW.md) · [工程交接与恢复](docs/ML_UPGRADE_HANDOFF_2026-09-04.md)。
 
 以下说明以已部署 main 代码为准，保留 `885e8f7` 的已核实限制。工程部署不等于模型晋级；详细运行与验收证据见部署回执。
 
@@ -329,13 +331,13 @@ bash scripts/ml.sh train      # 使用更新后的数据训练、评估并生成
 
 | 模块 | 结论 | 证据 | 能否交付 |
 | --- | --- | --- | --- |
-| **预测层** | CQR 在旧实验中提高覆盖 | 更宽区间可能降低触达；Claude 的朴素波动基准对照尚待统一快照重建 | 保留生成能力，新增 raw 损失、skill 与前向验证 |
+| **预测层** | CQR 在旧实验中提高覆盖 | 更宽区间可能降低触达；本次已完成统一协议 E0–E5 对照，无候选达到晋级门槛 | 保留生成能力，新增 raw 损失、skill 与前向验证 |
 | **撮合校准** | 旧协议记录匹配率 88–93% | 缺委托生命周期和同 bar 顺序，不能外推新策略 | 保留近似撮合，补事件约束与歧义状态 |
 | **规则基线 S0** | 保留固定对照 | 收益需在相同本金、库存、费用下重算 | 保留，加入 naive_vol 与库存规则对照 |
 | **bandit** | 旧窗口表现分化 | reward 与账户收益归属存在待修问题，不宣称特定行情下已可用 | 历史对照，本轮不扩展 |
 | **离线 RL（CQL）** | 既有实验为负结果 | 原因不能单凭结果完全归于样本量；没有晋级证据 | 本轮不重启／不上线 |
 
-当前优先级是建立可信版本、时间截止、朴素基准和受约束回放。新增特征或更复杂模型只有在共同样本的消融中显示增益，才进入前向观察；预测增益与策略收益分别验收。
+可信版本、时间截止、朴素基准和受约束回放已交付；后续事项统一见 [未尽事项](docs/OPEN_ITEMS.md)。新增特征或更复杂模型只有在共同样本的消融中显示增益，才进入前向观察；预测增益与策略收益分别验收。
 
 **被证伪并已移除的东西**（[`docs/ML_TIER1_ROBUSTNESS.md`](docs/ML_TIER1_ROBUSTNESS.md)）：曾以单种子 / 单测试窗记录为「四标的改善」的两项决策层增强——**风险调整 reward**（sharpe / drawdown_penalized）与 **HMM regime 软切换**——在**多时段锚定滚动**（6 个起点）复检下**全部方向翻转，胜率 15/36 = 42%（≈掷硬币）**，同一支股票只把评估起点挪几十天，Δ 就从 −40% 翻到 +69%。据「打不过就诚实记录」的纪律**予以移除**。属预测层的 **CQR 校准保留**（未被证伪，且与净值方差无关）。
 
@@ -378,7 +380,7 @@ bash scripts/ml.sh train      # 使用更新后的数据训练、评估并生成
 
 ### v2 研究页面 `/ml-next`
 
-复用全站主题，提供 20/60/120 session 回放及本金、库存、lot/tick、费用等参数。默认展示已标注的历史重建；下一目标日预测卡片只读有效 live，所以历史完整仍可能显示缺 live。API 为 `/api/ml/v2/{latest,review,compare,facts}`，仍为只读计算。证券规则尚未自动接入页面，港股 lot 需核验并填写，不能统一假设 100 股。有效预测保存在版本表，离线重建不能当作前向 shadow。
+复用全站主题，提供 20/60/120 session 回放及本金、库存、lot/tick、费用等参数。默认展示已标注的历史重建；下一目标日预测卡片只读有效 live，所以历史完整仍可能显示缺 live。API 为 `/api/ml/v2/{latest,review,compare}`，仍为只读计算；真实订单事实通过 `review?selected=日期` 返回，没有独立 facts 路由。证券规则尚未自动接入页面，港股 lot 需核验并填写，不能统一假设 100 股。有效预测保存在版本表，离线重建不能当作前向 shadow。
 
 ## 2.7 ML 侧测试
 
@@ -440,10 +442,11 @@ myStock/
 
 | 文档 | 内容 |
 | --- | --- |
+| [docs 文档索引](docs/README.md) | 当前接手／运行说明、升级证据链与历史研究导航 |
 | [`docs/COLLABORATION.md`](docs/COLLABORATION.md) | **Codex × Claude 协作约定**：docs/ + git 为唯一信道、一轮的形状、文档命名与边界声明 |
 | [`docs/OPEN_ITEMS.md`](docs/OPEN_ITEMS.md) | **未尽事项清单**：跨轮次的唯一待办来源，开新工单前先读 |
 | [`docs/DATA.md`](docs/DATA.md) | 数据字典：全部表字段、取值特征、已知坑点 |
-| [`docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md`](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md) | 当前 Astra 执行工单：四批任务、文件范围、验证、数据隔离与交付边界 |
+| [`docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md`](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md) | 已完成的 Astra 原始工单：四批任务、文件范围、验证、数据隔离与交付边界 |
 | [`docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md`](docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md) | 升级前备份位置、覆盖范围、恢复验证和回滚原则 |
 | [`docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md`](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md) | Codex v1.4：业务目标、证据、模型／回溯方案及 API 特征调研 |
 | [`docs/ML_CLAUDE_UPGRADE_MERGED.md`](docs/ML_CLAUDE_UPGRADE_MERGED.md) | Claude 合并讨论与逐轮回应，近期人工触发等决策记录 |
@@ -502,8 +505,8 @@ PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/ -q -p no:cacheprovider --ignor
 
 ## 3.4 实现注意事项
 
-- **幂等与覆盖**：所有写库用 UPSERT；当天可变数据（持仓快照、行情）以覆盖为准。
-- **失败可恢复**：单个标的行情抓取失败不中断整体流程，记录到 `sync_log` 后继续。
+- **幂等与覆盖**：生产可变事实按主键更新，持仓快照可替换；ML 新版本按 run 追加，内容与历史不可覆盖／删除。
+- **失败可恢复**：生产采集的单标的失败记 `sync_log` 后继续；ML 的任一标的 empty/error 仍使 data 非零退出，阻断 all 的训练／发布。
 - **富途限频**：历史订单 / 成交接口限频「每 30 秒最多 10 次」。采集时**按时间窗口分段**（默认 80 天/窗口）查询，窗口间主动间隔降速；命中限频自动退避重试（见 [`mystock/collectors/futu_client.py`](mystock/collectors/futu_client.py)）。
 - **yfinance 限频与噪音抑制**：抓取带重试与退避；对**连续抓不到数据的标的**（如退市股）计数，达阈值（`SKIP_THRESHOLD`=5）后写入 `quote_skiplist` 表并在后续运行中直接跳过，避免无效请求与库的退市警告噪音。**注意**：进入名单的代码不再请求 → 无法自愈；若一次限频 / 网络抖动批量抓空造成误伤（真实持仓被跳过），手动重置：`python -m mystock.pipelines.maintenance reset-skiplist [代码...]`（不带参数清空全部）。退市清仓且不再关注的代码可用 `python -m mystock.pipelines.maintenance purge <代码>` 从所有表删除（**不可逆**，会改历史盈亏）。
 - **yfinance `end` 排他**：`Ticker().history(start, end)` 的 `end` 为**排他**（返回严格早于 `end` 的 bar），若传 `end=今天` 会漏掉当天。日线与汇率抓取统一经 `_end_inclusive`（end+1 天）修正，确保抓到"当天"这根 bar。
@@ -512,14 +515,14 @@ PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/ -q -p no:cacheprovider --ignor
 
 ## 3.5 常见问题
 
-- **页面无数据 / `/api/*` 返回 503**：数据库不存在，请先 `bash scripts/init.sh`。
+- **页面无数据 / `/api/*` 返回 503**：先核对实际库路径与 schema；全新安装才运行 `init.sh`，已有运行库先备份并在副本验证迁移。
 - **富途数据抓取失败**：确认 OpenD 已启动并登录、端口与 `config.yaml` 一致；查 `sync_log` 表的 `error` 记录。
 - **历史成交为空**：确认 `trd_env: REAL`（成交接口仅支持实盘）。
 - **某些股票没有行情**：退市 / yfinance 无数据的标的会进入 `quote_skiplist` 跳过名单，属正常；个股详情页会提示「行情数据不足」，不影响其交易记录展示。
 - **`init.sh` / `update.sh` 可重复执行**：写库幂等，重复运行不会产生重复数据；当天数据按覆盖处理。
 - **ML 页面返回 503**：检查 ML 库路径、schema 和数据；新库按部署次序初始化并 `data`。缺库可隔离为接口错误，但依赖缺失不同：Web 顶层加载 ML API → service → pandas/numpy，缺这些包可能让整个 Web 无法启动，应先安装环境依赖。
 - **ML 报告某列显示「—」**：可能为数据不足、非有限值或指标分母不可用；应结合输入日期和日志排查，不能只凭显示「—」认定整条管线数据有效。
-- **升级功能为何还没出现在当前页面**：Astra 正在独立分支实施，main 和当前运行服务尚未切换；分支测试完成后仍需代码审查、数据迁移演练及切换步骤。
+- **升级页面入口**：工程已合入 main 并部署，打开 <http://127.0.0.1:8888/ml-next/>；若仍看到旧页，核对服务目录、提交和浏览器缓存。部署验收见 [回执](docs/ML_DEPLOYMENT_2026-09-05.md)。
 
 ---
 
