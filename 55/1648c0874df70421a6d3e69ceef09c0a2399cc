@@ -1,0 +1,27 @@
+docs/records/ml-deployment_codex_20260905.md
+  s_663546346c9d75::t_be401957f03e8f 40-68
+README.md
+  s_663546346c9d75::t_4269944d3cceb4 125-126
+mystock/pipelines/init_load.py
+  s_663546346c9d75::t_8ef2cc005c7fef 163-164,205-206,282-283
+mystock/pipelines/update_load.py
+  s_663546346c9d75::t_8ef2cc005c7fef 15,50-52,80-83,87-90
+tests/test_update_status.py
+  s_663546346c9d75::t_f9280a8b1b00b3 1-81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "551648c0874df70421a6d3e69ceef09c0a2399cc",
+  "prompts": {},
+  "sessions": {
+    "s_663546346c9d75": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a071f3-2d8c-7492-8b4b-bdc1067e04e1",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
