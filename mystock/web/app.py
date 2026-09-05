@@ -86,7 +86,7 @@ def handle_no_db(e):
 
 
 # ---------------- 页面 ----------------
-@app.route("/ml-next")
+@app.route("/ml-next", strict_slashes=False)
 def ml_next():
     return render_template("ml_next.html")
 

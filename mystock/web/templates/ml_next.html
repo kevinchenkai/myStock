@@ -10,12 +10,14 @@
 <nav class="tabs" aria-label="页面导航"><a class="tab" href="/">← 返回总览</a><span class="tab active" aria-current="page">ML 预测与库存回溯</span></nav>
 <main class="container">
 <div class="page-heading"><h2>下一目标日与库存回溯</h2><span class="tag">研究预览 · 人工触发 · v2</span></div><p class="muted">风险覆盖区间与模拟报价分开。每只股票独立本币账户；历史重建不等于当时可用，也不代表前向成绩。</p>
+<p class="muted">下一目标日卡片仅查看当时生成的预测；历史重建用于下方回溯，不作为下一目标日预测。</p>
 <div id="latest" class="cards" aria-live="polite"></div>
 <section class="panel"><h2>复盘场景</h2><form id="scenario">
 <div class="fields"><label>股票<select id="codes"><option>US.NVDA</option><option>US.TSLA</option><option>US.PDD</option><option>HK.00700</option><option>HK.09988</option><option>HK.01810</option></select></label>
 <label>市场 session 窗口<select id="days"><option>20</option><option selected>60</option><option>120</option></select></label>
 <label>截至日期<input id="end" type="date"></label>
-<label>预测来源<select id="source"><option value="live">有时间证据的 live</option><option value="recomputed">包含离线历史重建</option></select></label></div>
+<label>回溯模式<select id="source"><option value="recomputed" selected>历史回溯（包含离线重建）</option><option value="live">仅看当时生成的预测（live）</option></select></label></div>
+<div class="notice"><span id="history-mode">历史回溯包含离线重建预测，逐日标注来源；不代表当时已生成或发布。</span> <button id="use-recomputed" type="button" class="secondary" hidden>查看历史重建</button></div>
 <p id="scenario-source" class="notice">请填写场景参数。以下不是实盘预算；费用留空时仅显示 gross / 费用缺失。</p>
 <div class="fields">
 <label>初始现金（本币）<input id="initial_cash" type="number" min="0" step="any" required></label>

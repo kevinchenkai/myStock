@@ -58,6 +58,7 @@ def review(path,code,days=60,end=None,*,allow_recomputed=False,now=None):
         value=_REVIEW_CACHE.pop(review_key);_REVIEW_CACHE[review_key]=value
         return json.loads(value)
     selected=versions.select_by_target(ps,allow_recomputed=allow_recomputed)
+    reconstructed=versions.select_by_target([p for p in ps if p['source']=='recomputed'],allow_recomputed=True)
     dm={r['date']:r for r in ds};bm={}
     for b in bs:bm.setdefault(b['ts_et'][:10],[]).append(b)
     rows=[]
@@ -86,7 +87,7 @@ def review(path,code,days=60,end=None,*,allow_recomputed=False,now=None):
         prediction={**(base or {}),**(p or {})} or None
         hit=None
         if p and final:hit=bool(d['low']>=p['l_hat'] and d['high']<=p['h_hat'])
-        rows.append(dict(date=date,status=status,prediction=prediction,daily=d if final else None,
+        rows.append(dict(date=date,status=status,has_recomputed=date in reconstructed,prediction=prediction,daily=d if final else None,
                          hourly_sources=sorted({b.get('data_source') or 'yfinance' for b in bars}),
                          bars=bars if complete and final else [],bar_status='complete' if complete else 'missing_bars',
                          hit=hit,price_basis='yfinance_unadjusted_same_as_prediction',

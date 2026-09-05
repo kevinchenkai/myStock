@@ -51,3 +51,36 @@ def test_prediction_later_than_order_remains_fact_only(api):
     rows=facts(p,'US.NVDA','2026-09-04',{'published_at':'2026-09-04T15:00:00Z'})
     assert rows[0]['prediction_available_at_order'] is False
     assert rows[0]['hypothetical_pnl'] is None
+
+
+def test_recomputed_history_is_discoverable_but_never_becomes_live(api, monkeypatch):
+    from mystock.ml import sessions
+    c, path = api
+    now = sessions.utc('2026-09-05T06:00:00Z')
+    monkeypatch.setattr(sessions, 'utc_now', lambda: now)
+    with db.get_ml_connection(path) as conn:
+        db.upsert(conn, 'ml_quotes_1d', [dict(symbol='NVDA', futu_code='US.NVDA',date=d,
+            open=100,high=105,low=95,close=101,adj_close=101,volume=1000,
+            dividends=0,splits=0,synced_at=now.isoformat()) for d in ['2026-09-02','2026-09-03']])
+        db.upsert(conn, 'ml_quotes_1h', [dict(symbol='NVDA',futu_code='US.NVDA',
+            ts_utc=f'2026-09-03 {hour}:30:00',ts_et=f'2026-09-03 {hour-4:02}:30:00',
+            open=100,high=105,low=95,close=101,volume=100,synced_at=now.isoformat()) for hour in range(13,20)])
+        versions.append(conn, [dict(code='US.NVDA',as_of='2026-09-02',target_session='2026-09-03',
+            close=101,l_hat=90,h_hat=110,source='recomputed',generated_at=now.isoformat())],run_id='history-fixture')
+    query='codes=US.NVDA&days=1&end=2026-09-03'
+    live=c.get('/api/ml/v2/review?'+query).get_json()['results'][0]['rows'][0]
+    assert live['status']=='missing_prediction' and live['has_recomputed'] is True
+    assert live['prediction']['prediction_id'] is None
+    rebuilt=c.get('/api/ml/v2/review?'+query+'&source=recomputed').get_json()['results'][0]['rows'][0]
+    assert rebuilt['status']=='ok' and rebuilt['prediction_status']=='recomputed'
+    assert rebuilt['prediction']['run_id']=='history-fixture'
+    assert rebuilt['prediction']['decision_at'] is None and rebuilt['prediction']['published_at'] is None
+    assert c.get('/api/ml/v2/latest?codes=US.NVDA').get_json()['results'][0]['prediction'] is None
+    absent=c.get('/api/ml/v2/review?codes=US.NVDA&days=1&end=2026-09-04').get_json()['results'][0]['rows'][0]
+    assert absent['has_recomputed'] is False
+
+
+def test_ml_next_accepts_both_url_spellings(api):
+    c,_=api
+    assert c.get('/ml-next').status_code == 200
+    assert c.get('/ml-next/').status_code == 200
