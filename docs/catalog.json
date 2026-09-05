@@ -392,6 +392,18 @@
       "governed_at": "2026-09-05"
     },
     {
+      "path": "docs/records/web-data-upgrade-work-order_codex_20260905.md",
+      "legacy_paths": [],
+      "title": "Web 数据可用性升级工单（讨论稿，暂不执行）",
+      "category": "records",
+      "document_date": "2026-09-05",
+      "producer": "codex",
+      "status": "draft",
+      "provenance": "用户请求 API 调研与 Web 工单；后续明确先讨论、不执行。Codex 于 2026-09-05 撰写；基线 b2a2e15。",
+      "first_commit": null,
+      "governed_at": "2026-09-05"
+    },
+    {
       "path": "docs/research/futu-api-research_claude_20260718.html",
       "legacy_paths": [
         "docs/futu-API数据扩展调研.html"
@@ -464,6 +476,18 @@
       "provenance": "首次提交 f7b6081 明确一并入库 Grok 版；HTML 页尾生成日期 2026-07-18",
       "first_commit": "f7b60818a7a43b32770efeb8f934f1172bd41715",
       "first_commit_authored_at": "2026-07-18T07:55:27-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/research/web-api-opportunities_codex_20260905.md",
+      "legacy_paths": [],
+      "title": "Web API 优化调研",
+      "category": "research",
+      "document_date": "2026-09-05",
+      "producer": "codex",
+      "status": "current",
+      "provenance": "用户请求 API 调研与 Web 工单；后续明确先讨论、不执行。Codex 于 2026-09-05 撰写；基线 b2a2e15。",
+      "first_commit": null,
       "governed_at": "2026-09-05"
     }
   ]

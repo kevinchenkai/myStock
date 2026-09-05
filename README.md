@@ -445,6 +445,7 @@ myStock/
 | 文档 | 内容 |
 | --- | --- |
 | [AGENTS.md](AGENTS.md) / [CLAUDE.md](CLAUDE.md) | 共用项目规则 / Claude 入口；通用约定只维护一份 |
+| [Web 升级讨论稿](docs/records/web-data-upgrade-work-order_codex_20260905.md) | API／依赖版本调研后的候选功能，待讨论；尚未派发或实施 |
 | [文档治理规范](docs/GOVERNANCE.md) | 命名、分类、作者／日期来源、旧名映射与只读检查 |
 | [docs 文档索引](docs/README.md) | 当前接手／运行说明、升级证据链与历史研究导航 |
 | [`docs/COLLABORATION.md`](docs/COLLABORATION.md) | **Codex × Claude 协作约定**：docs/ + git 为唯一信道、一轮的形状、文档命名与边界声明 |
