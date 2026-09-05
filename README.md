@@ -184,6 +184,8 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 > 一页速览见 [`docs/ML_OVERVIEW.md`](docs/ML_OVERVIEW.md)；完整方案与决策记录见 [`docs/ML_PLAN.md`](docs/ML_PLAN.md)。
 > 代码在 [`mystock/ml/`](mystock/ml/)，独立库 `data/ml/mystock_ml.db`，与 Web 生产库分库。
 
+**升级讨论（2026-09-04，尚未实施）**：[Codex 方案 v1.3](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)包含核心目标、合并反馈取舍、四批交付、历史重算及 API 特征调研；讨论输入见 [Claude 合并稿](docs/ML_CLAUDE_UPGRADE_MERGED.md)与 [Claude 原方案](docs/ML_UPGRADE_PLAN.md)。以下说明仍描述既有系统，升级方案不代表当前功能已经改变。
+
 **对外页面**：<https://g.ismayday.com/mystock/>（每工作日 cron 自动更新；首页 = 最新报告，`.../<date>/` = 历史归档）
 
 ## 2.1 要解决的问题与设计

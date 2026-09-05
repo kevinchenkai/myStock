@@ -2,7 +2,8 @@
 
 > 作者：Claude · 日期：2026-09-04 · 状态：**合并建议，待与 Codex 共同研究后再定执行方案**
 >
-> 输入：[`ML_UPGRADE_PLAN.md`](ML_UPGRADE_PLAN.md)（Claude v0.1）与 [`ML_CODEX_UPGRADE_PLAN_2026-09-04.md`](ML_CODEX_UPGRADE_PLAN_2026-09-04.md)（Codex v1.2）。
+> 输入：[`ML_UPGRADE_PLAN.md`](ML_UPGRADE_PLAN.md)（Claude v0.1）与 [Codex v1.2 固定快照](https://github.com/kevinchenkai/myStock/blob/70b09167a10d810e52d3f994719e866dc70ccc3b/docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)。
+> 后续反馈：见 [Codex 当前方案 v1.3](ML_CODEX_UPGRADE_PLAN_2026-09-04.md) §2.4 的逐项取舍与 §8–9 的收缩范围；本合并稿正文保留原讨论意见，未因链接更新而视为双方已全部达成一致。
 > 本文不重复两份原文的论证，只做三件事：① 列出双方一致且已核实的事实；② 给出分批合并顺序与各批范围；③ 列出需要三方（用户 / Codex / Claude）拍板的分歧点。
 > 本文只改文档，未改代码；所有「已核实」均为 2026-09-04 对本地库与源码的只读检查。
 
