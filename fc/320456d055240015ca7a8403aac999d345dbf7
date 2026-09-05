@@ -1,0 +1,29 @@
+docs/OPEN_ITEMS.md
+  s_612cad8e12fb53::t_88b57c031b9973 70-82
+docs/catalog.json
+  s_612cad8e12fb53::t_88b57c031b9973 397,401-402
+docs/README.md
+  s_612cad8e12fb53::t_88b57c031b9973 11,13,18
+docs/records/web-data-upgrade-work-order_codex_20260905.md
+  s_612cad8e12fb53::t_88b57c031b9973 1,3-4,6,8-12,14,16,18,20,22-30,32,40,58,60,62,64,66,68-76
+README.md
+  s_612cad8e12fb53::t_88b57c031b9973 448
+docs/research/web-api-opportunities_codex_20260905.md
+  s_612cad8e12fb53::t_88b57c031b9973 3,12,59,83-90
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "fc320456d055240015ca7a8403aac999d345dbf7",
+  "prompts": {},
+  "sessions": {
+    "s_612cad8e12fb53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a06fa0-7445-7b73-84c4-5ea66f7dc7a6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
