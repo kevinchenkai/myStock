@@ -1,0 +1,27 @@
+README.md
+  s_612cad8e12fb53::t_1c532fb4e80b9b 270
+  s_612cad8e12fb53::t_91ee6aa3cb87f6 187,189,275,278-279,283-285,336
+docs/ML_CLAUDE_UPGRADE_MERGED.md
+  s_612cad8e12fb53::t_91ee6aa3cb87f6 6
+docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md
+  s_612cad8e12fb53::t_480748a7cffbb4 276-296,511,575,581,591,670
+  s_612cad8e12fb53::t_a16f3e9d5fdd0b 3,14-15,39-40,87-88,156-170
+  s_612cad8e12fb53::t_91ee6aa3cb87f6 265
+  s_612cad8e12fb53::t_e7006cf8bcf52f 171
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "3b80d12c0070a01f1019f9ae46205132b946730e",
+  "prompts": {},
+  "sessions": {
+    "s_612cad8e12fb53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a06fa0-7445-7b73-84c4-5ea66f7dc7a6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
