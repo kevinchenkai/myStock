@@ -1,0 +1,54 @@
+docs/ML_CLAUDE_UPGRADE_MERGED.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 3-4
+docs/项目接手指南.html
+  s_612cad8e12fb53::t_6e674d022e37db 93,145
+  s_612cad8e12fb53::t_78e123476d7625 253,427,436,497,624,655,686,723,764,797,836,885,1019,1041
+  s_612cad8e12fb53::t_df8d7d6250c2df 287-289,291,309,314,341-342,373-374,401,404-409,659,676-678,685,700,921-922,924-928,930-937,939,941,943-949,952,954,956-959,966-978,980-991,1009-1010,1017,1020-1022,1024,1026-1030,1032,1034-1039
+CLAUDE.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 90
+docs/ML_UPGRADE_HANDOFF_2026-09-04.md
+  s_612cad8e12fb53::t_78e123476d7625 3,15
+  s_612cad8e12fb53::t_df8d7d6250c2df 5,7,9,11,13,17-20,22-34,37-48,50,52-72,74,76,78,80
+docs/OPEN_ITEMS.md
+  s_612cad8e12fb53::t_78e123476d7625 7,60-61
+docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 3-4
+docs/ML_UPGRADE_PLAN.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 3-4
+docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 3-4
+docs/ML_OVERVIEW.md
+  s_612cad8e12fb53::t_78e123476d7625 3,80
+  s_612cad8e12fb53::t_df8d7d6250c2df 1,5,7,9,11,13,15-18,20,22,24,26-34,36,38,40,42,44,46-49,51,53,55,58-65,68,70,72,74-78
+docs/README.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 1-2,4-13,17-35,37-46,48-60
+  s_612cad8e12fb53::t_78e123476d7625 3,14-16,36,47,61
+docs/ML_HISTORY_REFRESH_2026-09-05.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 3-4
+docs/ML_UPGRADE_REVIEW_AND_RELEASE_2026-09-04.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 3-4
+docs/DATA.md
+  s_612cad8e12fb53::t_78e123476d7625 3,60
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 9,13,147,280,302,307-392
+docs/ML_PLAN.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 3-4
+README.md
+  s_612cad8e12fb53::t_3d07a6ae4d5ae0 30,36-37
+  s_612cad8e12fb53::t_78e123476d7625 334,340,383,445,449,508-509,518,525
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "25fca5132064f34efac0e3656a6bb47cc01456a6",
+  "prompts": {},
+  "sessions": {
+    "s_612cad8e12fb53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a06fa0-7445-7b73-84c4-5ea66f7dc7a6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
