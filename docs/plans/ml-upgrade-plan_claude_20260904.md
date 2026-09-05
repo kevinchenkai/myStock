@@ -1,12 +1,14 @@
 # myStock ML 升级方案 —— 预测准确性 + 「ML 挂单回溯」可用性（Claude 讨论稿 v0.1）
 
-> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](ML_UPGRADE_HANDOFF_2026-09-04.md)，验收见 [部署回执](ML_DEPLOYMENT_2026-09-05.md)，全部资料见 [文档索引](README.md)。
+> 文档身份：2026-09-04 · 原始作者 claude · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
+> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](../records/ml-upgrade-handoff_codex_20260904.md)，验收见 [部署回执](../records/ml-deployment_codex_20260905.md)，全部资料见 [文档索引](../README.md)。
 
 > 作者：Claude · 日期：2026-09-04 · 状态：**只读调研 + 方案，未改任何代码**
 >
 > 依据：逐文件读 `mystock/ml/`（19 文件）、`mystock/web/app.py` 的 `/api/ml/*`、前端 `app.js` ML 段、
-> 六份 ML 文档（[`ML_PLAN`](ML_PLAN.md) / [`ML_OVERVIEW`](ML_OVERVIEW.md) / [`ML_ALGORITHM_PROPOSAL`](ML_ALGORITHM_PROPOSAL.md) /
-> [`ML_QLIB_BORROW_PLAN`](ML_QLIB_BORROW_PLAN.md) / [`ML_TIER1_ROBUSTNESS`](ML_TIER1_ROBUSTNESS.md) / [`DATA`](DATA.md)），
+> 六份 ML 文档（[`ML_PLAN`](ml-plan_claude_20260623.md) / [`ML_OVERVIEW`](../guides/ml-overview_claude_20260623.md) / [`ML_ALGORITHM_PROPOSAL`](ml-algorithm-proposal_cursor_20260704.md) /
+> [`ML_QLIB_BORROW_PLAN`](ml-qlib-borrow-plan_claude_20260718.md) / [`ML_TIER1_ROBUSTNESS`](../records/ml-tier1-robustness_claude_20260718.md) / [`DATA`](../guides/data-dictionary_claude_20260623.md)），
 > 并对真实 ML 库（`data/ml/mystock_ml.db`，截至 2026-09-04）做了只读统计与两个 scratchpad 实验（脚本未入库，数字已固化在附录）。
 > 测试基线：`pytest tests/ -q` → **167 passed**（mk 环境：lightgbm 4.6.0 / sklearn 1.7.2 / pandas 2.3.3 / numpy 2.2.6）。
 
@@ -163,7 +165,7 @@ app.py        GET /api/ml/strategy?codes=&days=   （只读 ML 库；唯一的 M
 
 ## 4. 目标与验收（先定尺子，再动手）
 
-> 教训来自 [`ML_TIER1_ROBUSTNESS`](ML_TIER1_ROBUSTNESS.md)：单种子 + 单窗口的「改善」42% 概率是噪声。本轮所有门槛都要求**锁箱 holdout + 多时段 + 多种子**三者同时满足。
+> 教训来自 [`ML_TIER1_ROBUSTNESS`](../records/ml-tier1-robustness_claude_20260718.md)：单种子 + 单窗口的「改善」42% 概率是噪声。本轮所有门槛都要求**锁箱 holdout + 多时段 + 多种子**三者同时满足。
 
 ### 4.1 预测准确性的新主指标
 
@@ -240,7 +242,7 @@ app.py        GET /api/ml/strategy?codes=&days=   （只读 ML 库；唯一的 M
 
 ### A5 明确不做 / 后置
 
-- **TFT / Transformer / 深度时序**：样本量不支持（[`ML_ALGORITHM_PROPOSAL §8`](ML_ALGORITHM_PROPOSAL.md) 已否），本轮不碰。
+- **TFT / Transformer / 深度时序**：样本量不支持（[`ML_ALGORITHM_PROPOSAL §8`](ml-algorithm-proposal_cursor_20260704.md) 已否），本轮不碰。
 - **HMM regime 软切换**：已被多时段检验证伪，不复活；A1 的 `vol_5d/vol_20d` 比与 VIX 是更便宜的 regime 代理。
 - **RL（含 IQL/Cal-QL）**：不在预测层议题内，且 P4 负结果未被新数据推翻。
 
@@ -334,7 +336,7 @@ Web ML Tab 顶部新增卡片（每支标的一张，按币种分组）：
   W5  B4 K 线叠加、B5 真实挂单对照、B7 落表/缓存           [P-E 门槛]
 ```
 
-每期结束更新 [`ML_OVERVIEW`](ML_OVERVIEW.md) 的「当前状态」与实验结论表；负结果照记。
+每期结束更新 [`ML_OVERVIEW`](../guides/ml-overview_claude_20260623.md) 的「当前状态」与实验结论表；负结果照记。
 
 ---
 
@@ -358,7 +360,7 @@ Web ML Tab 顶部新增卡片（每支标的一张，按币种分组）：
 | `mystock/web/static/app.js`、`index.html`、`style.css` | 建议卡、复盘面板、固定窗口、K 线叠加、对照表 | 三 |
 | `scripts/ml.sh` | 注释时区；train 加 materialize 步骤 | 二/三 |
 | `tests/test_ml_baselines.py`、`test_ml_touch.py`、`test_ml_strategy.py`（扩）、`test_ml_calibrator.py`（扩）、`test_ml_cv.py`（扩） | 纯函数单测 | 各期 |
-| `docs/ML_OVERVIEW.md`、`README.md`、`CLAUDE.md` | 同步口径（skill 指标、策略 v2、接口表） | 各期 |
+| `docs/guides/ml-overview_claude_20260623.md`、`README.md`、`CLAUDE.md` | 同步口径（skill 指标、策略 v2、接口表） | 各期 |
 
 ---
 

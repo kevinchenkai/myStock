@@ -31,7 +31,7 @@ tar czf - \
   mystock/ml/report.py mystock/ml/offline_rl.py \
   mystock/code_map.py \
   scripts/ml.sh scripts/ml_setup_h20.sh scripts/ml_sync_h20.sh scripts/ml_vllm.sh \
-  docs/ML_OVERVIEW.md docs/ML_PLAN.md \
+  docs/guides/ml-overview_claude_20260623.md docs/plans/ml-plan_claude_20260623.md \
   tests/test_ml_simulator.py tests/test_ml_policy.py tests/test_ml_offline_rl.py \
   2>/dev/null \
   | ${SSH} "${H20_HOST}" "tar xzf - -C ${H20_DIR} 2>/dev/null && find ${H20_DIR} -name '._*' -delete && echo '✓ 代码已解包到远端'"

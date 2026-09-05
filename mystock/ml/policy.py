@@ -1,6 +1,6 @@
 """P3 决策层策略：S0 规则基线 + S2 contextual bandit（LinUCB）。
 
-动作（docs/ML_PLAN.md §3.2，离散+可解释）：
+动作（docs/plans/ml-plan_claude_20260623.md §3.2，离散+可解释）：
   - 在 [L_hat, H_hat] 区间内挑挂价档（买偏低、卖偏高）；
   - 在持仓/现金允许下挑数量档。
 S0：固定规则（买挂 L_hat、卖挂 H_hat、固定量），永远保留做对照。

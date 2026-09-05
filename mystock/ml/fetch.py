@@ -5,7 +5,7 @@
   2. 2 年 1 小时线（ml_quotes_1h）
   3. 生产库 deals/orders/positions 只读快照（ml_deals/ml_orders/ml_positions）
 
-标的清单见 config.TARGETS（3 美股 + 3 港股，docs/ML_OVERVIEW.md §二）。
+标的清单见 config.TARGETS（3 美股 + 3 港股，docs/guides/ml-overview_claude_20260623.md §二）。
 运行：python -m mystock.ml.fetch [--full]  或  bash scripts/ml.sh data
 """
 from __future__ import annotations
@@ -178,7 +178,7 @@ def _ohlc_ok(row: dict) -> bool:
     yfinance 偶发返回 NaN 行（最常见：盘后/周末重拉时撞上当日尚未结算的最新
     bar，美股收盘 16:00 ET ≈ 次日北京清晨，周末 cron 易踩）。这类行 _f() 会转成
     None；若写进库，回测 mark_next 取到 NaN → 净值曲线整条被污染 → 报告总览显示
-    nan。故在采集层就地丢弃——宁可当天少一根，也不让脏行进库（DATA.md §4）。
+    nan。故在采集层就地丢弃——宁可当天少一根，也不让脏行进库（docs/guides/data-dictionary_claude_20260623.md §4）。
     """
     return sessions.ohlc_ok(row)
 

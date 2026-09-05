@@ -492,7 +492,7 @@ class _ReportCfg:
 
     标准口径：超额-bandit + CQR 校准（建议2，提升区间命中率）+ purged 隔离带（借鉴②）。
     风险调整 reward / HMM regime 软切换（原 Tier1 建议1+3）未通过时段稳健性检验、
-    已移除，详见 docs/ML_TIER1_ROBUSTNESS.md。
+    已移除，详见 docs/records/ml-tier1-robustness_claude_20260718.md。
     """
     conformal: bool = True
     target_coverage: float = 0.70   # 兜底；实际按股走 mlcfg.coverage_for(code)
@@ -652,7 +652,7 @@ h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}
 全落进预测区间的比例（分位收窄的诚实代价，~50% 属预期，见指标说明）。结论看相对值，绝对收益不单独采信。</p>
 {_review_panel(reviews)}
 {''.join(sections)}
-<hr><p style="color:#aaa;font-size:12px">生成于 {dt.datetime.now():%Y-%m-%d %H:%M}。完整方案见 docs/ML_PLAN.md，速览见 docs/ML_OVERVIEW.md，新算法见 docs/ML_ALGORITHM_PROPOSAL.md。</p>
+<hr><p style="color:#aaa;font-size:12px">生成于 {dt.datetime.now():%Y-%m-%d %H:%M}。完整方案见 docs/plans/ml-plan_claude_20260623.md，速览见 docs/guides/ml-overview_claude_20260623.md，新算法见 docs/plans/ml-algorithm-proposal_cursor_20260704.md。</p>
 </body></html>"""
 
     index = out_dir / "index.html"

@@ -1,19 +1,21 @@
 # myStock ML 准确性与「ML 挂单回溯」联动升级方案
 
-> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](ML_UPGRADE_HANDOFF_2026-09-04.md)，验收见 [部署回执](ML_DEPLOYMENT_2026-09-05.md)，全部资料见 [文档索引](README.md)。
+> 文档身份：2026-09-04 · 原始作者 codex · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
+> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](../records/ml-upgrade-handoff_codex_20260904.md)，验收见 [部署回执](../records/ml-deployment_codex_20260905.md)，全部资料见 [文档索引](../README.md)。
 
 > 作者：Codex · 调研／更新日期：2026-09-04（America/Los_Angeles）· 版本：v1.4
 >
 > 状态：只读调研后的实施提案，尚未实施模型或业务改动。
-> 执行交接：用户已授权实施，见 [明确执行工单](ML_UPGRADE_WORK_ORDER_2026-09-04.md)及 [已验证的升级前备份](ML_PRE_UPGRADE_BACKUP_2026-09-04.md)；工程在隔离任务中进行，本方案中的候选结果仍须实际验证，当前生产运行未切换。
+> 执行交接：用户已授权实施，见 [明确执行工单](../records/ml-upgrade-work-order_codex_20260904.md)及 [已验证的升级前备份](../records/ml-pre-upgrade-backup_codex_20260904.md)；工程在隔离任务中进行，本方案中的候选结果仍须实际验证，当前生产运行未切换。
 > 代码基准：`beefd0c`（2026-09-03）；v1.0 首次调研开始时 Git 工作区干净。
 > 历次数据库调研通过 SQLite `mode=ro` 读取，统计连接另设 `query_only=ON`；未抓取行情、重训生产模型、回填预测、生成／发布业务报告或操作交易。v1.3 同步更新 README 与讨论稿的导航链接，按用户要求提交并推送文档。
 >
-> v1.1：参考用户提供的 [Claude 方案 v0.1](ML_UPGRADE_PLAN.md)，加入波动率缩放基准、多日库存状态机、触价后收益诊断与真实挂单对照，并修正标签合成、校准及策略验证中的若干边界。Claude scratchpad 数字作为参考证据，未在本轮独立复现；不改动其原文。
+> v1.1：参考用户提供的 [Claude 方案 v0.1](ml-upgrade-plan_claude_20260904.md)，加入波动率缩放基准、多日库存状态机、触价后收益诊断与真实挂单对照，并修正标签合成、校准及策略验证中的若干边界。Claude scratchpad 数字作为参考证据，未在本轮独立复现；不改动其原文。
 >
 > v1.2：补齐用户确认的业务目标、背景与待定执行口径；明确旧数据复用／新版历史重算协议；核查 Futu 官方文档、yfinance 项目文档和本地 SDK，新增特征路线与可用时间约束。文件从 `ML_CODEX_UPGRADE_PLAN.md` 改为带日期名称；同日小版本继续在本文件迭代，后续跨日讨论可另存日期快照。此次仍只修改文档，未调用行情接口或升级依赖。
 >
-> v1.3：逐条参考 [Claude 合并讨论稿](ML_CLAUDE_UPGRADE_MERGED.md)，核查基准 `7e24fe7` 的相关源码。采纳四批交付、首期缩减建表／接口、固定策略先落地；修正四列版本化、只读边界、交易单位证据及 holdout 口径。取舍见 §2.4，更新后的首期范围见 §8–9。合并稿仍是讨论输入，本次更新不代表用户已批准模型／业务实施。
+> v1.3：逐条参考 [Claude 合并讨论稿](ml-upgrade-merged_claude_20260904.md)，核查基准 `7e24fe7` 的相关源码。采纳四批交付、首期缩减建表／接口、固定策略先落地；修正四列版本化、只读边界、交易单位证据及 holdout 口径。取舍见 §2.4，更新后的首期范围见 §8–9。合并稿仍是讨论输入，本次更新不代表用户已批准模型／业务实施。
 >
 > v1.4：参考合并稿 v0.2（`1d79dd6`）和 v0.2.1（`9720a94`），独立核对三份本地 HTML 预测、当前日线／预测记录及采集／预测代码。新增 F16/P0 收盘与发布时间守卫，近期按人工触发设计；已入库实验脚本仅静态审阅，未执行训练。最新共识与实现边界见 §2.5、§5.1；仍仅更新方案与文档链接。
 
@@ -152,7 +154,7 @@ Claude 的主要贡献是补充了简单模型对照和跨日回合分析，使�
 | 沿用现网收盘后批次，盘前更新另议 | **作为实施候选** | 计划触发时间、实际完成时间和每个市场可用截止不同；先核实 cron 时区／星期覆盖／完成日志，使用 IANA 时区处理冬夏令时，不能只凭“02:40 PDT”断言全部日子及时 |
 | 覆盖率与成交是相反目标；1h 吻合率足够 | **弱化绝对表述** | 当挂价绑定边界、区间向外扩展时，触达机会通常下降；分开输出后不必然对立。历史匹配率不保证新库存策略的路径准确性，1h 先用但保留同 bar 歧义 |
 
-版本化核查依据：[`schema.sql`](../mystock/ml/schema.sql) 的复合主键，以及 [`db.py`](../mystock/ml/db.py) 的 `upsert / PRED_COLS / upsert_predictions`。SQLite 的 REPLACE 会在唯一键冲突时移除旧行后插入新行；并非追加一个预测版本。[SQLite 官方冲突处理说明](https://www.sqlite.org/lang_conflict.html)
+版本化核查依据：[`schema.sql`](../../mystock/ml/schema.sql) 的复合主键，以及 [`db.py`](../../mystock/ml/db.py) 的 `upsert / PRED_COLS / upsert_predictions`。SQLite 的 REPLACE 会在唯一键冲突时移除旧行后插入新行；并非追加一个预测版本。[SQLite 官方冲突处理说明](https://www.sqlite.org/lang_conflict.html)
 
 合并稿的“双方均核实”需继续按数据来源和窗口区分：本方案 v1.0 双边触达的独立统计是最近 30 个可用预测日，不能据此认领 47–49 日全窗口也独立核实；模型对照与跨日毛利仍按 Claude 实验归属，参见 §2.3。后续先把实验固化成可运行资产，再形成共同证据。
 
@@ -164,7 +166,7 @@ Claude 的主要贡献是补充了简单模型对照和跨日回合分析，使�
 
 这里独立核实的是**本地留存报告／当前库／代码**，未检查公网服务器上的历史发布版本，也未独立枚举所有调度器；“没有自动任务”的机器核查仍归属 Claude。不能仅凭价格不一致把所有历史差异都归为盘中输入。此前 F02/F03/F10 和验证矩阵已列出覆盖、最终确认与截止风险，本次具体案例把它们升级为需要优先处理的实际问题。
 
-**新入库的实验资产**：已静态阅读 [实验说明](../scripts/ml_experiments/README.md)、[实验 A](../scripts/ml_experiments/exp_a_baseline.py)、[实验 B](../scripts/ml_experiments/exp_b_touch_economics.py)。脚本可作为重建起点，原始输入快照／环境与当前库仍需区分；本轮没有运行脚本，不新增数值复现声明。
+**新入库的实验资产**：已静态阅读 [实验说明](../../scripts/ml_experiments/README.md)、[实验 A](../../scripts/ml_experiments/exp_a_baseline.py)、[实验 B](../../scripts/ml_experiments/exp_b_touch_economics.py)。脚本可作为重建起点，原始输入快照／环境与当前库仍需区分；本轮没有运行脚本，不新增数值复现声明。
 
 - A 已对各候选使用包含额外特征的共同样本掩码，分位实际来自 `config.alpha_for`；不能按文件头把所有股票解释为固定 0.2/0.8。朴素尺度缺少零／非有限保护、CV 尾部和折均值口径沿用旧实现，强正则组同时改了特征。原样重建与修正后的正式基准须分别命名、记录差异。
 - B 读取时使用可写连接，运行时应先改为只读／显式数据上下文；脚本不做受约束账户回放。`min(i+5, last)` 会把末尾不足期限的结果当“五日”输出，而且买入日是 i+1，该索引对应的持有期限需重新命名或对齐。未来正式评估须将未成熟标签标为 pending；逐笔独立寻找退出仍不能直接证明组合收益。
@@ -664,13 +666,13 @@ ORDER BY q.futu_code, q.date;
 
 ## 12. 参考与历史决策衔接
 
-- [项目 README](../README.md)：当前 Web 与 ML 双链路、独立数据库及回溯说明；部分静态“无缺口”描述已与本地观察不符。
-- [ML Qlib 借鉴方案](ML_QLIB_BORROW_PLAN.md)：借用评估机制而非迁移框架；CV／IC 已实现，锁箱与统一运行追踪仍需补齐。
-- [历史稳健性复检](ML_TIER1_ROBUSTNESS.md)：HMM／风险 reward 在多时段结果翻转并已移除；本方案不重启已失败组件作为默认升级路线。
-- [原算法候选清单](ML_ALGORITHM_PROPOSAL.md)：保留为历史，不覆盖其决策记录；本方案按当前代码和数据重新排优先级。
-- [Claude 升级方案 v0.1](ML_UPGRADE_PLAN.md)：v1.1 直接参考，尤其 §3.1 naive_vol 对照、§3.3 跨日回合及 §5–6 模型／页面候选；数字按参考文档归属，不冒充本轮独立实验。
-- [Claude 合并讨论稿](ML_CLAUDE_UPGRADE_MERGED.md)：v1.3 的直接评审输入；采纳与修订逐条见 §2.4，首期范围见 §8–9。其输入对应 [Codex v1.2 固定快照](https://github.com/kevinchenkai/myStock/blob/70b09167a10d810e52d3f994719e866dc70ccc3b/docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)，避免后续迭代改变讨论所指的历史版本。
-- 合并稿 v0.2／v0.2.1（提交 `1d79dd6 / 9720a94`）：v1.4 的直接输入；新增事故核查、人工触发决策和收敛意见见 §2.5。入库 [实验 A/B 说明](../scripts/ml_experiments/README.md)作为后续复现入口，已有脚本不等于本轮已复现实验。
+- [项目 README](../../README.md)：当前 Web 与 ML 双链路、独立数据库及回溯说明；部分静态“无缺口”描述已与本地观察不符。
+- [ML Qlib 借鉴方案](ml-qlib-borrow-plan_claude_20260718.md)：借用评估机制而非迁移框架；CV／IC 已实现，锁箱与统一运行追踪仍需补齐。
+- [历史稳健性复检](../records/ml-tier1-robustness_claude_20260718.md)：HMM／风险 reward 在多时段结果翻转并已移除；本方案不重启已失败组件作为默认升级路线。
+- [原算法候选清单](ml-algorithm-proposal_cursor_20260704.md)：保留为历史，不覆盖其决策记录；本方案按当前代码和数据重新排优先级。
+- [Claude 升级方案 v0.1](ml-upgrade-plan_claude_20260904.md)：v1.1 直接参考，尤其 §3.1 naive_vol 对照、§3.3 跨日回合及 §5–6 模型／页面候选；数字按参考文档归属，不冒充本轮独立实验。
+- [Claude 合并讨论稿](ml-upgrade-merged_claude_20260904.md)：v1.3 的直接评审输入；采纳与修订逐条见 §2.4，首期范围见 §8–9。其输入对应 [Codex v1.2 固定快照](https://github.com/kevinchenkai/myStock/blob/70b09167a10d810e52d3f994719e866dc70ccc3b/docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)，避免后续迭代改变讨论所指的历史版本。
+- 合并稿 v0.2／v0.2.1（提交 `1d79dd6 / 9720a94`）：v1.4 的直接输入；新增事故核查、人工触发决策和收敛意见见 §2.5。入库 [实验 A/B 说明](../../scripts/ml_experiments/README.md)作为后续复现入口，已有脚本不等于本轮已复现实验。
 - [Romano et al., Conformalized Quantile Regression](https://arxiv.org/abs/1905.03222)：支持分位回归加独立校准的基本机制；可交换性条件不能省略。
 - [Gibbs & Candès, Adaptive Conformal Inference Under Distribution Shift](https://arxiv.org/abs/2106.00170)：支持把自适应校准列为时序漂移候选，不构成本项目已验证有效的证据。
 - [LightGBM 4.6.0 参数文档](https://lightgbm.readthedocs.io/en/v4.6.0/Parameters.html)：本机对应版本；bagging_fraction 与 bagging_freq 需联合配置。

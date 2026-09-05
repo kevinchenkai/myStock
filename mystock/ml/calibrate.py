@@ -1,6 +1,6 @@
 """P1 校准 — 用真实 orders 回放 1h 撮合规则，核对吻合率。
 
-docs/ML_PLAN.md §4.3：拿真实挂价 + order_status，用 match_limit_order 在挂单当日
+docs/plans/ml-plan_claude_20260623.md §4.3：拿真实挂价 + order_status，用 match_limit_order 在挂单当日
 的 1h bars 上回放，看"模拟是否成交"与"真实是否成交"的吻合率。达标后再训练。
 
 真实是否成交：order_status in (FILLED_ALL, CANCELLED_PART) 且 dealt_qty>0。

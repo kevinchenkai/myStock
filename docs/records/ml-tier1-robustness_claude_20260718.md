@@ -1,10 +1,12 @@
 # Tier1 稳健性检验与移除决策记录
 
+> 文档身份：2026-07-18 · 原始作者 claude · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
 > 作者：Claude · 日期：2026-07-18 · 状态：**已执行**（Tier1 建议1+3 已从代码移除）
 >
-> 一句话：**Tier1 的"决策层增强"（风险调整 reward + HMM regime 软切换）未通过时段稳健性检验——6 个历史时段方向翻转、胜率 42%（≈掷硬币），据 [`ML_PLAN.md`](ML_PLAN.md) §7"打不过就诚实记录"纪律予以移除。CQR 校准（建议2，属预测层、真实有效）保留。**
+> 一句话：**Tier1 的"决策层增强"（风险调整 reward + HMM regime 软切换）未通过时段稳健性检验——6 个历史时段方向翻转、胜率 42%（≈掷硬币），据 [`ml-plan_claude_20260623.md`](../plans/ml-plan_claude_20260623.md) §7"打不过就诚实记录"纪律予以移除。CQR 校准（建议2，属预测层、真实有效）保留。**
 >
-> 关联：[`ML_ALGORITHM_PROPOSAL.md`](ML_ALGORITHM_PROPOSAL.md)（Tier1 三件套的原始提案）、[`ML_QLIB_BORROW_PLAN.md`](ML_QLIB_BORROW_PLAN.md)（②③ 评估地基，本次检验的工具）。
+> 关联：[`ml-algorithm-proposal_cursor_20260704.md`](../plans/ml-algorithm-proposal_cursor_20260704.md)（Tier1 三件套的原始提案）、[`ml-qlib-borrow-plan_claude_20260718.md`](../plans/ml-qlib-borrow-plan_claude_20260718.md)（②③ 评估地基，本次检验的工具）。
 
 ---
 
@@ -79,7 +81,7 @@
 
 ## 5. 决策与执行
 
-**决策**：据 [`ML_PLAN.md`](ML_PLAN.md) §7"能停则停、打不过基线如实记录"，移除未通过检验的决策层增强。
+**决策**：据 [`ml-plan_claude_20260623.md`](../plans/ml-plan_claude_20260623.md) §7"能停则停、打不过基线如实记录"，移除未通过检验的决策层增强。
 
 **已删除**（代码）：
 - `mystock/ml/regime.py`（HMM regime 全模块）
@@ -102,6 +104,6 @@
 - **先修尺子，再谈提升**。Tier1 曾被判"改善"，只因当时的尺子（单种子/单窗/无隔离带）读不准。借鉴 qlib 的 ②③ 落地后重估，才让"停"这个决策有了可信依据——这正是修尺子的意义。
 - **决策层复杂度 ≠ 收益**。在小样本上，reward 工程与 regime 切换更容易换来方差而非稳定超额。宁可保留可解释的简单基线（S0 + 超额-bandit）。
 - **区分预测层与决策层的证据**。同一次检验里 CQR（预测层）稳、regime+DD（决策层）翻——两级评估让这个区分变得可操作，避免"一刀切"误伤有效组件。
-- **下一步不该继续堆决策层复杂度**。若要再动决策层，先补齐 [`ML_QLIB_BORROW_PLAN.md`](ML_QLIB_BORROW_PLAN.md) §2.4 的**多种子 + 锁箱 holdout**验收门槛，用双维度（时段 × 种子）证据说话，而非单点跑分。
+- **下一步不该继续堆决策层复杂度**。若要再动决策层，先补齐 [`ml-qlib-borrow-plan_claude_20260718.md`](../plans/ml-qlib-borrow-plan_claude_20260718.md) §2.4 的**多种子 + 锁箱 holdout**验收门槛，用双维度（时段 × 种子）证据说话，而非单点跑分。
 
 > 一句话收尾：这次移除不是"Tier1 变差了"，而是**它从来没被可信地证明过更好**。修好尺子后，诚实地把它归位——这比留着一个读不准的"改善"更有价值。

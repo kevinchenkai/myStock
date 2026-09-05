@@ -1,4 +1,4 @@
-"""P4 — 离线 RL（研究性增量，docs/ML_PLAN.md §6 S3）。
+"""P4 — 离线 RL（研究性增量，docs/plans/ml-plan_claude_20260623.md §6 S3）。
 
 务实定位：小样本上 model-free 在线 RL 方差极大，故走**离线 RL**——
   1. 用行为策略（S0 规则 + ε-随机，保证动作覆盖）在 1h 模拟器上 rollout，记录

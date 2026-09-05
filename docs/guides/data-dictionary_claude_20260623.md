@@ -1,12 +1,14 @@
 # myStock 数据文档（数据字典）
 
+> 文档身份：2026-06-23 · 原始作者 claude · 现行维护；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
 > 更新：2026-09-05；核对基线 `a460d38` / `main`，本轮仅同步文档。本文面向**数据分析与模型训练**，覆盖生产库 `data/mystock.db` 和独立 ML 库 `data/ml/mystock_ml.db`。第 1–9 节保留早期字段与统计背景，第 10–12 节补齐当前表、迁移列、预测版本及建模约束；原文的行数、时间跨度与“当前仅几天”均指 2026-06-22 快照，不是当前库存量。
 >
 > - 数据来源：**富途 OpenD**（持仓 / 订单 / 成交）+ **yfinance**（日线行情 / 公司通用信息）。
 > - 市场范围：**仅 HK（港股）与 US（美股）**。
 > - 单用户、单机、个人真实交易数据 —— **属隐私数据，`data/`、`*.db` 已 gitignore，切勿外泄或提交**。
 > - 文档中的统计快照取自 **2026-06-22** 的库（用于说明量级与分布，会随更新变化）。
->   当前结构须同时看 [生产 schema](../mystock/schema.sql)、[生产列迁移](../mystock/db.py)、[ML schema](../mystock/ml/schema.sql) 与 [ML 迁移](../mystock/ml/db.py)。导航见 [文档索引](README.md)。
+>   当前结构须同时看 [生产 schema](../../mystock/schema.sql)、[生产列迁移](../../mystock/db.py)、[ML schema](../../mystock/ml/schema.sql) 与 [ML 迁移](../../mystock/ml/db.py)。导航见 [文档索引](../README.md)。
 
 ---
 
@@ -270,7 +272,7 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
 - **已实现盈亏**：项目内两套口径并存——**移动平均成本**（券商口径，用于盈亏列表）与 **FIFO 配对**（用于单股回合复盘，得到干净的持有周期）。两者结果会有小差异，建模时**先明确口径**。
 - **窗口前缺口**：deals 从 2025-01-01 起，更早买入缺失 → 用 `positions.cost_price` 兜底；**兜底成本 ≤ 0 视为不可用**（富途超卖记账产物），对应数量记为 `uncovered_sell_qty`，不可产出有效盈亏。
 - **无费用字段**：盈亏为税前毛额。
-- 参考实现：[`mystock/pnl.py`](../mystock/pnl.py)（`compute_pnl` 移动平均、`analyze_stock` FIFO 回合）。
+- 参考实现：[`mystock/pnl.py`](../../mystock/pnl.py)（`compute_pnl` 移动平均、`analyze_stock` FIFO 回合）。
 
 ### 8.3 做分析 / 建模前的清洗清单
 
@@ -300,7 +302,7 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
 ## 9. 获取数据的方式
 
 - **直接只读库**（推荐分析用）：`sqlite3 -readonly data/mystock.db`；Python 使用 SQLite URI `mode=ro` 并设 `PRAGMA query_only=ON` 后再传给 `pandas.read_sql`。
-- **只读 JSON API**（Web 层提供，见 [`mystock/web/app.py`](../mystock/web/app.py)）：`/api/positions`、`/api/orders`、`/api/deals`、`/api/quotes`、`/api/stock/<code>`、`/api/stock/<code>/profile`、`/api/stock/<code>/analysis`、`/api/pnl`。
+- **只读 JSON API**（Web 层提供，见 [`mystock/web/app.py`](../../mystock/web/app.py)）：`/api/positions`、`/api/orders`、`/api/deals`、`/api/quotes`、`/api/stock/<code>`、`/api/stock/<code>/profile`、`/api/stock/<code>/analysis`、`/api/pnl`。
 - 刷新数据：`bash scripts/update.sh`（需富途 OpenD 已登录）。
 
 > 数据会随每日更新变化；本文档中的统计数字是 2026-06-22 的快照，结构稳定、数字会变。
@@ -350,7 +352,7 @@ orders 1 ──< deals N        (orders.order_id = deals.order_id)
 
 ## 11. 当前 ML 库与预测版本
 
-ML 只读生产事实再写入自己的数据库；Web 连接只读 ML 库。数据表定义见 [ML schema](../mystock/ml/schema.sql)。
+ML 只读生产事实再写入自己的数据库；Web 连接只读 ML 库。数据表定义见 [ML schema](../../mystock/ml/schema.sql)。
 
 | 表 | 主键 | 内容与边界 |
 | --- | --- | --- |
@@ -389,4 +391,4 @@ ML 只读生产事实再写入自己的数据库；Web 连接只读 ML 库。数
 - **历史与前向证据**：2026-09-05 的 720 条重建是事后历史研究；不等于 720 次当时发布。live、HTML 回填与 recomputed 分开，缺口显式保留。
 - **窗口与权益**：20／60／120 是各市场 session 数，每个窗口独立初始化。各股独立本币账户；费用未填标 gross，不把 legacy 成交额收益率与库存初始权益收益率直接比较。
 - **真实订单边界**：只有订单快照，缺完整生命周期；事实通过 `/api/ml/v2/review?selected=YYYY-MM-DD` 返回，没有独立 facts 路由。不把事后替换订单当作真实可执行收益。
-- **只读与写入**：分析和 Web 只读；采集、修复、迁移、重建均有写入边界，应先备份并明确目标库。历史 repair／rebuild 命令见 [历史补齐记录](ML_HISTORY_REFRESH_2026-09-05.md)，部署后的现状以 [部署回执](ML_DEPLOYMENT_2026-09-05.md) 为准。
+- **只读与写入**：分析和 Web 只读；采集、修复、迁移、重建均有写入边界，应先备份并明确目标库。历史 repair／rebuild 命令见 [历史补齐记录](../records/ml-history-refresh_codex_20260905.md)，部署后的现状以 [部署回执](../records/ml-deployment_codex_20260905.md) 为准。

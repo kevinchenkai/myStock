@@ -3,7 +3,7 @@
 纯 index 运算，不依赖 LightGBM/sklearn。返回 (train_idx, test_idx) 列表，
 供 predictor.walk_forward_eval / backtest 复用同一套切分口径。
 
-为什么需要它（定性见 docs/ML_QLIB_BORROW_PLAN.md §2.1）：本项目是**扩张窗 +
+为什么需要它（定性见 docs/plans/ml-qlib-borrow-plan_claude_20260718.md §2.1）：本项目是**扩张窗 +
 test 恒在 train 之后 + 标签只前看 1 天**，train 末行标签在首个测试决策时点已实现
 → **不存在传统"未来函数"泄漏**。purge 修的是三个更"软"但同样伤可信度的问题：
   1. 边界标签重叠（1 天）——train 末行与 test 首行共享同一天数据；

@@ -149,6 +149,7 @@
 <header class="hero">
   <span class="badge">CLAUDE 独立评估</span>
   <h1>myStock ML 如何借鉴 / 使用 Qlib</h1>
+<p class="doc-provenance">文档身份：2026-07-18 · 原始作者 claude · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 <a href="../README.md">文档索引</a> · <a href="../catalog.json">清单</a></p>
   <p>基于逐文件读 <code>mystock/ml/</code>（15 文件 / 2561 行）+ 三份 ML 文档 + qlib 源码的深度调研 · 2026-07-18</p>
 </header>
 
@@ -476,9 +477,9 @@ def purged_splits(n, n_folds, embargo, feat_window):
   <h2>12 · 参考</h2>
   <ul>
     <li>myStock ML 代码：<code>mystock/ml/</code>（<code>features / predictor / calibrator / regime / policy / simulator / backtest / offline_rl</code> 等 15 文件 2561 行，逐一读过）</li>
-    <li>myStock ML 文档：<code>docs/ML_PLAN.md</code>、<code>docs/ML_OVERVIEW.md</code>、<code>docs/ML_ALGORITHM_PROPOSAL.md</code></li>
+    <li>myStock ML 文档：<code>docs/plans/ml-plan_claude_20260623.md</code>、<code>docs/guides/ml-overview_claude_20260623.md</code>、<code>docs/plans/ml-algorithm-proposal_cursor_20260704.md</code></li>
     <li>Qlib 源码：<code>qlib/data/ops.py</code>（表达式）、<code>qlib/data/dataset/{handler,processor}.py</code>、<code>qlib/workflow/record_temp.py</code>（记录链/IC）、<code>qlib/backtest/executor.py</code>、<code>qlib/contrib/meta/</code>（DDG-DA）</li>
-    <li>配套：<a href="Qlib深入解读-Claude.html">Qlib 深入解读（Claude 版）</a> — 本报告引用的 qlib 机制细节详见该文</li>
+    <li>配套：<a href="qlib-deep-dive_claude_20260718.html">Qlib 深入解读（Claude 版）</a> — 本报告引用的 qlib 机制细节详见该文</li>
     <li>方法参考：CQR（Romano et al. 2019）、Purged K-Fold + Embargo（López de Prado, <em>Advances in Financial Machine Learning</em>）</li>
   </ul>
   <div class="callout">

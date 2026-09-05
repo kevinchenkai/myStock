@@ -1,0 +1,470 @@
+{
+  "schema_version": 1,
+  "governed_at": "2026-09-05",
+  "baseline": "25fca5132064f34efac0e3656a6bb47cc01456a6",
+  "naming": "{topic}_{producer}_{YYYYMMDD}.{ext}",
+  "date_policy": "已有日期保留；否则采用明确的成文日期，再否则首次入库提交自身时区日期；不等同最后修改日",
+  "producer_policy": "原始作者优先采用正文／明确导入说明，其次专门文档提交署名；未知不得按批量导入提交者推定",
+  "protected_files": [
+    {
+      "path": "scripts/ml_experiments/frozen_cv_446e657.py",
+      "reason": "冻结评估脚本，保持字节不变；旧注释引用由 legacy_paths 映射追溯",
+      "sha256": "ed221b1fe47b1bd0119dd53c9bb410897ef41c8958cebd4d564d71a060f39927"
+    }
+  ],
+  "documents": [
+    {
+      "path": "docs/COLLABORATION.md",
+      "legacy_paths": [],
+      "title": "协作约定",
+      "category": "index",
+      "document_date": "2026-09-05",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "固定入口；作者／日期保留在清单，修订者见 Git 历史",
+      "first_commit": "a460d38",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/GOVERNANCE.md",
+      "legacy_paths": [],
+      "title": "文档治理规范与迁移记录",
+      "category": "index",
+      "document_date": "2026-09-05",
+      "producer": "codex",
+      "status": "current",
+      "provenance": "固定入口；作者／日期保留在清单，修订者见 Git 历史",
+      "first_commit": null,
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/OPEN_ITEMS.md",
+      "legacy_paths": [],
+      "title": "未尽事项",
+      "category": "index",
+      "document_date": "2026-09-05",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "固定入口；作者／日期保留在清单，修订者见 Git 历史",
+      "first_commit": "a460d38",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/README.md",
+      "legacy_paths": [],
+      "title": "文档导航",
+      "category": "index",
+      "document_date": "2026-09-05",
+      "producer": "codex",
+      "status": "current",
+      "provenance": "固定入口；作者／日期保留在清单，修订者见 Git 历史",
+      "first_commit": "25fca51",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/guides/data-dictionary_claude_20260623.md",
+      "legacy_paths": [
+        "docs/DATA.md"
+      ],
+      "title": "数据字典",
+      "category": "guides",
+      "document_date": "2026-06-23",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "首次入库提交 026d575 的专门文档提交及 Claude 署名；日期为提交自身时区日期，6 月 22 日是数据快照日期",
+      "first_commit": "026d575506a48d8e8cf162ec55df6d815dbd4047",
+      "first_commit_authored_at": "2026-06-23T00:10:17+08:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/guides/ml-overview_claude_20260623.md",
+      "legacy_paths": [
+        "docs/ML_OVERVIEW.md"
+      ],
+      "title": "ML 当前运行概览",
+      "category": "guides",
+      "document_date": "2026-06-23",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "首次提交 d246d8f 的 Claude 署名；日期为首次入库日期，当前正文已由 Codex 大幅更新",
+      "first_commit": "d246d8f88b29de0f12d94c0740ebe584399c260c",
+      "first_commit_authored_at": "2026-06-23T08:02:06+08:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/guides/project-onboarding_cursor_20260704.html",
+      "legacy_paths": [
+        "docs/项目接手指南.html"
+      ],
+      "title": "项目接手指南",
+      "category": "guides",
+      "document_date": "2026-07-04",
+      "producer": "cursor",
+      "status": "current",
+      "provenance": "首次提交 e2a5818 明确新增接手指南，署名 Cursor；后经 Claude/Codex 维护",
+      "first_commit": "e2a5818182677edaf762542c6acae91e5ecf4c88",
+      "first_commit_authored_at": "2026-07-04T07:51:55-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/plans/ml-algorithm-proposal_cursor_20260704.md",
+      "legacy_paths": [
+        "docs/ML_ALGORITHM_PROPOSAL.md"
+      ],
+      "title": "ML 算法建议",
+      "category": "plans",
+      "document_date": "2026-07-04",
+      "producer": "cursor",
+      "status": "historical",
+      "provenance": "正文调研基准 2026-07-04；首次提交 e2a5818 署名 Cursor",
+      "first_commit": "e2a5818182677edaf762542c6acae91e5ecf4c88",
+      "first_commit_authored_at": "2026-07-04T07:51:55-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/plans/ml-plan_claude_20260623.md",
+      "legacy_paths": [
+        "docs/ML_PLAN.md"
+      ],
+      "title": "早期 ML 计划",
+      "category": "plans",
+      "document_date": "2026-06-23",
+      "producer": "claude",
+      "status": "historical",
+      "provenance": "首次提交 d246d8f 的 Claude 署名；日期为首次入库日期",
+      "first_commit": "d246d8f88b29de0f12d94c0740ebe584399c260c",
+      "first_commit_authored_at": "2026-06-23T08:02:06+08:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/plans/ml-qlib-borrow-plan_claude_20260718.md",
+      "legacy_paths": [
+        "docs/ML_QLIB_BORROW_PLAN.md"
+      ],
+      "title": "Qlib 借鉴计划",
+      "category": "plans",
+      "document_date": "2026-07-18",
+      "producer": "claude",
+      "status": "historical",
+      "provenance": "正文明确作者 Claude、日期 2026-07-18",
+      "first_commit": "f7b60818a7a43b32770efeb8f934f1172bd41715",
+      "first_commit_authored_at": "2026-07-18T07:55:27-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/plans/ml-upgrade-merged_claude_20260904.md",
+      "legacy_paths": [
+        "docs/ML_CLAUDE_UPGRADE_MERGED.md"
+      ],
+      "title": "Claude 合并讨论稿 v0.2.1",
+      "category": "plans",
+      "document_date": "2026-09-04",
+      "producer": "claude",
+      "status": "historical",
+      "provenance": "正文明确作者 Claude、日期 2026-09-04；合并双方思路不等于共同执笔",
+      "first_commit": "7e24fe72db12aefcc24a371862fe0f2ccde402da",
+      "first_commit_authored_at": "2026-09-04T21:40:53-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/plans/ml-upgrade-plan_claude_20260904.md",
+      "legacy_paths": [
+        "docs/ML_UPGRADE_PLAN.md"
+      ],
+      "title": "Claude 原升级方案",
+      "category": "plans",
+      "document_date": "2026-09-04",
+      "producer": "claude",
+      "status": "historical",
+      "provenance": "首次提交 53f9d99 署名 Claude Fable 5.1；原文日期 2026-09-04",
+      "first_commit": "53f9d993dede0e26f579712d32d94efb78f05feb",
+      "first_commit_authored_at": "2026-09-04T21:20:55-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/plans/ml-upgrade-plan_codex_20260904.md",
+      "legacy_paths": [
+        "docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md"
+      ],
+      "title": "Codex ML 升级方案 v1.4",
+      "category": "plans",
+      "document_date": "2026-09-04",
+      "producer": "codex",
+      "status": "historical",
+      "provenance": "正文作者 Codex；保留原文件日期",
+      "first_commit": "70b09167a10d810e52d3f994719e866dc70ccc3b",
+      "first_commit_authored_at": "2026-09-04T21:35:31-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/plans/requirements-v1_gpt_20260621.md",
+      "legacy_paths": [
+        "docs/myStock-需求文档-v1-gpt.md"
+      ],
+      "title": "GPT 需求 v1",
+      "category": "plans",
+      "document_date": "2026-06-21",
+      "producer": "gpt",
+      "status": "historical",
+      "provenance": "作者标记仅依据原文件名 -gpt；不推断具体模型或客户端；日期为首次入库日期",
+      "first_commit": "c1a4eabc9f74e4543ce342af6cdf33b8e1914729",
+      "first_commit_authored_at": "2026-06-21T23:16:35+08:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/plans/requirements-v1_unknown_20260621.md",
+      "legacy_paths": [
+        "docs/myStock-需求文档-v1.md"
+      ],
+      "title": "原始需求 v1",
+      "category": "plans",
+      "document_date": "2026-06-21",
+      "producer": "unknown",
+      "status": "historical",
+      "provenance": "批量初始提交 c1a4eab 只有提交者的 Claude 署名，正文仅写面向 Claude；无法确认原始生成者，日期为首次入库日期",
+      "first_commit": "c1a4eabc9f74e4543ce342af6cdf33b8e1914729",
+      "first_commit_authored_at": "2026-06-21T23:16:35+08:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-deployment_codex_20260905.md",
+      "legacy_paths": [
+        "docs/ML_DEPLOYMENT_2026-09-05.md"
+      ],
+      "title": "ML 部署验收回执",
+      "category": "records",
+      "document_date": "2026-09-05",
+      "producer": "codex",
+      "status": "historical",
+      "provenance": "首次提交 e23bb4e 署名 Codex；原文件／正文日期 2026-09-05",
+      "first_commit": "e23bb4e184bdbcfff930d57589a6a368f893bc40",
+      "first_commit_authored_at": "2026-09-05T00:10:15-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-history-refresh_codex_20260905.md",
+      "legacy_paths": [
+        "docs/ML_HISTORY_REFRESH_2026-09-05.md"
+      ],
+      "title": "历史行情修复与重建记录",
+      "category": "records",
+      "document_date": "2026-09-05",
+      "producer": "codex",
+      "status": "historical",
+      "provenance": "首次提交 83027fb 署名 Codex；原文件日期为 09-05，首次提交 PDT 日期为 09-04，保留原文件日期并记录差异",
+      "first_commit": "83027fb2339a1f78f30f4140fee75d34c447fe65",
+      "first_commit_authored_at": "2026-09-04T23:39:00-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-pre-upgrade-backup_codex_20260904.md",
+      "legacy_paths": [
+        "docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md"
+      ],
+      "title": "升级前备份回执",
+      "category": "records",
+      "document_date": "2026-09-04",
+      "producer": "codex",
+      "status": "historical",
+      "provenance": "首次提交 903b5b7 署名 Codex；保留原文件日期",
+      "first_commit": "903b5b783d2f979300d6efd52d8c83cc60ba2415",
+      "first_commit_authored_at": "2026-09-04T22:20:59-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-tier1-robustness_claude_20260718.md",
+      "legacy_paths": [
+        "docs/ML_TIER1_ROBUSTNESS.md"
+      ],
+      "title": "Tier1 稳健性复检",
+      "category": "records",
+      "document_date": "2026-07-18",
+      "producer": "claude",
+      "status": "historical",
+      "provenance": "首次提交 8d50705 署名 Claude，正文复检日期 2026-07-18",
+      "first_commit": "8d507059d9fb1351a44b001870b6bc1dd087ec72",
+      "first_commit_authored_at": "2026-07-18T08:38:34-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-upgrade-claude-review-fixes_codex_20260905.md",
+      "legacy_paths": [
+        "docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md"
+      ],
+      "title": "Codex 对 Claude 审查的修复回执",
+      "category": "records",
+      "document_date": "2026-09-05",
+      "producer": "codex",
+      "status": "historical",
+      "provenance": "实际实施／修复者为 Codex，首次提交 7d95fc7 署名 Codex；旧名 CLAUDE 表示审查来源，保留原日期",
+      "first_commit": "7d95fc77d6fa9d2c8370ca4b4aacef882b5aa9ed",
+      "first_commit_authored_at": "2026-09-05T00:03:16-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-upgrade-execution-log_codex_20260904.md",
+      "legacy_paths": [
+        "docs/ML_UPGRADE_EXECUTION_LOG_2026-09-04.md"
+      ],
+      "title": "ML 升级执行日志",
+      "category": "records",
+      "document_date": "2026-09-04",
+      "producer": "codex",
+      "status": "historical",
+      "provenance": "首次提交 c84ac9e 署名 Codex；保留原文件日期",
+      "first_commit": "c84ac9ecb11502a0e9de356072f762bdba167546",
+      "first_commit_authored_at": "2026-09-04T22:30:21-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-upgrade-experiment-results_codex_20260904.md",
+      "legacy_paths": [
+        "docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md"
+      ],
+      "title": "E0–E5 实验结果",
+      "category": "records",
+      "document_date": "2026-09-04",
+      "producer": "codex",
+      "status": "historical",
+      "provenance": "首次提交 f701ea7 署名 Codex；保留原文件日期",
+      "first_commit": "f701ea732470b5f183127d3f01ba3575b3821ef8",
+      "first_commit_authored_at": "2026-09-04T22:45:55-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-upgrade-handoff_codex_20260904.md",
+      "legacy_paths": [
+        "docs/ML_UPGRADE_HANDOFF_2026-09-04.md"
+      ],
+      "title": "ML 工程交接与恢复",
+      "category": "records",
+      "document_date": "2026-09-04",
+      "producer": "codex",
+      "status": "current",
+      "provenance": "首次提交 07c3aca 署名 Codex；日期为原工单起始日，当前交接正文已更新",
+      "first_commit": "07c3acae37359bfedd3db6689f3b1df7c7d64144",
+      "first_commit_authored_at": "2026-09-04T23:02:01-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-upgrade-review-release_codex_20260904.md",
+      "legacy_paths": [
+        "docs/ML_UPGRADE_REVIEW_AND_RELEASE_2026-09-04.md"
+      ],
+      "title": "审查与上线流程记录",
+      "category": "records",
+      "document_date": "2026-09-04",
+      "producer": "codex",
+      "status": "historical",
+      "provenance": "首次提交 190b582 署名 Codex；保留原文件日期",
+      "first_commit": "190b582daae0781c50d306631ab1a43464d6edc8",
+      "first_commit_authored_at": "2026-09-04T23:20:29-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-upgrade-review_claude_20260904.md",
+      "legacy_paths": [
+        "docs/ML_UPGRADE_CLAUDE_REVIEW_2026-09-04.md"
+      ],
+      "title": "Claude 独立审查",
+      "category": "records",
+      "document_date": "2026-09-04",
+      "producer": "claude",
+      "status": "historical",
+      "provenance": "正文明确审查者 Claude；由 Codex 提交不代表 Codex 执笔；原文件日期 09-04，正文同时记 09-05／PDT 09-04 晚，保留原日期并记录差异",
+      "first_commit": "7d95fc77d6fa9d2c8370ca4b4aacef882b5aa9ed",
+      "first_commit_authored_at": "2026-09-05T00:03:16-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/records/ml-upgrade-work-order_codex_20260904.md",
+      "legacy_paths": [
+        "docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md"
+      ],
+      "title": "ML 升级执行工单",
+      "category": "records",
+      "document_date": "2026-09-04",
+      "producer": "codex",
+      "status": "historical",
+      "provenance": "首次提交 903b5b7 署名 Codex；保留原工单日期",
+      "first_commit": "903b5b783d2f979300d6efd52d8c83cc60ba2415",
+      "first_commit_authored_at": "2026-09-04T22:20:59-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/research/futu-api-research_claude_20260718.html",
+      "legacy_paths": [
+        "docs/futu-API数据扩展调研.html"
+      ],
+      "title": "Futu API 数据扩展调研",
+      "category": "research",
+      "document_date": "2026-07-18",
+      "producer": "claude",
+      "status": "historical",
+      "provenance": "首次提交 835eded 说明新增调研并署名 Claude；未发现更早创建日期，使用首次入库日期",
+      "first_commit": "835ededbae363e40fdc4b963074c08c60eb06487",
+      "first_commit_authored_at": "2026-07-18T20:02:24-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/research/ml-qlib-evaluation_claude_20260718.html",
+      "legacy_paths": [
+        "docs/myStock-ML借鉴Qlib深度评估-Claude.html"
+      ],
+      "title": "ML 借鉴 Qlib 评估（Claude）",
+      "category": "research",
+      "document_date": "2026-07-18",
+      "producer": "claude",
+      "status": "historical",
+      "provenance": "HTML 页尾明确由 Claude 独立撰写、生成日期 2026-07-18",
+      "first_commit": "f7b60818a7a43b32770efeb8f934f1172bd41715",
+      "first_commit_authored_at": "2026-07-18T07:55:27-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/research/ml-qlib-evaluation_grok_20260718.html",
+      "legacy_paths": [
+        "docs/myStock-ML与Qlib深度调研评估.html"
+      ],
+      "title": "ML 与 Qlib 评估（Grok）",
+      "category": "research",
+      "document_date": "2026-07-18",
+      "producer": "grok",
+      "status": "historical",
+      "provenance": "首次提交 f7b6081 明确 Grok 版；HTML 生成日期 2026-07-18",
+      "first_commit": "f7b60818a7a43b32770efeb8f934f1172bd41715",
+      "first_commit_authored_at": "2026-07-18T07:55:27-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/research/qlib-deep-dive_claude_20260718.html",
+      "legacy_paths": [
+        "docs/Qlib深入解读-Claude.html"
+      ],
+      "title": "Qlib 深入解读（Claude）",
+      "category": "research",
+      "document_date": "2026-07-18",
+      "producer": "claude",
+      "status": "historical",
+      "provenance": "HTML 署名 Claude、生成日期 2026-07-18",
+      "first_commit": "f7b60818a7a43b32770efeb8f934f1172bd41715",
+      "first_commit_authored_at": "2026-07-18T07:55:27-07:00",
+      "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/research/qlib-introduction_grok_20260718.html",
+      "legacy_paths": [
+        "docs/Qlib中文详细介绍.html"
+      ],
+      "title": "Qlib 中文介绍（Grok）",
+      "category": "research",
+      "document_date": "2026-07-18",
+      "producer": "grok",
+      "status": "historical",
+      "provenance": "首次提交 f7b6081 明确一并入库 Grok 版；HTML 页尾生成日期 2026-07-18",
+      "first_commit": "f7b60818a7a43b32770efeb8f934f1172bd41715",
+      "first_commit_authored_at": "2026-07-18T07:55:27-07:00",
+      "governed_at": "2026-09-05"
+    }
+  ]
+}

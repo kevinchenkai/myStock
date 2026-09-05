@@ -1,11 +1,13 @@
 # myStock ML 升级执行工单
 
-> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](ML_UPGRADE_HANDOFF_2026-09-04.md)，验收见 [部署回执](ML_DEPLOYMENT_2026-09-05.md)，全部资料见 [文档索引](README.md)。
+> 文档身份：2026-09-04 · 原始作者 codex · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
+> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](ml-upgrade-handoff_codex_20260904.md)，验收见 [部署回执](ml-deployment_codex_20260905.md)，全部资料见 [文档索引](../README.md)。
 
 > 工单：ML-UPGRADE-20260904；负责人：Codex Astra（按用户最新指示，独立执行任务）。
 > 状态：已授权启动工程实施；按本工单顺序完成四批代码、测试和离线验证。
 > 代码／数据备份基线：`3b80d12c0070a01f1019f9ae46205132b946730e`。
-> 方案：[Codex v1.4](ML_CODEX_UPGRADE_PLAN_2026-09-04.md)；讨论：[Claude v0.2.1](ML_CLAUDE_UPGRADE_MERGED.md)；恢复依据：[升级前备份记录](ML_PRE_UPGRADE_BACKUP_2026-09-04.md)。
+> 方案：[Codex v1.4](../plans/ml-upgrade-plan_codex_20260904.md)；讨论：[Claude v0.2.1](../plans/ml-upgrade-merged_claude_20260904.md)；恢复依据：[升级前备份记录](ml-pre-upgrade-backup_codex_20260904.md)。
 
 ## 1. 目标和完成边界
 
@@ -123,8 +125,8 @@ git diff --check
 ## 8. 提交、进度与交接产物
 
 - 在隔离分支按四批提交，合理拆分修复与实验，不混入与本单无关变更；保留用户 Git author／committer，每个提交末尾增加 `Co-authored-by: Codex <codex@openai.com>`。
-- 持续更新 `docs/ML_UPGRADE_EXECUTION_LOG_2026-09-04.md`：任务 ID、状态、提交、测试命令及实际结果、数据／协议版本、失败与负结果、尚待前向验证事项。不得把此工单的“待实现”改写成未经验证的完成。
-- 新增 `docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md`：E0–E5 的实际矩阵、共同日期与样本数、各股指标、候选判定，以及固定策略费用／风险对照；没有运行的项目明确写未运行。
+- 持续更新 `docs/records/ml-upgrade-execution-log_codex_20260904.md`：任务 ID、状态、提交、测试命令及实际结果、数据／协议版本、失败与负结果、尚待前向验证事项。不得把此工单的“待实现”改写成未经验证的完成。
+- 新增 `docs/records/ml-upgrade-experiment-results_codex_20260904.md`：E0–E5 的实际矩阵、共同日期与样本数、各股指标、候选判定，以及固定策略费用／风险对照；没有运行的项目明确写未运行。
 - 最终报告：已完成的任务 ID、分支／提交、测试与页面证据、可复现命令、生产切换与回滚步骤、尚未满足的真实 shadow／用户参数条件。
 - 不自动合并 main；可以准备可审查的分支或 draft PR。若推送分支，先检查暂存范围，绝不提交备份／data／配置。原运行服务和备份保持原样。
 

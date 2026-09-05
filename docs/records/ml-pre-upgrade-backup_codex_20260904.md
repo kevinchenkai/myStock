@@ -1,8 +1,10 @@
 # myStock 升级前备份记录
 
+> 文档身份：2026-09-04 · 原始作者 codex · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
 > 时间：2026-09-04 22:15:30 America/Los_Angeles；状态：已完成并验证。
 > 基线：`3b80d12c0070a01f1019f9ae46205132b946730e`，main，备份开始时工作区干净。
-> 对应执行工单：[ML_UPGRADE_WORK_ORDER_2026-09-04.md](ML_UPGRADE_WORK_ORDER_2026-09-04.md)。
+> 对应执行工单：[ml-upgrade-work-order_codex_20260904.md](ml-upgrade-work-order_codex_20260904.md)。
 
 ## 1. 备份位置与范围
 

@@ -250,7 +250,8 @@
 <header class="hero">
   <span class="badge">PROJECT ONBOARDING</span>
   <h1>myStock · 项目接手指南</h1>
-  <p><strong>更新：2026-09-05 · 核对 a460d38 / main · 仅文档同步</strong> · <a href="README.md">文档索引</a> · <a href="ML_DEPLOYMENT_2026-09-05.md">部署回执</a></p>
+<p class="doc-provenance">文档身份：2026-07-04 · 原始作者 cursor · 现行维护；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 <a href="../README.md">文档索引</a> · <a href="../catalog.json">清单</a></p>
+  <p><strong>内容核对：2026-09-05（a460d38）· 命名治理基线：25fca51 / main</strong> · <a href="../README.md">文档索引</a> · <a href="../records/ml-deployment_codex_20260905.md">部署回执</a></p>
   <p>个人港股 / 美股 持仓、交易、行情的本地化数据系统 —— 一份从零到接手的完整导读</p>
   <p style="margin-top:8px;">
     <span class="pill">Python 3.10+</span>
@@ -288,7 +289,7 @@
     ML 工程已合入 main 并部署，入口 <a href="http://127.0.0.1:8888/ml-next/">本地 ML 页面</a>。核心目标是预测下一交易日低价／高价，辅助人类量化下单，并在现金、库存和费用约束下评估周期权益。E0–E5 没有模型达到晋级门槛；工程上线不代表预测准确率或收益已改善。仍人工触发，无自动下单或自动调度。
   </div>
   <h3>阅读建议</h3>
-  <p>先 §1–§4 建立全局观 → §5–§11 逐模块读源码 → §12–§15 建立数据与口径直觉 → §16+ 了解 ML 扩展与运维。<code>CLAUDE.md</code>、<code>README.md</code>、<code>docs/DATA.md</code> 描述当前实现，本指南提供导读；历史方案和阶段回执按日期阅读，当前操作以 <a href="ML_UPGRADE_HANDOFF_2026-09-04.md">工程交接</a> 为准。</p>
+  <p>先 §1–§4 建立全局观 → §5–§11 逐模块读源码 → §12–§15 建立数据与口径直觉 → §16+ 了解 ML 扩展与运维。<code>CLAUDE.md</code>、<code>README.md</code>、<code>docs/guides/data-dictionary_claude_20260623.md</code> 描述当前实现，本指南提供导读；历史方案和阶段回执按日期阅读，当前操作以 <a href="../records/ml-upgrade-handoff_codex_20260904.md">工程交接</a> 为准。</p>
 </section>
 
 <!-- ============ 2. 架构与数据流 ============ -->
@@ -369,12 +370,13 @@ python -m pytest tests/ -q</code></pre>
 ├── README.md                     # 面向开发者的完整说明
 ├── CLAUDE.md                     # Claude Code 工作约定（亦为本指南的母本）
 ├── docs/
-│   ├── DATA.md                   # 数据字典（面向分析/建模，必读）
-│   ├── README.md                 # 当前文档导航与历史资料分类
-│   ├── ML_PLAN.md                # 早期方案（历史记录）
-│   ├── ML_OVERVIEW.md            # ML 速览（一页看懂）
-│   ├── futu-API数据扩展调研.html  # 富途接口可行性实测 + 三期升级计划
-│   └── 项目接手指南.html          # ← 本文件
+│   ├── README.md / GOVERNANCE.md # 全量导航、命名与旧名映射
+│   ├── COLLABORATION.md          # 协作约定
+│   ├── OPEN_ITEMS.md / catalog.json # 待办、作者和日期依据
+│   ├── guides/                  # 当前接手指南、ML 概览、数据字典
+│   ├── plans/                   # 需求、升级方案与算法建议
+│   ├── research/                # API / Qlib 专题调研
+│   └── records/                 # 工单、实验、审查、修复、部署回执
 ├── environment.yml               # conda 环境 mk
 ├── config.example.yaml           # 配置模板
 ├── config.yaml                   # 真实配置（.gitignore，勿提交）
@@ -429,7 +431,7 @@ python -m pytest tests/ -q</code></pre>
       <tr><td><code>mystock/web/static/vendor/</code></td><td>vendored Lightweight-Charts（K 线图，离线）</td></tr>
       <tr><td><code>mystock/ml/predictor.py</code></td><td>S1 分位数回归区间预测（LightGBM），<code>IntervalModel.conformal</code> 套 CQR 校准</td></tr>
       <tr><td><code>mystock/ml/calibrator.py</code></td><td>建议 2 CQR 纯函数：non-conformity score、有限样本分位、apply、命中率/宽度</td></tr>
-      <tr><td><code>mystock/ml/policy.py</code></td><td>S0 <code>RulePolicy</code> / S2 <code>LinUCB</code>（regime 软切换版已移除，见 ML_TIER1_ROBUSTNESS.md）</td></tr>
+      <tr><td><code>mystock/ml/policy.py</code></td><td>S0 <code>RulePolicy</code> / S2 <code>LinUCB</code>（regime 软切换版已移除，见 docs/records/ml-tier1-robustness_claude_20260718.md）</td></tr>
       <tr><td><code>mystock/ml/backtest.py</code></td><td>回测引擎；<code>compute_reward</code>（raw/excess 纯函数）；<code>BTConfig</code>（CQR + purged 隔离带默认开）</td></tr>
       <tr><td><code>mystock/ml/cv.py</code></td><td>借鉴② Purged/Embargo 滚动切分（防泄漏评估地基，纯函数）</td></tr>
       <tr><td><code>mystock/ml/signal_eval.py</code></td><td>借鉴③ 信号层 IC/RankIC/ICIR（宽度 IC 为主指标，两级评估）</td></tr>
@@ -720,7 +722,7 @@ python -m mystock.pipelines.maintenance purge US.YY</code></pre>
 <!-- ============ 12. 表结构 ============ -->
 <section id="schema">
   <h2>12 · 数据库表结构（schema.sql）</h2>
-  <p>生产 10 张表；结构需合看 <code>mystock/schema.sql</code> 与 <code>db.py</code> 列迁移。另有 8 张 ML 表，见 §16；完整数据口径见 <a href="DATA.md">数据字典</a>。</p>
+  <p>生产 10 张表；结构需合看 <code>mystock/schema.sql</code> 与 <code>db.py</code> 列迁移。另有 8 张 ML 表，见 §16；完整数据口径见 <a href="data-dictionary_claude_20260623.md">数据字典</a>。</p>
 
   <table>
     <thead><tr><th>表</th><th>用途</th><th>主键</th><th>来源</th></tr></thead>
@@ -756,7 +758,7 @@ account_funds               账户级每日快照，不含 code，无法与个�
 <!-- ============ 13. 数据字典速查 ============ -->
 <section id="datadict">
   <h2>13 · 数据字典速查</h2>
-  <p>仅列字段含义与<strong>必须知道的坑</strong>。完整字段、取值范围、缺失率见 <code>docs/DATA.md</code>。</p>
+  <p>仅列字段含义与<strong>必须知道的坑</strong>。完整字段、取值范围、缺失率见 <code>docs/guides/data-dictionary_claude_20260623.md</code>。</p>
 
   <h3>positions —— 持仓每日快照</h3>
   <ul>
@@ -919,12 +921,12 @@ account_funds               账户级每日快照，不含 code，无法与个�
 <!-- ============ 16. ML 子系统 ============ -->
 <section id="ml">
   <h2>16 · ML 子系统：预测、回溯与版本证据</h2>
-  <p>当前运行说明见 <a href="ML_OVERVIEW.md">ML 概览</a>；实现与后续维护见 <a href="ML_UPGRADE_HANDOFF_2026-09-04.md">工程交接</a>。<a href="ML_PLAN.md">早期 ML 方案</a>及旧 Qlib／算法研究是历史资料，不能直接作为运行工单。</p>
+  <p>当前运行说明见 <a href="ml-overview_claude_20260623.md">ML 概览</a>；实现与后续维护见 <a href="../records/ml-upgrade-handoff_codex_20260904.md">工程交接</a>。<a href="../plans/ml-plan_claude_20260623.md">早期 ML 方案</a>及旧 Qlib／算法研究是历史资料，不能直接作为运行工单。</p>
 
   <h3>预测服务于周期权益</h3>
   <p>为 NVDA／TSLA／PDD／腾讯／阿里／小米预测下一交易日的低价与高价，由人类决定挂单。当前保留分位回归 + CQR；同时检查上下侧误差、覆盖／宽度及固定执行策略的权益与回撤。覆盖区间不自动等于最优买卖价，也不保证特定市场时段的覆盖或收益。</p>
   <div class="callout warn"><span class="tag">工程已部署，模型未晋级</span>
-    E0–E5 没有候选达到预设门槛，未进行五种子晋级复核、独立 holdout 或 60 个真实 session 的前向 shadow。旧文档的单窗收益、HMM／reward 初测结论不能作为当前优势证明。详见 <a href="ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md">本次实验负结果</a>与 <a href="ML_TIER1_ROBUSTNESS.md">早期稳健性复检</a>。
+    E0–E5 没有候选达到预设门槛，未进行五种子晋级复核、独立 holdout 或 60 个真实 session 的前向 shadow。旧文档的单窗收益、HMM／reward 初测结论不能作为当前优势证明。详见 <a href="../records/ml-upgrade-experiment-results_codex_20260904.md">本次实验负结果</a>与 <a href="../records/ml-tier1-robustness_claude_20260718.md">早期稳健性复检</a>。
   </div>
 
   <h3>页面使用顺序</h3>
@@ -949,13 +951,13 @@ account_funds               账户级每日快照，不含 code，无法与个�
       <tr><td><code>reports/runs/&lt;id&gt;/</code> 与 <code>receipts/</code></td><td>报告原文与训练／发布回执；latest 仅兼容副本，采集 .data.json 不可用于发布</td></tr>
     </tbody>
   </table>
-  <p><strong>live／backfill／recomputed 分开：</strong>新 live 需有时间证据；历史 HTML 导入不追认原发布时间；重建仅表示基于截断历史输入的事后研究。2026-09-05 部署验收时六股 20／60／120 session 共 120／360／720 条 ok，无缺行情／预测／小时线；这是验收快照，未来仍需审计。另已生成并发布六股 live，见 <a href="ML_DEPLOYMENT_2026-09-05.md">部署回执</a>。</p>
+  <p><strong>live／backfill／recomputed 分开：</strong>新 live 需有时间证据；历史 HTML 导入不追认原发布时间；重建仅表示基于截断历史输入的事后研究。2026-09-05 部署验收时六股 20／60／120 session 共 120／360／720 条 ok，无缺行情／预测／小时线；这是验收快照，未来仍需审计。另已生成并发布六股 live，见 <a href="../records/ml-deployment_codex_20260905.md">部署回执</a>。</p>
 
   <h3>时间守卫与当前限制</h3>
   <ul>
     <li>冻结交易日历覆盖 2020–2027；US 截止 09:30 ET，HK 截止 09:00 香港时间，不能套用固定北京时间定时。剩余不足 60 天告警，越界拒绝，临时停市仍需维护。</li>
     <li>日线收盘确认后才能生成；特征末日必须等于所需 as_of，缺口返回 feature_gap。generated／decision／published 时间分开，晚于截止的发布不能进入默认有效信号。</li>
-    <li>证券规则历史与页面预填、冻结快照保留策略、采集部分成功协议及报告改造仍待完成，见 <a href="ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md">修复与延期清单</a>。</li>
+    <li>证券规则历史与页面预填、冻结快照保留策略、采集部分成功协议及报告改造仍待完成，见 <a href="../records/ml-upgrade-claude-review-fixes_codex_20260905.md">修复与延期清单</a>。</li>
     <li>完整工程测试最近记录为 227 passed；少数测试会读取本地库并拟合，完整测试须在隔离数据副本运行。本文更新不等于重新执行实验。</li>
   </ul>
 </section>
@@ -982,12 +984,12 @@ bash scripts/server.sh</code></pre>
     <tr><td>富途抓取失败</td><td>确认 OpenD 登录和配置端口；查看生产 sync_log 或独立 ml_sync_log</td></tr>
     <tr><td>awaiting_final_data／feature_gap</td><td>核对收盘、synced_at 与所需 as_of；先审计行情缺口，不能改时间戳绕过守卫</td></tr>
     <tr><td>历史 live 缺失但重建存在</td><td>检查来源筛选；重建可用于研究，不应伪装成当时生成的预测</td></tr>
-    <tr><td>日历越界／即将到期</td><td>按 <a href="../mystock/ml/calendars/README.md">日历说明</a> 更新并验证休市、半日市及临时事件</td></tr>
+    <tr><td>日历越界／即将到期</td><td>按 <a href="../../mystock/ml/calendars/README.md">日历说明</a> 更新并验证休市、半日市及临时事件</td></tr>
     <tr><td>发布失败／报告过期</td><td>检查本次 train 回执、哈希及截止；旧报告不能重发为当前有效信号</td></tr>
     <tr><td>真实持仓被 skiplist 跳过</td><td>先核验抓取失败原因，再按维护流程 reset-skiplist；purge 会不可逆地改变历史事实</td></tr>
   </tbody></table>
   <h3>备份、恢复与审计</h3>
-  <p><a href="ML_PRE_UPGRADE_BACKUP_2026-09-04.md">升级前备份</a>覆盖 Web／ML／完整 data／配置与 Git。最新部署前备份及验收证据位于私有 <code>data/deployments/20260905-ml-upgrade/</code>。恢复先写新路径，核对哈希、SQLite 完整性与兼容性；不得用旧整库覆盖新增交易事实。回滚代码不自动恢复数据库或公网首页，操作细节见 <a href="ML_UPGRADE_HANDOFF_2026-09-04.md">工程交接</a>。</p>
+  <p><a href="../records/ml-pre-upgrade-backup_codex_20260904.md">升级前备份</a>覆盖 Web／ML／完整 data／配置与 Git。最新部署前备份及验收证据位于私有 <code>data/deployments/20260905-ml-upgrade/</code>。恢复先写新路径，核对哈希、SQLite 完整性与兼容性；不得用旧整库覆盖新增交易事实。回滚代码不自动恢复数据库或公网首页，操作细节见 <a href="../records/ml-upgrade-handoff_codex_20260904.md">工程交接</a>。</p>
   <p>历史 audit 仅读；repair 联网写指定 ML 库；rebuild 追加 recomputed 并冻结输入。恢复和修复保留版本、run 与回执引用，不能直接清理掉历史证据。</p>
 </section>
 
@@ -1016,14 +1018,14 @@ bash scripts/server.sh</code></pre>
   <h2>19 · 接手清单（按顺序勾选）</h2>
   <h3>先确认现状</h3>
   <ul>
-    <li>☐ 阅读 <a href="README.md">docs 索引</a>、<a href="COLLABORATION.md">协作约定</a>、<a href="OPEN_ITEMS.md">未尽事项</a>及部署回执，区分历史方案、工程状态与模型验证结果。</li>
+    <li>☐ 阅读 <a href="../README.md">docs 索引</a>、<a href="../COLLABORATION.md">协作约定</a>、<a href="../OPEN_ITEMS.md">未尽事项</a>及部署回执，区分历史方案、工程状态与模型验证结果。</li>
     <li>☐ 核对 main、Git 状态、mk 环境、配置和两库路径；已有部署先打开 8888，只读检查，勿重复 init。</li>
     <li>☐ 核对最近备份与恢复说明；需要实验时建立新的隔离代码／数据副本，原 dc66 工作树已移除。</li>
     <li>☐ 全新安装才按 §3 配置环境、OpenD 和初始化；凭据仅保存在本地配置或环境变量。</li>
   </ul>
   <h3>读源码与数据契约</h3>
   <ul>
-    <li>☐ config.py → code_map.py → 两份 schema.sql 与 db.py 的列迁移 → <a href="DATA.md">数据字典</a>。</li>
+    <li>☐ config.py → code_map.py → 两份 schema.sql 与 db.py 的列迁移 → <a href="data-dictionary_claude_20260623.md">数据字典</a>。</li>
     <li>☐ collectors → pipelines → pnl.py：采集与展示分离，成本缺口、币种及现金口径明确。</li>
     <li>☐ web/app.py、ml_api.py、templates/ml_next.html、static/ml_next.js：v2 三条路由与只读边界。</li>
     <li>☐ ML sessions.py → predictor.py／calibrator.py → versions.py／runs.py → execution.py／service.py → report.py／pipeline.py。</li>
@@ -1038,7 +1040,7 @@ bash scripts/server.sh</code></pre>
     <li>☐ 后端改动后重启服务；前端改动检查 JS 并刷新。金额标币种，涨跌红涨绿跌。</li>
     <li>☐ 提交 diff 不包含配置、数据库、账户明细、模型或私有回执；不覆盖历史预测证据。</li>
   </ul>
-  <div class="callout ok"><span class="tag">接手结果</span>能够定位数据来源、解释预测和交易回溯口径、按回执发布和恢复，并清楚区分“已部署工程”与“尚未证明的模型收益”。后续任务从 <a href="OPEN_ITEMS.md">未尽事项</a>逐项推进。</div>
+  <div class="callout ok"><span class="tag">接手结果</span>能够定位数据来源、解释预测和交易回溯口径、按回执发布和恢复，并清楚区分“已部署工程”与“尚未证明的模型收益”。后续任务从 <a href="../OPEN_ITEMS.md">未尽事项</a>逐项推进。</div>
 </section>
 
 </main>

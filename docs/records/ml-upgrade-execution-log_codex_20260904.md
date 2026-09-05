@@ -1,5 +1,7 @@
 # ML 升级执行日志
 
+> 文档身份：2026-09-04 · 原始作者 codex · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
 工单 ML-UPGRADE-20260904；执行分支 `codex/ml-upgrade-20260904`，工作树 `/Users/kk/.codex/worktrees/dc66/myStock`。起点 `446e657`，初始工作区干净（detached HEAD，新建分支后实施）。已读 CLAUDE.md、用户 AGENTS.md 和工单。
 
 - B00–B02：工单及备份可读；SHA256SUMS 全通过，snapshot 137 文件逐一哈希通过，repository.bundle verify 通过，两库 immutable 只读 integrity_check 均 ok。没有复制配置、没有访问原服务。

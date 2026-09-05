@@ -57,7 +57,7 @@ bash scripts/server.sh    # 启动 Web（127.0.0.1:8888），仅读库
 conda activate mk && python -m pytest tests/ -q
 ```
 
-测试需在 `mk` 环境（base Python 缺 yfinance 等依赖可能报错）。文件数／用例数随分支变化，以 `python -m pytest tests --collect-only -q` 为准；本次验证见 [Claude 修复回执](docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md)。多数测试为合成数据；少数既有 ML 测试读取本地库并拟合模型，完整验证在隔离工作树副本运行。
+测试需在 `mk` 环境（base Python 缺 yfinance 等依赖可能报错）。文件数／用例数随分支变化，以 `python -m pytest tests --collect-only -q` 为准；本次验证见 [Claude 修复回执](docs/records/ml-upgrade-claude-review-fixes_codex_20260905.md)。多数测试为合成数据；少数既有 ML 测试读取本地库并拟合模型，完整验证在隔离工作树副本运行。
 
 前端无构建工具，改动后用 `node --check mystock/web/static/app.js` 做语法检查。
 
@@ -78,6 +78,8 @@ conda activate mk && python -m pytest tests/ -q
 
 **`docs/` + git 是唯一协作信道**——不读对方 session 状态、不看进程、不进对方工作树窥探进度。要知道对方做到哪了就读 `git log` 与该轮文档；要交东西给对方就提交进 git，没提交 = 没交付。对方没写进文档的就是没做，不替它脑补进度。
 
+文档命名与旧名映射见 [docs/GOVERNANCE.md](docs/GOVERNANCE.md)，新增／改名需同步清单和索引，并运行 `python3 scripts/check_docs.py`。
+
 完整约定见 [`docs/COLLABORATION.md`](docs/COLLABORATION.md)：一轮的形状（工单 → 执行 → 审查 → 修复 → 交接 → 部署）、文档命名、每份文档头三行必须交代的基线 SHA／分支／状态／边界。
 
 两条最容易出事的：
@@ -92,7 +94,7 @@ conda activate mk && python -m pytest tests/ -q
 - `data/ml/runs/<id>/` 保存私有冻结 input.db 与 manifest；`receipts/` 保存训练回执和独立 `.data.json` 数据回执；`reports/runs/<id>/` 是本地报告归档。
 - `mystock/ml/calendars/` 为 2020–2027 冻结日历；剩余不足 60 天日志／回执预警，越界拒绝。US 决策截止 09:30 ET，HK 09:00；生成器依赖只在隔离工具环境使用。
 - 全部人工触发：迁移副本 → `update.sh` → `ml.sh data` → `ml.sh train`。首次 train 前先 data 确认收盘缓存；feature_gap 先修行情缺口。`ml.sh` 无参数仅帮助，没有 cron。
-- `train` 打印回执；换终端用 `bash scripts/ml.sh publish <回执路径>`，校验产物哈希、run（如显式指定）和目标截止。不自动选择旧文件，仅覆盖公网 index.html，不上传日期归档。`all` 包含公网发布；任一采集失败仍会中止 all。详细演练见 [交接流程](docs/ML_UPGRADE_REVIEW_AND_RELEASE_2026-09-04.md)。
+- `train` 打印回执；换终端用 `bash scripts/ml.sh publish <回执路径>`，校验产物哈希、run（如显式指定）和目标截止。不自动选择旧文件，仅覆盖公网 index.html，不上传日期归档。`all` 包含公网发布；任一采集失败仍会中止 all。详细演练见 [交接流程](docs/records/ml-upgrade-review-release_codex_20260904.md)。
 - Web 顶层 import ML API → service → pandas/numpy；缺 ML 数据库可返回接口错误，但缺这些 Python 依赖可能阻止 Web 启动，不能声称全部延迟导入。
 - legacy 的 US 10/HK 100 为模拟参数，不是证券实际交易单位；v2 lot/tick 仍需人工核验，规则快照尚未完整接入。
 

@@ -1,5 +1,7 @@
 # ML 升级离线实验结果
 
+> 文档身份：2026-09-04 · 原始作者 codex · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
 固定输入：`data/upgrade-input/ml/mystock_ml.db`；哈希见本地 `data/upgrade-output/input-hashes.json`。所有细粒度结果仅留 ignored 输出。
 
 ## 协议与边界

@@ -12,13 +12,13 @@ ROOT_DIR = Path(__file__).resolve().parent.parent.parent
 # ---- 标的（3 美 + 3 港，单标的独立资金，各股本币不换汇）----
 #   美股（USD）：NVDA / TSLA / PDD
 #   港股（HKD）：腾讯 00700 / 阿里 09988 / 小米 01810
-# 各股独立账户、各自本币闭环，回测/预测无需跨币种归一（docs/ML_PLAN.md §3.4）。
+# 各股独立账户、各自本币闭环，回测/预测无需跨币种归一（docs/plans/ml-plan_claude_20260623.md §3.4）。
 TARGETS: list[str] = [
     "US.NVDA", "US.TSLA", "US.PDD",
     "HK.00700", "HK.09988", "HK.01810",
 ]
 
-# ---- 次日区间预测的分位（按股自适应，docs/ML_PLAN.md S1）----
+# ---- 次日区间预测的分位（按股自适应，docs/plans/ml-plan_claude_20260623.md S1）----
 # 区间 [L_hat,H_hat] 由 low/high 两个分位张成：分位越靠 0.5，区间越窄、但命中率越低
 # （宽度与覆盖率直接对赌）。下表按各股实测「宽度 vs 命中率」甜区定档：
 # 多数股 0.20/0.80（命中率守 ~50%、宽度较 0.10/0.90 降 ~25-30%）；
@@ -55,7 +55,7 @@ def coverage_for(code: str) -> float:
     return COVERAGE_BY_CODE.get(code, DEFAULT_COVERAGE)
 
 
-# ---- 抓取窗口（yfinance 实测硬限制，见 docs/ML_PLAN.md §2.1）----
+# ---- 抓取窗口（yfinance 实测硬限制，见 docs/plans/ml-plan_claude_20260623.md §2.1）----
 DAILY_PERIOD = "5y"      # 日线可取 5 年
 HOURLY_PERIOD = "730d"   # 1h 上限约 2 年（730d 单次可取，无需分段）
 

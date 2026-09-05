@@ -39,17 +39,19 @@
 
 不是每轮都要走满七步。小改动直接提交 + 在 commit message 里说清即可；**只有跨会话、跨 agent、需要对方接手的工作才立文档**。判断标准：*对方不读这份文档就接不上手* → 立；否则不立。
 
-## 2. 文档命名
+## 2. 文档命名与导航
 
+2026-09-05 按用户要求统一治理，完整规范与旧名映射见 [GOVERNANCE.md](GOVERNANCE.md)，文件身份登记在 [catalog.json](catalog.json)。
+
+```text
+docs/<guides|plans|research|records>/<topic>_<producer>_<YYYYMMDD>.<md|html>
 ```
-docs/ML_<阶段>_<YYYY-MM-DD>.md
-```
 
-阶段名沿用已有的：`UPGRADE_WORK_ORDER`、`UPGRADE_EXECUTION_LOG`、`UPGRADE_EXPERIMENT_RESULTS`、`UPGRADE_CLAUDE_REVIEW`、`UPGRADE_CLAUDE_FIXES`、`UPGRADE_HANDOFF`、`DEPLOYMENT`、`HISTORY_REFRESH`。
-
-- **日期是文档创建日**，后续修订不改名（改名会断掉别处的链接）。
-- 非 ML 的协作去掉 `ML_` 前缀即可。
-- 新立文档必须在 [`README.md`](../README.md) 的「主要文档」表里加一行，否则等于没人找得到。
+- 作者标记指原始执笔者（codex／claude／cursor 等），审查人和代提交人另记；无法确认就 unknown。模型版本仅在有依据时写正文。
+- 日期优先保留原文档身份，缺日期时按治理规范追溯；修订只更新正文日期，不因换维护工具重新命名。
+- 本次集中改名同步仓库内引用并留旧名映射；固定 SHA 历史链接和冻结脚本保持原样。
+- README、COLLABORATION、OPEN_ITEMS、GOVERNANCE 及 catalog 保留固定入口。
+- 新文档必须登记 catalog 并加入 docs/README 的对应类别；关键工单／规范同步根 README，其余由全量索引承接。提交前运行 `python3 scripts/check_docs.py`。
 
 ## 3. 每份文档的头三行
 
@@ -62,7 +64,7 @@ docs/ML_<阶段>_<YYYY-MM-DD>.md
 | **状态** | 已完成 / 进行中 / 仅结论未改代码 / 已合并 |
 | **边界** | **做了什么、明确没做什么**。见 §5 |
 
-现有文档已是这个样子，照抄格式即可（例：[执行日志](ML_UPGRADE_EXECUTION_LOG_2026-09-04.md)、[审查报告](ML_UPGRADE_CLAUDE_REVIEW_2026-09-04.md)）。
+现有文档已是这个样子，照抄格式即可（例：[执行日志](records/ml-upgrade-execution-log_codex_20260904.md)、[审查报告](records/ml-upgrade-review_claude_20260904.md)）。
 
 ## 4. 未尽事项去 `OPEN_ITEMS.md`
 
@@ -96,7 +98,7 @@ docs/ML_<阶段>_<YYYY-MM-DD>.md
 
 ## 7. 结论照实写
 
-沿用项目既有纪律（见 [`ML_TIER1_ROBUSTNESS.md`](ML_TIER1_ROBUSTNESS.md)）：
+沿用项目既有纪律（见 [`ml-tier1-robustness_claude_20260718.md`](records/ml-tier1-robustness_claude_20260718.md)）：
 
 - **负结果照写。** 打不过基线就写打不过，不调低门槛、不挑窗口。
 - **工程完成 ≠ 模型晋级。** 两件事分开表述，不用前者的完成度暗示后者。

@@ -1,6 +1,6 @@
 """P1 — 1h 盘中限价撮合模拟器（纯函数，可单测）。
 
-口径见 docs/ML_PLAN.md §4：
+口径见 docs/plans/ml-plan_claude_20260623.md §4：
   - 对某交易日的逐根 1h K 线按盘中顺序遍历；
   - 限价买 P_b：第一根满足 low(bar) <= P_b 的 bar 成交，成交价 = min(P_b, open(bar))；
   - 限价卖 P_s：第一根满足 high(bar) >= P_s 的 bar 成交，成交价 = max(P_s, open(bar))；
@@ -55,7 +55,7 @@ def match_limit_order(
 
 @dataclass
 class Account:
-    """单标的独立账户（docs/ML_PLAN.md §3.4：不共享现金池）。"""
+    """单标的独立账户（docs/plans/ml-plan_claude_20260623.md §3.4：不共享现金池）。"""
     cash: float
     qty: float = 0.0
     # 移动平均成本（券商口径）；用于结算回合净值

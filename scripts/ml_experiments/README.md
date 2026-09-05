@@ -34,4 +34,9 @@ python -m scripts.ml_experiments.strategy_validation --db "$MYSTOCK_EXPERIMENT_D
 
 回溯重建只进不可覆盖版本表，旧版投影仅新增经时间验证的 live。已有旧版重建数据继续保留并标注来源。新的 gap 检查同时查询有效版本表，避免因重建不再写旧表而重复计算。
 
-完整执行证据见 [历史修复记录](../../docs/ML_HISTORY_REFRESH_2026-09-05.md)、[升级实验结果](../../docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md)及 [Claude 修复回执](../../docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md)。
+完整执行证据见 [历史修复记录](../../docs/records/ml-history-refresh_codex_20260905.md)、[升级实验结果](../../docs/records/ml-upgrade-experiment-results_codex_20260904.md)及 [Claude 修复回执](../../docs/records/ml-upgrade-claude-review-fixes_codex_20260905.md)。
+
+
+### 文档治理后的汇总输出
+
+`summarize_upgrade.py` 默认写 `data/upgrade-output/experiment-summary.md` 私有草稿；`--out` 可明确指定输出路径。已有实验回执是已审查记录，脚本不再默认覆盖它。新结果审阅后按 [文档治理规范](../../docs/GOVERNANCE.md) 命名、登记到清单和索引；文件迁移不改变原实验协议。

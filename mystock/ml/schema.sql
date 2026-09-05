@@ -1,5 +1,5 @@
 -- myStock ML 训练库 schema（独立于 mystock/schema.sql）
--- 设计见 docs/ML_PLAN.md §2.3。绝不与 web 生产库共用。
+-- 设计见 docs/plans/ml-plan_claude_20260623.md §2.3。绝不与 web 生产库共用。
 
 -- 扩抓日线（5 年），auto_adjust=False 保留 close + adj_close
 CREATE TABLE IF NOT EXISTS ml_quotes_1d (

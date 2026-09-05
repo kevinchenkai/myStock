@@ -1,7 +1,7 @@
 """P2 特征工程（纯函数，可单测）。
 
 严防未来函数：所有特征只用到截至 T 日收盘可得的信息，预测 T+1 的 high/low。
-收益率/技术指标用 adj_close（避免分红/拆股假跳空，DATA.md §4）。
+收益率/技术指标用 adj_close（避免分红/拆股假跳空，docs/guides/data-dictionary_claude_20260623.md §4）。
 
 标签（next-day，需对齐 T+1 实际行情）：
   - y_high_ret = high(T+1)/close(T) - 1

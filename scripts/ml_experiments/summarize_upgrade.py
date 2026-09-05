@@ -1,11 +1,12 @@
 """Build reviewable aggregate evidence; never exports personal orders/deals."""
+import argparse
 import json
 from pathlib import Path
 import numpy as np
 from mystock.ml import evaluation as ev,config
 
 ROOT=Path(__file__).resolve().parents[2]
-def main():
+def main(out=None):
  p=ROOT/'data/upgrade-output/matrix';metrics=json.loads((p/'metrics.json').read_text());preds=json.loads((p/'predictions.json').read_text());d={(r['code'],r['candidate']):r for r in metrics};codes=config.TARGETS
  lines=['# ML 升级离线实验结果','',
  '固定输入：`data/upgrade-input/ml/mystock_ml.db`；哈希见本地 `data/upgrade-output/input-hashes.json`。所有细粒度结果仅留 ignored 输出。',
@@ -40,5 +41,10 @@ def main():
   if 'pinball_low' not in r:continue
   lines.append(f"|{r['code']}|{r['candidate']}|{r['pinball_low']:.6f}|{r['pinball_high']:.6f}|{r['coverage']:.3f}|{r['width']*100:.2f}|{r['lower_miss']:.3f}/{r['upper_miss']:.3f}|")
  lines+=['','## 固定策略和后续事项','','策略汇总在第四批离线回放后追加。E6–E8、RL/TFT/HMM、外部特征采集未运行，不属于本次必交付。生产预测器和生产策略默认均未切换。']
- (ROOT/'docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md').write_text('\n'.join(lines)+'\n')
-if __name__=='__main__':main()
+ output=Path(out) if out is not None else ROOT/'data/upgrade-output/experiment-summary.md'
+ output.parent.mkdir(parents=True,exist_ok=True)
+ output.write_text('\n'.join(lines)+'\n')
+if __name__=='__main__':
+ parser=argparse.ArgumentParser(description='Generate an experiment draft; reviewed docs are not overwritten by default.')
+ parser.add_argument('--out',type=Path,help='Draft output path (default: data/upgrade-output/experiment-summary.md)')
+ main(parser.parse_args().out)

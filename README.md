@@ -26,14 +26,14 @@
 
 | 项目 | 当前状态／入口 |
 | --- | --- |
-| 升级前备份 | 已备份 Web、ML、完整 data、配置与 Git 历史；137 个文件解压哈希和两库 integrity_check 通过。[备份记录与恢复说明](docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md) |
-| 执行负责人 | **Codex Astra**，已在 `codex/ml-upgrade-20260904` 隔离工作树及数据副本完成实施，后续合入 main。[执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md) |
-| 已观察到的进展 | 四批工程已实现：session 守卫、不可覆盖版本、E0–E5 实验、受约束回放与 `/ml-next`；历史副本已补齐 20/60/120 session。Claude 合并前修复及验证见 [修复回执](docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md) |
+| 升级前备份 | 已备份 Web、ML、完整 data、配置与 Git 历史；137 个文件解压哈希和两库 integrity_check 通过。[备份记录与恢复说明](docs/records/ml-pre-upgrade-backup_codex_20260904.md) |
+| 执行负责人 | **Codex Astra**，已在 `codex/ml-upgrade-20260904` 隔离工作树及数据副本完成实施，后续合入 main。[执行工单](docs/records/ml-upgrade-work-order_codex_20260904.md) |
+| 已观察到的进展 | 四批工程已实现：session 守卫、不可覆盖版本、E0–E5 实验、受约束回放与 `/ml-next`；历史副本已补齐 20/60/120 session。Claude 合并前修复及验证见 [修复回执](docs/records/ml-upgrade-claude-review-fixes_codex_20260905.md) |
 | 后续范围 | 工程已获确认、合入并部署；E0–E5 无候选达模型晋级门槛，证券规则历史与快照保留策略等继续跟踪 |
-| 运行边界 | **已合入 main 并推送，8888 服务已重启，ML 数据／历史重建／训练／公网报告发布验收通过**；仍人工触发，无自动下单或自动任务。[部署回执](docs/ML_DEPLOYMENT_2026-09-05.md) |
-| 方案／讨论 | [Codex v1.4](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)、[Claude 合并稿 v0.2.1](docs/ML_CLAUDE_UPGRADE_MERGED.md)、[Claude 原方案](docs/ML_UPGRADE_PLAN.md) |
+| 运行边界 | **已合入 main 并推送，8888 服务已重启，ML 数据／历史重建／训练／公网报告发布验收通过**；仍人工触发，无自动下单或自动任务。[部署回执](docs/records/ml-deployment_codex_20260905.md) |
+| 方案／讨论 | [Codex v1.4](docs/plans/ml-upgrade-plan_codex_20260904.md)、[Claude 合并稿 v0.2.1](docs/plans/ml-upgrade-merged_claude_20260904.md)、[Claude 原方案](docs/plans/ml-upgrade-plan_claude_20260904.md) |
 
-接手与维护：[docs 索引](docs/README.md) · [HTML 接手指南](docs/项目接手指南.html) · [当前 ML 概览](docs/ML_OVERVIEW.md) · [工程交接与恢复](docs/ML_UPGRADE_HANDOFF_2026-09-04.md)。
+接手与维护：[docs 索引](docs/README.md) · [HTML 接手指南](docs/guides/project-onboarding_cursor_20260704.html) · [当前 ML 概览](docs/guides/ml-overview_claude_20260623.md) · [工程交接与恢复](docs/records/ml-upgrade-handoff_codex_20260904.md)。
 
 以下说明以已部署 main 代码为准，保留 `885e8f7` 的已核实限制。工程部署不等于模型晋级；详细运行与验收证据见部署回执。
 
@@ -68,7 +68,7 @@ yfinance（行情 / 汇率 / 通用信息）──────┘               
 
 八张数据表：`positions`（持仓快照）、`orders`（历史订单）、`deals`（历史成交）、`daily_quotes`（日线行情）、`stock_profiles`（股票通用信息：公司/估值 + 富途盘面字段，随每日更新刷新）、`fx_rates`（外汇日线，当前为美元兑人民币 USDCNY）、`account_funds`（账户资金每日快照）、`capital_flow`（个股日频资金流向），外加 `sync_log`（同步日志）与 `quote_skiplist`（行情跳过名单）。详见 [`mystock/schema.sql`](mystock/schema.sql)。
 
-字段级数据字典（含取值分布与已知坑点）见 [`docs/DATA.md`](docs/DATA.md)。
+字段级数据字典（含取值分布与已知坑点）见 [`docs/guides/data-dictionary_claude_20260623.md`](docs/guides/data-dictionary_claude_20260623.md)。
 
 ---
 
@@ -198,10 +198,10 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 
 # 二、ML —— 次日区间预测 / 撮合回测 / 每日报告
 
-> 一页速览见 [`docs/ML_OVERVIEW.md`](docs/ML_OVERVIEW.md)；完整方案与决策记录见 [`docs/ML_PLAN.md`](docs/ML_PLAN.md)。
-> 代码在 [`mystock/ml/`](mystock/ml/)，独立库 `data/ml/mystock_ml.db`，与 Web 生产库分库。
+> 一页速览见 [`docs/guides/ml-overview_claude_20260623.md`](docs/guides/ml-overview_claude_20260623.md)；完整方案与决策记录见 [`docs/plans/ml-plan_claude_20260623.md`](docs/plans/ml-plan_claude_20260623.md)。
+> 代码在 [`mystock/ml/`](mystock/ml)，独立库 `data/ml/mystock_ml.db`，与 Web 生产库分库。
 
-升级工程已合入 main 并完成本机与报告部署，进度与备份入口见文首状态表。当前已提供收盘／发布守卫及不可覆盖预测留档；具体修复与验收见 [执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md)。
+升级工程已合入 main 并完成本机与报告部署，进度与备份入口见文首状态表。当前已提供收盘／发布守卫及不可覆盖预测留档；具体修复与验收见 [执行工单](docs/records/ml-upgrade-work-order_codex_20260904.md)。
 
 **对外页面**：<https://g.ismayday.com/mystock/>（人工运行并发布报告后更新；当前 publish 仅更新首页；新历史归档留在本地 reports/runs/）
 
@@ -259,7 +259,7 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 
 ## 2.3 模块与运行
 
-**代码模块**（[`mystock/ml/`](mystock/ml/)）：
+**代码模块**（[`mystock/ml/`](mystock/ml)）：
 
 | 文件 | 职责 |
 | --- | --- |
@@ -339,7 +339,7 @@ bash scripts/ml.sh train      # 使用更新后的数据训练、评估并生成
 
 可信版本、时间截止、朴素基准和受约束回放已交付；后续事项统一见 [未尽事项](docs/OPEN_ITEMS.md)。新增特征或更复杂模型只有在共同样本的消融中显示增益，才进入前向观察；预测增益与策略收益分别验收。
 
-**被证伪并已移除的东西**（[`docs/ML_TIER1_ROBUSTNESS.md`](docs/ML_TIER1_ROBUSTNESS.md)）：曾以单种子 / 单测试窗记录为「四标的改善」的两项决策层增强——**风险调整 reward**（sharpe / drawdown_penalized）与 **HMM regime 软切换**——在**多时段锚定滚动**（6 个起点）复检下**全部方向翻转，胜率 15/36 = 42%（≈掷硬币）**，同一支股票只把评估起点挪几十天，Δ 就从 −40% 翻到 +69%。据「打不过就诚实记录」的纪律**予以移除**。属预测层的 **CQR 校准保留**（未被证伪，且与净值方差无关）。
+**被证伪并已移除的东西**（[`docs/records/ml-tier1-robustness_claude_20260718.md`](docs/records/ml-tier1-robustness_claude_20260718.md)）：曾以单种子 / 单测试窗记录为「四标的改善」的两项决策层增强——**风险调整 reward**（sharpe / drawdown_penalized）与 **HMM regime 软切换**——在**多时段锚定滚动**（6 个起点）复检下**全部方向翻转，胜率 15/36 = 42%（≈掷硬币）**，同一支股票只把评估起点挪几十天，Δ 就从 −40% 翻到 +69%。据「打不过就诚实记录」的纪律**予以移除**。属预测层的 **CQR 校准保留**（未被证伪，且与净值方差无关）。
 
 > 这条记录本身是项目的一部分：**没有可信的尺子，"改善"就是噪声。** 借鉴 qlib 的 purged CV + 两级 IC 评估地基（`cv.py` / `signal_eval.py`）正是为此而落地。
 
@@ -442,21 +442,22 @@ myStock/
 
 | 文档 | 内容 |
 | --- | --- |
+| [文档治理规范](docs/GOVERNANCE.md) | 命名、分类、作者／日期来源、旧名映射与只读检查 |
 | [docs 文档索引](docs/README.md) | 当前接手／运行说明、升级证据链与历史研究导航 |
 | [`docs/COLLABORATION.md`](docs/COLLABORATION.md) | **Codex × Claude 协作约定**：docs/ + git 为唯一信道、一轮的形状、文档命名与边界声明 |
 | [`docs/OPEN_ITEMS.md`](docs/OPEN_ITEMS.md) | **未尽事项清单**：跨轮次的唯一待办来源，开新工单前先读 |
-| [`docs/DATA.md`](docs/DATA.md) | 数据字典：全部表字段、取值特征、已知坑点 |
-| [`docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md`](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md) | 已完成的 Astra 原始工单：四批任务、文件范围、验证、数据隔离与交付边界 |
-| [`docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md`](docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md) | 升级前备份位置、覆盖范围、恢复验证和回滚原则 |
-| [`docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md`](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md) | Codex v1.4：业务目标、证据、模型／回溯方案及 API 特征调研 |
-| [`docs/ML_CLAUDE_UPGRADE_MERGED.md`](docs/ML_CLAUDE_UPGRADE_MERGED.md) | Claude 合并讨论与逐轮回应，近期人工触发等决策记录 |
-| [`docs/ML_UPGRADE_PLAN.md`](docs/ML_UPGRADE_PLAN.md) | Claude 原始升级方案与探索性实验记录 |
+| [`docs/guides/data-dictionary_claude_20260623.md`](docs/guides/data-dictionary_claude_20260623.md) | 数据字典：全部表字段、取值特征、已知坑点 |
+| [`docs/records/ml-upgrade-work-order_codex_20260904.md`](docs/records/ml-upgrade-work-order_codex_20260904.md) | 已完成的 Astra 原始工单：四批任务、文件范围、验证、数据隔离与交付边界 |
+| [`docs/records/ml-pre-upgrade-backup_codex_20260904.md`](docs/records/ml-pre-upgrade-backup_codex_20260904.md) | 升级前备份位置、覆盖范围、恢复验证和回滚原则 |
+| [`docs/plans/ml-upgrade-plan_codex_20260904.md`](docs/plans/ml-upgrade-plan_codex_20260904.md) | Codex v1.4：业务目标、证据、模型／回溯方案及 API 特征调研 |
+| [`docs/plans/ml-upgrade-merged_claude_20260904.md`](docs/plans/ml-upgrade-merged_claude_20260904.md) | Claude 合并讨论与逐轮回应，近期人工触发等决策记录 |
+| [`docs/plans/ml-upgrade-plan_claude_20260904.md`](docs/plans/ml-upgrade-plan_claude_20260904.md) | Claude 原始升级方案与探索性实验记录 |
 | [`scripts/ml_experiments/README.md`](scripts/ml_experiments/README.md) | 原始实验 A／B 的运行入口与已知限制 |
-| [`docs/ML_OVERVIEW.md`](docs/ML_OVERVIEW.md) | ML 一页速览：思路 + 数据 + 实验结论 |
-| [`docs/ML_PLAN.md`](docs/ML_PLAN.md) | ML 完整方案与决策记录（历史文档，保留决策脉络） |
-| [`docs/ML_ALGORITHM_PROPOSAL.md`](docs/ML_ALGORITHM_PROPOSAL.md) | 候选算法改进清单（分档提案） |
-| [`docs/ML_QLIB_BORROW_PLAN.md`](docs/ML_QLIB_BORROW_PLAN.md) | 借鉴 qlib 的评估地基落地计划 |
-| [`docs/ML_TIER1_ROBUSTNESS.md`](docs/ML_TIER1_ROBUSTNESS.md) | Tier1 稳健性检验与**移除决策记录**（诚实负结果） |
+| [`docs/guides/ml-overview_claude_20260623.md`](docs/guides/ml-overview_claude_20260623.md) | ML 一页速览：思路 + 数据 + 实验结论 |
+| [`docs/plans/ml-plan_claude_20260623.md`](docs/plans/ml-plan_claude_20260623.md) | ML 完整方案与决策记录（历史文档，保留决策脉络） |
+| [`docs/plans/ml-algorithm-proposal_cursor_20260704.md`](docs/plans/ml-algorithm-proposal_cursor_20260704.md) | 候选算法改进清单（分档提案） |
+| [`docs/plans/ml-qlib-borrow-plan_claude_20260718.md`](docs/plans/ml-qlib-borrow-plan_claude_20260718.md) | 借鉴 qlib 的评估地基落地计划 |
+| [`docs/records/ml-tier1-robustness_claude_20260718.md`](docs/records/ml-tier1-robustness_claude_20260718.md) | Tier1 稳健性检验与**移除决策记录**（诚实负结果） |
 
 ---
 
@@ -522,7 +523,7 @@ PYTHONDONTWRITEBYTECODE=1 python -m pytest tests/ -q -p no:cacheprovider --ignor
 - **`init.sh` / `update.sh` 可重复执行**：写库幂等，重复运行不会产生重复数据；当天数据按覆盖处理。
 - **ML 页面返回 503**：检查 ML 库路径、schema 和数据；新库按部署次序初始化并 `data`。缺库可隔离为接口错误，但依赖缺失不同：Web 顶层加载 ML API → service → pandas/numpy，缺这些包可能让整个 Web 无法启动，应先安装环境依赖。
 - **ML 报告某列显示「—」**：可能为数据不足、非有限值或指标分母不可用；应结合输入日期和日志排查，不能只凭显示「—」认定整条管线数据有效。
-- **升级页面入口**：工程已合入 main 并部署，打开 <http://127.0.0.1:8888/ml-next/>；若仍看到旧页，核对服务目录、提交和浏览器缓存。部署验收见 [回执](docs/ML_DEPLOYMENT_2026-09-05.md)。
+- **升级页面入口**：工程已合入 main 并部署，打开 <http://127.0.0.1:8888/ml-next/>；若仍看到旧页，核对服务目录、提交和浏览器缓存。部署验收见 [回执](docs/records/ml-deployment_codex_20260905.md)。
 
 ---
 

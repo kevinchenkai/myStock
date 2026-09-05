@@ -1,6 +1,6 @@
 """P3 回测引擎：决策层策略在 1h 模拟器上的逐日回放 + 三基线对照。
 
-主指标（docs/ML_PLAN.md §7）：测试区间累计**达成交易净值**（卖出额−买入额，含期末持仓
+主指标（docs/plans/ml-plan_claude_20260623.md §7）：测试区间累计**达成交易净值**（卖出额−买入额，含期末持仓
 按最后收盘折算），单标的独立账户（§3.4，不共享现金）。
 
 对照三基线：
@@ -62,7 +62,7 @@ def compute_reward(step_pnl: float, bh_step: float, init_cash: float,
 
     注：曾试验过的风险调整 reward（sharpe / drawdown_penalized，即"Tier1 建议1"）
     未通过时段稳健性检验（6 段翻转、胜率 42%），已移除，详见
-    docs/ML_TIER1_ROBUSTNESS.md。
+    docs/records/ml-tier1-robustness_claude_20260718.md。
     """
     if excess:
         return (step_pnl - bh_step) / init_cash * scale
@@ -143,7 +143,7 @@ def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None, daily=Non
             continue
         mark_next = _mark_price(feat, i + 1)
         # 兜底：今日 close / 次日 mark 为 NaN 则跳过该日（否则 equity=qty*nan 会污染
-        # 整条净值曲线，总览显示 nan）。采集层已丢脏行，这里再防一道（DATA.md §4）。
+        # 整条净值曲线，总览显示 nan）。采集层已丢脏行，这里再防一道（docs/guides/data-dictionary_claude_20260623.md §4）。
         if not (np.isfinite(close_t) and np.isfinite(mark_next)):
             continue
         lo_r, hi_r = float(lo_by_i[i]), float(hi_by_i[i])
@@ -255,7 +255,7 @@ if __name__ == "__main__":
     from dataclasses import replace
     # 标准口径：超额-bandit + CQR 校准 + purged 隔离带（与 report 同口径）。
     # 风险调整 reward / regime 软切换（原 Tier1 建议1+3）未通过时段稳健性检验，
-    # 已移除，详见 docs/ML_TIER1_ROBUSTNESS.md。
+    # 已移除，详见 docs/records/ml-tier1-robustness_claude_20260718.md。
     base = BTConfig()  # conformal/purged 默认开
     print(f"{'code':9} {'days':>5} {'rule':>9} {'bandit':>9} {'human':>9} {'buy_hold':>9}  net(bandit)")
     for code in mlcfg.TARGETS:

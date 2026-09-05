@@ -1,6 +1,6 @@
 """Conformalized Quantile Regression (CQR) —— 区间预测的有限样本覆盖率校准。
 
-docs/ML_ALGORITHM_PROPOSAL.md 建议 2。在现有分位数回归（predictor.IntervalModel）
+docs/plans/ml-algorithm-proposal_cursor_20260704.md 建议 2。在现有分位数回归（predictor.IntervalModel）
 外面套一层 split conformal 校准，把按股手调的 ALPHA_BY_CODE 分位档替换为
 "目标覆盖率 → 自适应半宽"，并给出有限样本覆盖率保证（标准 QR 只有渐近保证）。
 

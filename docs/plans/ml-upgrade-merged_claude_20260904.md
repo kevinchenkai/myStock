@@ -1,17 +1,19 @@
 # myStock ML 升级 —— 合并方案（Claude v0.1 × Codex v1.2/v1.3 → 讨论稿 v0.2）
 
-> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](ML_UPGRADE_HANDOFF_2026-09-04.md)，验收见 [部署回执](ML_DEPLOYMENT_2026-09-05.md)，全部资料见 [文档索引](README.md)。
+> 文档身份：2026-09-04 · 原始作者 claude · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
+> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](../records/ml-upgrade-handoff_codex_20260904.md)，验收见 [部署回执](../records/ml-deployment_codex_20260905.md)，全部资料见 [文档索引](../README.md)。
 
 > 作者：Claude · 日期：2026-09-04 · 状态：**合并建议，待与 Codex 共同研究后再定执行方案**
 >
-> 输入：[`ML_UPGRADE_PLAN.md`](ML_UPGRADE_PLAN.md)（Claude v0.1）与 [Codex v1.2 固定快照](https://github.com/kevinchenkai/myStock/blob/70b09167a10d810e52d3f994719e866dc70ccc3b/docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)。
-> v0.2 回应依据：[Codex v1.3 固定快照](https://github.com/kevinchenkai/myStock/blob/f1c6883572093768e128e4e20739a07b45ff3718/docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)。后续反馈见 [Codex 当前方案 v1.4](ML_CODEX_UPGRADE_PLAN_2026-09-04.md) §2.5 的共识与核查、§5.1 的人工触发守卫及 §8–9 的实施范围；本稿早期段落保留讨论经过，当前回应以 §7 及 v0.2.1 决策记录为准。
+> 输入：[`ml-upgrade-plan_claude_20260904.md`](ml-upgrade-plan_claude_20260904.md)（Claude v0.1）与 [Codex v1.2 固定快照](https://github.com/kevinchenkai/myStock/blob/70b09167a10d810e52d3f994719e866dc70ccc3b/docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)。
+> v0.2 回应依据：[Codex v1.3 固定快照](https://github.com/kevinchenkai/myStock/blob/f1c6883572093768e128e4e20739a07b45ff3718/docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)。后续反馈见 [Codex 当前方案 v1.4](ml-upgrade-plan_codex_20260904.md) §2.5 的共识与核查、§5.1 的人工触发守卫及 §8–9 的实施范围；本稿早期段落保留讨论经过，当前回应以 §7 及 v0.2.1 决策记录为准。
 > 本文不重复两份原文的论证，只做三件事：① 列出双方一致且已核实的事实；② 给出分批合并顺序与各批范围；③ 列出需要三方（用户 / Codex / Claude）拍板的分歧点。
 > 本文只改文档，未改代码；所有「已核实」均为 2026-09-04 对本地库与源码的只读检查。
 >
 > **v0.2.1**：用户拍板「近期人工手动触发 `update.sh` / `ml.sh`，自动调度以后再议」；第一批的「调度」项改为「手工触发 + 盘中跳过守卫」（§2 第一批、§7）。
 >
-> **v0.2（2026-09-04 晚）**：逐项回应 Codex v1.3 §2.4（见 §7）；新增一条双方方案都未覆盖的 P0（§1.3：报告在盘中生成、用未收盘 bar 当「收盘」，且 REPLACE 抹掉了证据）；撤回 v0.1 关于「02:40 PDT 批次满足时序」的说法；删除 §1.2 中一处不该出现在公开仓库的持仓数字；实验脚本入库 [`scripts/ml_experiments/`](../scripts/ml_experiments/) 供复现。
+> **v0.2（2026-09-04 晚）**：逐项回应 Codex v1.3 §2.4（见 §7）；新增一条双方方案都未覆盖的 P0（§1.3：报告在盘中生成、用未收盘 bar 当「收盘」，且 REPLACE 抹掉了证据）；撤回 v0.1 关于「02:40 PDT 批次满足时序」的说法；删除 §1.2 中一处不该出现在公开仓库的持仓数字；实验脚本入库 [`scripts/ml_experiments/`](../../scripts/ml_experiments) 供复现。
 
 ---
 
@@ -159,7 +161,7 @@ Codex v1.3 对「02:40 PDT 批次」提出质疑，核查结果比质疑更严�
 ## 5. 明确不做（双方一致）
 
 - 自动下单 / 对接富途交易接口；Web 只读、不训练、不写 ML 库。
-- RL（含 IQL / Cal-QL）、TFT / Transformer、HMM regime、风险调整 reward（已被 [`ML_TIER1_ROBUSTNESS`](ML_TIER1_ROBUSTNESS.md) 证伪）。
+- RL（含 IQL / Cal-QL）、TFT / Transformer、HMM regime、风险调整 reward（已被 [`ML_TIER1_ROBUSTNESS`](../records/ml-tier1-robustness_claude_20260718.md) 证伪）。
 - 跨币种归一、共享现金池、ML 结果写进生产库。
 - 扩大选股池。
 

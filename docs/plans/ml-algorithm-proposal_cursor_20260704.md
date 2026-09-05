@@ -1,10 +1,12 @@
 # ML 新算法建议清单（讨论稿 v0.1）
 
-> **⚠️ 后续更新（2026-07-18）**：第一档三件套已落地并复检。**建议1（风险调整 reward）与建议3（HMM regime 软切换）未通过时段稳健性检验（6 时段翻转、胜率 42%），已从代码移除**，详见 [`ML_TIER1_ROBUSTNESS.md`](ML_TIER1_ROBUSTNESS.md)。**建议2（CQR 校准）稳健有效、保留**。下方原始提案保留作历史，阅读时请对照该记录。
+> 文档身份：2026-07-04 · 原始作者 cursor · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
+> **⚠️ 后续更新（2026-07-18）**：第一档三件套已落地并复检。**建议1（风险调整 reward）与建议3（HMM regime 软切换）未通过时段稳健性检验（6 时段翻转、胜率 42%），已从代码移除**，详见 [`ml-tier1-robustness_claude_20260718.md`](../records/ml-tier1-robustness_claude_20260718.md)。**建议2（CQR 校准）稳健有效、保留**。下方原始提案保留作历史，阅读时请对照该记录。
 >
-> 状态：本文件为**新算法建议清单**，承接 [`ML_OVERVIEW.md`](ML_OVERVIEW.md) 的"下一步优先级 = regime 感知 > 扩样本 > RL"与 [`ML_PLAN.md`](ML_PLAN.md) 的"能停则停、打不过基线如实记录"纪律。**未拍板、未开工**，供讨论与排期。
+> 状态：本文件为**新算法建议清单**，承接 [`ml-overview_claude_20260623.md`](../guides/ml-overview_claude_20260623.md) 的"下一步优先级 = regime 感知 > 扩样本 > RL"与 [`ml-plan_claude_20260623.md`](ml-plan_claude_20260623.md) 的"能停则停、打不过基线如实记录"纪律。**未拍板、未开工**，供讨论与排期。
 >
-> 关联：数据口径见 [`DATA.md`](DATA.md)，盈亏口径见 [`mystock/pnl.py`](../mystock/pnl.py)，现有 ML 代码见 [`mystock/ml/`](../mystock/ml/)。
+> 关联：数据口径见 [`data-dictionary_claude_20260623.md`](../guides/data-dictionary_claude_20260623.md)，盈亏口径见 [`mystock/pnl.py`](../../mystock/pnl.py)，现有 ML 代码见 [`mystock/ml/`](../../mystock/ml)。
 >
 > 调研基准：2026-07-04，已对照 2025–2026 当前最佳实践（Conformal Quantile Regression、HMM regime、IQL/Cal-QL、Bootstrap Thompson Sampling、Purged K-Fold）。
 >
@@ -29,12 +31,12 @@
 
 | 层 | 现用算法 | 文件 | 已验证结论 |
 | --- | --- | --- | --- |
-| 预测 P2 | 分位数回归（LightGBM 优先 / sklearn 回退），按股自适应 α | [`predictor.py`](../mystock/ml/predictor.py) | 区间命中 ~50%（收窄后），宽度↓25-30%，walk-forward 无泄漏 |
-| 决策 P3 | LinUCB contextual bandit（13 臂，ε-探索，超额奖励） | [`policy.py`](../mystock/ml/policy.py) | regime 依赖：NVDA 超基线，TSLA 改善仍输，PDD 退化 |
-| RL P4 | Discrete CQL（离线） | [`offline_rl.py`](../mystock/ml/offline_rl.py) | **负结果**：三支全退化为"不动"，`conservative_loss(1.93) > td_loss(1.17)` |
-| 撮合 P1 | 1h bar 限价撮合模拟器 | [`simulator.py`](../mystock/ml/simulator.py) | 真实 orders 回放吻合 88-90% |
+| 预测 P2 | 分位数回归（LightGBM 优先 / sklearn 回退），按股自适应 α | [`predictor.py`](../../mystock/ml/predictor.py) | 区间命中 ~50%（收窄后），宽度↓25-30%，walk-forward 无泄漏 |
+| 决策 P3 | LinUCB contextual bandit（13 臂，ε-探索，超额奖励） | [`policy.py`](../../mystock/ml/policy.py) | regime 依赖：NVDA 超基线，TSLA 改善仍输，PDD 退化 |
+| RL P4 | Discrete CQL（离线） | [`offline_rl.py`](../../mystock/ml/offline_rl.py) | **负结果**：三支全退化为"不动"，`conservative_loss(1.93) > td_loss(1.17)` |
+| 撮合 P1 | 1h bar 限价撮合模拟器 | [`simulator.py`](../../mystock/ml/simulator.py) | 真实 orders 回放吻合 88-90% |
 
-**项目自己给出的下一步优先级**（[`ML_OVERVIEW.md`](ML_OVERVIEW.md) 实验总结）：**regime 感知 > 扩样本 > RL**。
+**项目自己给出的下一步优先级**（[`ml-overview_claude_20260623.md`](../guides/ml-overview_claude_20260623.md) 实验总结）：**regime 感知 > 扩样本 > RL**。
 
 **关键洞见**：P3→P3.1 仅把奖励改成"相对 buy&hold 超额"，NVDA 就从输变赢 —— **奖励/目标对齐比换更复杂模型更管用**。这条经验贯穿本文档所有建议。
 
@@ -56,7 +58,7 @@
 
 ### 3.1 建议 1 — 风险调整 reward（延续 P3.1 成功经验）
 
-**是什么**：当前 reward = `相对 buy&hold 超额 × reward_scale`（[`backtest.py::BTConfig`](../mystock/ml/backtest.py)）。建议加两个可选目标 A/B 对照：
+**是什么**：当前 reward = `相对 buy&hold 超额 × reward_scale`（[`backtest.py::BTConfig`](../../mystock/ml/backtest.py)）。建议加两个可选目标 A/B 对照：
 - (a) **Sharpe 化回合 reward**：用滚动 20 日 reward 的 mean/std 归一，惩罚高方差路径；
 - (b) **回撤惩罚 reward**：reward 减去 `max(0, drawdown_t - dd_threshold)` 项，直接对齐"不要大幅回撤"。
 
@@ -77,11 +79,11 @@
 **是什么**：在现有 LightGBM 分位数回归外面套一层 split conformal 校准——用一段 held-out 校准集算 non-conformity score `max(y_low - L_hat, H_hat - y_high)`，取其 (1-α) 分位数 `q` 作为半宽，最终区间 `[L_hat - q, H_hat + q]`。可用 [MAPIE](https://mapie.readthedocs.io/) 或 [quantile-guard](https://pypi.org/project/quantile-guard/)，或纯函数自实现（<50 行）。
 
 **为什么贴合本项目**：
-- 当前 [`config.ALPHA_BY_CODE`](../mystock/ml/config.py) 是**手调**的逐股分位（NVDA 0.20/0.80、PDD 0.25/0.75…），靠 walk-forward 实测"宽度 vs 命中率"甜区定档。CQR 把这个手调过程**自动化 + 给出有限样本覆盖率保证**（标准 QR 只有渐近保证）。
+- 当前 [`config.ALPHA_BY_CODE`](../../mystock/ml/config.py) 是**手调**的逐股分位（NVDA 0.20/0.80、PDD 0.25/0.75…），靠 walk-forward 实测"宽度 vs 命中率"甜区定档。CQR 把这个手调过程**自动化 + 给出有限样本覆盖率保证**（标准 QR 只有渐近保证）。
 - 项目已严格按时间 walk-forward 切分，天然适合时序版 conformal（Adaptive Conformal Inference，随时间更新 `q`）。
 - **不改预测层结构**，只加一层后处理，`IntervalModel` 接口不变，回测/报告全链路零改动。
 
-**集成点**：[`predictor.py::IntervalModel.predict_ret`](../mystock/ml/predictor.py) 返回前加一层 conformal 校准；新增 `calibrator.py`（纯函数可单测，符合项目"新逻辑优先写成纯函数"约定）；`config.py` 的 `ALPHA_BY_CODE` 退化为"目标覆盖率"而非"分位档"。
+**集成点**：[`predictor.py::IntervalModel.predict_ret`](../../mystock/ml/predictor.py) 返回前加一层 conformal 校准；新增 `calibrator.py`（纯函数可单测，符合项目"新逻辑优先写成纯函数"约定）；`config.py` 的 `ALPHA_BY_CODE` 退化为"目标覆盖率"而非"分位档"。
 
 **工作量**：1-2 天。**风险**：极低（失败只是退回原 QR）。**预期收益**：消除手调 α、覆盖率有保证、报告"命中率"列从启发式变成有保证的量。
 
@@ -96,12 +98,12 @@
 **是什么**：用 2-3 状态 Gaussian HMM（`hmmlearn`）在每股的 (log return, 20d vol, MA50-MA200 spread) 上**离线**学 regime（涨势 / 震荡 / 下行），然后用 regime 后验概率**软切换**策略池，而非硬 if/else。
 
 **为什么贴合本项目**：
-- 这是 [`ML_OVERVIEW.md`](ML_OVERVIEW.md) 实验总结**明确点名**的下一步："没有单一策略通吃……下一步真正值得做的是 regime 感知，而非堆 RL"。
+- 这是 [`ml-overview_claude_20260623.md`](../guides/ml-overview_claude_20260623.md) 实验总结**明确点名**的下一步："没有单一策略通吃……下一步真正值得做的是 regime 感知，而非堆 RL"。
 - 直接解释 P3.1 的矛盾结果：NVDA/TSLA 单边涨 → bandit 该让位 buy&hold；PDD 震荡下行 → bandit 该择时。**同一个 bandit 在不同 regime 下最优动作不同**，但当前 LinUCB 把它们混在一个模型里学。
 - HMM 是**小样本友好的生成式模型**（比 change-point 检测、Transformer regime 检测都轻），2-3 状态 + 3 特征 = 参数极少，1234 样本足够。
 - 软切换（按 regime 后验概率加权多个 LinUCB 的 θ）比硬切换稳，符合项目"敬畏小样本、看方差"的纪律。
 
-**集成点**：新增 `regime.py`（HMM fit + `regime_prob(row)` 纯函数）；[`policy.py::LinUCB`](../mystock/ml/policy.py) 改为"每 regime 一组 A/b"，`select(x, valid, regime_probs)` 按 `regime_probs` 加权合成 θ；[`backtest.py`](../mystock/ml/backtest.py) 在 `_state_vec` 旁加 regime 后验。**S0 规则也 regime 化**：涨势偏 buy&hold（少动）、震荡偏 bandit、下行偏保守。
+**集成点**：新增 `regime.py`（HMM fit + `regime_prob(row)` 纯函数）；[`policy.py::LinUCB`](../../mystock/ml/policy.py) 改为"每 regime 一组 A/b"，`select(x, valid, regime_probs)` 按 `regime_probs` 加权合成 θ；[`backtest.py`](../../mystock/ml/backtest.py) 在 `_state_vec` 旁加 regime 后验。**S0 规则也 regime 化**：涨势偏 buy&hold（少动）、震荡偏 bandit、下行偏保守。
 
 **防泄漏要点**：HMM 只能用 ≤ t 的数据 fit（滚动重训或 walk-forward），绝不能用全量 fit 后再回溯标注 —— 否则 regime 标签泄漏。
 
@@ -124,7 +126,7 @@
 - **纯神经 bandit 数据不够**（需 10k+ 决策/天）。Bootstrap ensemble 是小样本下的 Bayesian 近似，正好夹在中间。
 - LinUCB 在金融场景"34% 更低 reward 方差、可解释"优势项目已享受过；切换需谨慎，**保留 LinUCB 作为对照基线**（项目惯例）。
 
-**集成点**：[`policy.py`](../mystock/ml/policy.py) 新增 `BootstrapTS` 类与 `LinUCB` 并列；[`backtest.py`](../mystock/ml/backtest.py) 加一个 `"bandit_ts"` 账户。**不替换 LinUCB，并存对比。**
+**集成点**：[`policy.py`](../../mystock/ml/policy.py) 新增 `BootstrapTS` 类与 `LinUCB` 并列；[`backtest.py`](../../mystock/ml/backtest.py) 加一个 `"bandit_ts"` 账户。**不替换 LinUCB，并存对比。**
 
 **工作量**：2-3 天。**风险**：中（10 模型训练成本×10，模型小，H20 可忽略；本机 CPU 也可接受）。**预期收益**：中等——只在非线性结构真重要时见效，需 walk-forward 实测。
 
@@ -141,11 +143,11 @@
 - **Cal-QL**：在 CQL 基础上加"校准到参考策略价值下界"，防止 Q 值塌缩到零。正是 P4"Q 全为 0、策略不动"的对症药。
 
 **为什么贴合本项目**：
-- P4 负结果**不是"RL 不行"，是"CQL 在此奖励规模下过保守"**。[`ML_PLAN.md §6`](ML_PLAN.md) 自己也说"优先离线 RL"，但选了 CQL。IQL 在小数据 + 弱奖励场景实证优于 CQL（D4RL benchmark IQL 47 vs CQL 44 vs 朴素 35）。
+- P4 负结果**不是"RL 不行"，是"CQL 在此奖励规模下过保守"**。[`ML_PLAN.md §6`](ml-plan_claude_20260623.md) 自己也说"优先离线 RL"，但选了 CQL。IQL 在小数据 + 弱奖励场景实证优于 CQL（D4RL benchmark IQL 47 vs CQL 44 vs 朴素 35）。
 - **零新增依赖**（d3rlpy 既有）、零口径改动（同样 13 臂、同模拟器、同超额奖励）。
 - 项目原则"能停则停、跑不赢如实记录"——但 P4 还没试 IQL 就判 RL 死刑略早。给 IQL 一次机会是诚实的。
 
-**集成点**：[`offline_rl.py::train_cql`](../mystock/ml/offline_rl.py) 加 `algo ∈ {cql, iql, cal_cql}` 分支；报告把 P4 三种算法并列。
+**集成点**：[`offline_rl.py::train_cql`](../../mystock/ml/offline_rl.py) 加 `algo ∈ {cql, iql, cal_cql}` 分支；报告把 P4 三种算法并列。
 
 **工作量**：1 天（主要跑实验+写报告，代码改动极小）。**风险**：低。**预期收益**：中等——最坏又一个诚实负结果（仍写进报告），最好情况翻盘一两个标的。
 
@@ -179,7 +181,7 @@
 
 **为什么 TFT 暂不推荐**：检索证据一致——TFT 在小数据/噪声大数据上**输给 ARIMA 和 LightGBM**，只在"高维、长期依赖、充足数据"时赢。本项目 1234 样本、单标的、强噪声 → TFT 几乎确定过拟合。**直接多目标 LightGBM 是低成本升级**，TFT 留作"扩样本到 10+ 标的"之后再试。
 
-**集成点**：[`features.py::LABEL_COLS`](../mystock/ml/features.py) 扩列；[`predictor.py`](../mystock/ml/predictor.py) 训练一个 multi-output LGBM；[`backtest.py`](../mystock/ml/backtest.py) 在 T+1 决策时用 T+1..T+3 区间做"挂单有效期/数量档"更优决策。
+**集成点**：[`features.py::LABEL_COLS`](../../mystock/ml/features.py) 扩列；[`predictor.py`](../../mystock/ml/predictor.py) 训练一个 multi-output LGBM；[`backtest.py`](../../mystock/ml/backtest.py) 在 T+1 决策时用 T+1..T+3 区间做"挂单有效期/数量档"更优决策。
 
 **工作量**：3-4 天。**风险**：中。**预期收益**：中等（多步区间让限价单挂得更聪明：今天挂的买单若 T+2 才触达，可结合 T+2 区间判断是否值得等）。
 
@@ -191,7 +193,7 @@
 
 **是什么**：6 标的当前各自独立训练。可用 LightGBM 多任务（同模型 + 标的 one-hot/embedding）或 federated quantile regression，让腾讯/阿里的港股规律帮 NVDA/TSLA。
 
-**为什么放第三档**：项目明确"单标的独立账户、本币闭环"（[`config.py`](../mystock/ml/config.py) 注释、[`ML_PLAN.md §3.4`](ML_PLAN.md)），且 NVDA/TSLA 高相关、PDD/港股独立——跨标的有信号但风险是**相关性污染**（高相关标的共享模型会放大 regime 同步错误）。需先有 regime 检测（建议 3）再考虑。
+**为什么放第三档**：项目明确"单标的独立账户、本币闭环"（[`config.py`](../../mystock/ml/config.py) 注释、[`ML_PLAN.md §3.4`](ml-plan_claude_20260623.md)），且 NVDA/TSLA 高相关、PDD/港股独立——跨标的有信号但风险是**相关性污染**（高相关标的共享模型会放大 regime 同步错误）。需先有 regime 检测（建议 3）再考虑。
 
 **工作量**：1 周。**风险**：中高。**预期收益**：不确定，需实验。
 
@@ -209,17 +211,17 @@
 
 **工作量**：1-2 天。**风险**：极低。**预期收益**：提升所有上述算法结论的可信度。
 
-**集成点**：[`predictor.py::walk_forward_eval`](../mystock/ml/predictor.py) 与 [`backtest.py::run_backtest`](../mystock/ml/backtest.py) 的切分逻辑；`report.py` 加方差栏。
+**集成点**：[`predictor.py::walk_forward_eval`](../../mystock/ml/predictor.py) 与 [`backtest.py::run_backtest`](../../mystock/ml/backtest.py) 的切分逻辑；`report.py` 加方差栏。
 
 ---
 
 ### 6.2 建议 10 — 撮合保真度升级：1h → 15m
 
-**是什么**：[`fetch.py`](../mystock/ml/fetch.py) 加抓 15m 线（yfinance 60 天可取 ~1500 行/股），仅回测/校准时用，不进生产库。校准吻合率从 88-90% 往上推。
+**是什么**：[`fetch.py`](../../mystock/ml/fetch.py) 加抓 15m 线（yfinance 60 天可取 ~1500 行/股），仅回测/校准时用，不进生产库。校准吻合率从 88-90% 往上推。
 
-**为什么有价值**：撮合是整个决策层可信度的命门（[`ML_PLAN.md §4.3`](ML_PLAN.md)）。15m 把"1h bar 内 high/low 先后未知"的残余失真再压一个量级。
+**为什么有价值**：撮合是整个决策层可信度的命门（[`ML_PLAN.md §4.3`](ml-plan_claude_20260623.md)）。15m 把"1h bar 内 high/low 先后未知"的残余失真再压一个量级。
 
-**集成点**：[`schema.sql`](../mystock/ml/schema.sql) 加 `ml_quotes_15m`；`fetch.py` 加一档（`H_TIERS` 旁加 `M15_TIERS`）；[`simulator.py::match_limit_order`](../mystock/ml/simulator.py) 加 `bar_interval` 参数；[`calibrate.py`](../mystock/ml/calibrate.py) 选 15m 或 1h。
+**集成点**：[`schema.sql`](../../mystock/ml/schema.sql) 加 `ml_quotes_15m`；`fetch.py` 加一档（`H_TIERS` 旁加 `M15_TIERS`）；[`simulator.py::match_limit_order`](../../mystock/ml/simulator.py) 加 `bar_interval` 参数；[`calibrate.py`](../../mystock/ml/calibrate.py) 选 15m 或 1h。
 
 **工作量**：1 天。**风险**：低（仅 60 天窗口，不影响 5y/2y 主数据）。**预期收益**：校准吻合率每提升 5pct，所有决策层结论可信度同步上升。
 
@@ -255,13 +257,13 @@
 
 | 不推荐 | 原因 |
 | --- | --- |
-| **端到端在线 RL（PPO/SAC）** | 小样本必过拟合，[`ML_PLAN.md §6`](ML_PLAN.md) 已预判、§9 风险 1 已警示，CQL 负结果再次印证 |
+| **端到端在线 RL（PPO/SAC）** | 小样本必过拟合，[`ML_PLAN.md §6`](ml-plan_claude_20260623.md) 已预判、§9 风险 1 已警示，CQL 负结果再次印证 |
 | **TFT / 时序 Transformer（现阶段）** | 检索证据：小数据噪声大时输给 LightGBM/ARIMA；需先扩样本（建议 7 的证据） |
 | **纯神经 bandit（无 Bootstrap）** | 需 10k+ 决策/天，本项目决策样本仅 ~494 测试日（建议 4 证据） |
 | **把 RL 推理写进 web 生产库** | 违反 P6 顺序与"抓取/计算与展示分离"边界，达标稳定前禁做 |
-| **跨币种归一成 USD 再训练** | 违反项目"各股本币闭环、不换汇"锁定（[`config.py`](../mystock/ml/config.py) 注释、[`ML_PLAN.md §3.4`](ML_PLAN.md)） |
+| **跨币种归一成 USD 再训练** | 违反项目"各股本币闭环、不换汇"锁定（[`config.py`](../../mystock/ml/config.py) 注释、[`ML_PLAN.md §3.4`](ml-plan_claude_20260623.md)） |
 | **硬切换 regime（if bull → 策略A）** | 软切换（按后验概率加权）对小样本更稳，硬切换在 regime 边界抖动会反复刷单 |
-| **跨标的共享现金池 / 组合级再平衡** | 第一版明确锁定单标的独立账户（[`ML_PLAN.md §3.4`](ML_PLAN.md)），非本阶段范围 |
+| **跨标的共享现金池 / 组合级再平衡** | 第一版明确锁定单标的独立账户（[`ML_PLAN.md §3.4`](ml-plan_claude_20260623.md)），非本阶段范围 |
 
 ---
 

@@ -1,6 +1,6 @@
 """P2 — 次日 high/low 区间预测器（分位数回归）。
 
-docs/ML_PLAN.md S1：预测 next-day high/low，输出 [L_hat, H_hat] 区间 + 不确定性。
+docs/plans/ml-plan_claude_20260623.md S1：预测 next-day high/low，输出 [L_hat, H_hat] 区间 + 不确定性。
 口径：
   - 目标用比例（y_high_ret / y_low_ret，相对今日 close），推理时还原成价位。
   - high 取上分位、low 取下分位张成区间 [L_hat, H_hat]。分位越靠 0.5 区间越窄、

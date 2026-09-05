@@ -1,11 +1,13 @@
 # 交易点位/数量预测 —— 机器学习方案（先 ML，后 RL；讨论稿 v0.6）
 
-> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](ML_UPGRADE_HANDOFF_2026-09-04.md)，验收见 [部署回执](ML_DEPLOYMENT_2026-09-05.md)，全部资料见 [文档索引](README.md)。
+> 文档身份：2026-06-23 · 原始作者 claude · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
 
-> 状态：本文件为**完整方案 / 决策记录**（历史文档，保留决策脉络不回写）。速览版（核心思路 + 数据 + 进度，一页看懂）见 [`docs/ML_OVERVIEW.md`](ML_OVERVIEW.md)。
+> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](../records/ml-upgrade-handoff_codex_20260904.md)，验收见 [部署回执](../records/ml-deployment_codex_20260905.md)，全部资料见 [文档索引](../README.md)。
+
+> 状态：本文件为**完整方案 / 决策记录**（历史文档，保留决策脉络不回写）。速览版（核心思路 + 数据 + 进度，一页看懂）见 [`docs/guides/ml-overview_claude_20260623.md`](../guides/ml-overview_claude_20260623.md)。
 >
 > **现状注（2026-07-01，以 OVERVIEW 为准）**：① P0–P5 已全部完成并例行化（cron 每工作日跑）；② 标的已从 3 美股扩为 **3 美 + 3 港**（HK.00700/09988/01810，各股本币独立账户）；③ 文中 `scripts/ml_fetch.sh`、`scripts/ml_report.sh` 已**合并为统一入口 `scripts/ml.sh`**（data/train/publish/all）；④ 预测分位已按股自适应（`config.alpha_for`），非文中的固定 0.10/0.90。
-> 关联：数据口径见 [`docs/DATA.md`](DATA.md)，盈亏口径见 [`mystock/pnl.py`](../mystock/pnl.py)。
+> 关联：数据口径见 [`docs/guides/data-dictionary_claude_20260623.md`](../guides/data-dictionary_claude_20260623.md)，盈亏口径见 [`mystock/pnl.py`](../../mystock/pnl.py)。
 > 训练/推理环境：2×H20（96GB，torch 2.10/cu129），SSH `vscode-h20-hh-970624@hanhai-prod.ai.kingsoft.com:2222`。
 > Conda Env：/home/share/user/chenkai/mystock-ml/env
 >
@@ -252,7 +254,7 @@
 
 ### 8.1 Workspace 与同步
 - **Workspace**：`/home/share/user/chenkai/mystock-ml`（已存在）。代码、ML 库、报告都落这里。
-- **同步脚本**：`scripts/ml_sync_h20.sh` —— rsync 把 `mystock/ml/`、`code_map.py`、`scripts/ml_*`、`docs/ML_PLAN.md` 和 `data/ml/mystock_ml.db` 推到 workspace。私人机器、数据安全，**可同步真实交易数据**。
+- **同步脚本**：`scripts/ml_sync_h20.sh` —— rsync 把 `mystock/ml/`、`code_map.py`、`scripts/ml_*`、`docs/plans/ml-plan_claude_20260623.md` 和 `data/ml/mystock_ml.db` 推到 workspace。私人机器、数据安全，**可同步真实交易数据**。
 
 ### 8.2 独立 conda env `mystock-ml`
 - 由 `scripts/ml_setup_h20.sh` 创建（python 3.11，**pip 用阿里云源** `mirrors.aliyun.com/pypi/simple`；依赖分两批：批1 核心 P1/P2/P3 轻量、批2 RL 重依赖 d3rlpy/sb3 单独装失败不阻塞）。

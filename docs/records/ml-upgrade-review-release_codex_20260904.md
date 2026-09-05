@@ -1,20 +1,22 @@
 # ML 升级：Claude 审查与 main 上线流程
 
-> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](ML_UPGRADE_HANDOFF_2026-09-04.md)，验收见 [部署回执](ML_DEPLOYMENT_2026-09-05.md)，全部资料见 [文档索引](README.md)。
+> 文档身份：2026-09-04 · 原始作者 codex · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
+> **状态导航（2026-09-05）**：以下保留原阶段的方案／记录，文中的“当前”、隔离目录、端口及未部署状态均按当时理解。四批工程现已合入 main 并部署，模型未晋级；当前使用与恢复见 [工程交接](ml-upgrade-handoff_codex_20260904.md)，验收见 [部署回执](ml-deployment_codex_20260905.md)，全部资料见 [文档索引](../README.md)。
 
 ## 当前建议
 
-本分支已收到 [Claude 独立审查](ML_UPGRADE_CLAUDE_REVIEW_2026-09-04.md)，其 §5 合并前问题已处理，见 [修复回执与复测](ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md)。尚未合并 main 或部署，自动测试不能替代修复复核与部署演练。审查阻塞项修复、复测及迁移演练通过后，可以合入工程改动，保留现有模型与 legacy 默认入口，另以 `/ml-next` 提供 v2 预览。
+本分支已收到 [Claude 独立审查](ml-upgrade-review_claude_20260904.md)，其 §5 合并前问题已处理，见 [修复回执与复测](ml-upgrade-claude-review-fixes_codex_20260905.md)。尚未合并 main 或部署，自动测试不能替代修复复核与部署演练。审查阻塞项修复、复测及迁移演练通过后，可以合入工程改动，保留现有模型与 legacy 默认入口，另以 `/ml-next` 提供 v2 预览。
 
 本轮 E0–E5 开发样本没有支持模型晋级。工程合并与模型晋级是两个决定；新模型/策略改为生产默认仍需要独立 holdout、晋级复核及真实前向 60-session shadow，不能把历史 recomputed 当成前向成绩。
 
-页面回溯现默认包含已明确标注的历史重建，下一目标日卡片及 API 默认仍仅取 live。后续历史补齐已在隔离工作树完成：六股近 120 session 行情完整，并新增 720 条逐日重建预测，详见 [2026-09-05 执行记录](ML_HISTORY_REFRESH_2026-09-05.md)。这些私有数据尚未迁移到原运行库；审查需包含逐日拟合、港股来源转换、日历修正和来源字段迁移。
+页面回溯现默认包含已明确标注的历史重建，下一目标日卡片及 API 默认仍仅取 live。后续历史补齐已在隔离工作树完成：六股近 120 session 行情完整，并新增 720 条逐日重建预测，详见 [2026-09-05 执行记录](ml-history-refresh_codex_20260905.md)。这些私有数据尚未迁移到原运行库；审查需包含逐日拟合、港股来源转换、日历修正和来源字段迁移。
 
 ## 给 Claude Code 的任务
 
 在本工作树启动 Claude Code，把下面这段作为审查任务即可；不需要先合并 main、部署或上传私有数据库。
 
-> 请对当前 `codex/ml-upgrade-20260904` 分支做独立 code review，先记录当前 HEAD SHA，完整审查 `446e657..HEAD` 的代码、测试和文档；不要只看最后一笔样式提交。先阅读 CLAUDE.md、docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md、docs/ML_UPGRADE_EXECUTION_LOG_2026-09-04.md、docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md、docs/ML_UPGRADE_HANDOFF_2026-09-04.md、docs/ML_HISTORY_REFRESH_2026-09-05.md 和本文件。报告结论只是待核实证据，不要默认接受。
+> 请对当前 `codex/ml-upgrade-20260904` 分支做独立 code review，先记录当前 HEAD SHA，完整审查 `446e657..HEAD` 的代码、测试和文档；不要只看最后一笔样式提交。先阅读 CLAUDE.md、docs/records/ml-upgrade-work-order_codex_20260904.md、docs/records/ml-upgrade-execution-log_codex_20260904.md、docs/records/ml-upgrade-experiment-results_codex_20260904.md、docs/records/ml-upgrade-handoff_codex_20260904.md、docs/records/ml-history-refresh_codex_20260905.md 和本文件。报告结论只是待核实证据，不要默认接受。
 >
 > 请重点检查：时间泄漏与市场日历/DST/半日市/HK 午休及 CAS；盘中缓存收盘后是否被误当最终数据；生成/决策/发布截止与不可覆盖版本；legacy 审计迁移的幂等性与兼容读取；实验 OOF、校准、共同样本、负结果和选择偏差；库存现金预留、到期退出、lot/tick、费用、公司行动与同 bar 歧义；Web 只读库、缺 ML 库/依赖时主站可用性、缓存隔离和失效、并发请求与错误状态；共享主题与原首页回归。确认离线重建不能混成 live 或 shadow，ML 不反向 import Web。
 >
@@ -79,7 +81,7 @@ bash scripts/ml.sh train
 日历覆盖至 2027-12-31，剩余不足 60 日会在日志、回执中提示；到期前按交易所公告续期。规则快照尚未完整接入，HK lot/tick 必须逐证券核验；模型运行需 Git 和训练依赖，并预留逐次冻结输入的磁盘空间。
 
 5. v2 的 20/60/120 库存回放在 Web 请求时只读计算，不需要每次更新后再跑一个持久化回溯任务。`train` 也不会自动补齐 120 日有效历史版本。首次迁移后 live 为空是可能的：旧审计记录不能伪装成有效预测。
-6. 若要填充历史研究视图，使用 [历史修复记录](ML_HISTORY_REFRESH_2026-09-05.md) 的 audit/repair/rebuild 流程逐日补齐；`upgrade_matrix` + `archive_development` 是开发实验归档，不代替完整逐日重建。页面默认包含已标注的重建，可切换为只看 live。这不是上线必做项，不改变生产模型，也不计入真实 shadow。实验副本数据不会随 Git 合并自动上线；不要整库覆盖运行数据。run 的输入路径与 manifest 在目标机器上也需要重新验证。
+6. 若要填充历史研究视图，使用 [历史修复记录](ml-history-refresh_codex_20260905.md) 的 audit/repair/rebuild 流程逐日补齐；`upgrade_matrix` + `archive_development` 是开发实验归档，不代替完整逐日重建。页面默认包含已标注的重建，可切换为只看 live。这不是上线必做项，不改变生产模型，也不计入真实 shadow。实验副本数据不会随 Git 合并自动上线；不要整库覆盖运行数据。run 的输入路径与 manifest 在目标机器上也需要重新验证。
 7. 独立端口核对原 Web、`/ml-next`、版本时间和数据来源后再切换。回滚按交接文档恢复切换前代码/服务与当时备份，保留后来新增的交易事实和审计记录。
 
 ## 本次样式补充验证
@@ -89,4 +91,4 @@ bash scripts/ml.sh train
 
 ## 本轮 Claude 修复复核任务
 
-> 请完整阅读 docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md，记录当前 HEAD，审查 e623d41..HEAD；同时复核首次报告基线 190b582 之后的 6cfa245/83027fb/e623d41 历史补齐与页面改动。重点重跑 P1-1/P1-2、P2-1/P2-2 和 publish 回执跨终端测试；确认 README 保留 main 885e8f7 的限制说明。区分已关闭与延期项，给出可合并工程／可部署／可晋级模型三个独立判断。保持上述只读审查和私有数据边界，不执行外部采集、真实发布、合并或服务切换。
+> 请完整阅读 docs/records/ml-upgrade-claude-review-fixes_codex_20260905.md，记录当前 HEAD，审查 e623d41..HEAD；同时复核首次报告基线 190b582 之后的 6cfa245/83027fb/e623d41 历史补齐与页面改动。重点重跑 P1-1/P1-2、P2-1/P2-2 和 publish 回执跨终端测试；确认 README 保留 main 885e8f7 的限制说明。区分已关闭与延期项，给出可合并工程／可部署／可晋级模型三个独立判断。保持上述只读审查和私有数据边界，不执行外部采集、真实发布、合并或服务切换。

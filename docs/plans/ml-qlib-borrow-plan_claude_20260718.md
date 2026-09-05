@@ -1,5 +1,7 @@
 # 借鉴 Qlib 的三项优化 —— 详细实施 Plan（讨论稿 v0.2，已 double-check）
 
+> 文档身份：2026-07-18 · 原始作者 claude · 历史记录；2026-09-05 由 Codex 治理文件名与引用。作者／日期依据及旧名见文档清单。 [索引](../README.md) · [清单](../catalog.json)
+
 > 作者：Claude · 日期：2026-07-18 · v0.2（同日 double-check 修订）
 > 依据：逐文件读 `mystock/ml/`（15 文件 2561 行）+ 三份 ML 文档 + qlib 源码。
 >
@@ -10,7 +12,7 @@
 > 4. CQR 校准隔离从 `purge_w`(22) 改为 **1 行**（label_horizon）——烧 22 行校准样本且违背 conformal 可交换性诉求（见 §2.3）。
 > 5. ③ 新增**宽度 IC**（预测区间宽 vs 真实振幅）为主信号指标——分位模型没学过方向，方向 IC≈0 ≠ 信号无效（见 §3.1）。
 > 6. 新增**锁箱 holdout** 验收门槛——对付 `ALPHA_BY_CODE`/`COVERAGE_BY_CODE` 在同批数据上调档的窥视；purge / 多种子都修不了它（见 §2.4）。
-> 配套阅读：[`docs/myStock-ML借鉴Qlib深度评估-Claude.html`](myStock-ML借鉴Qlib深度评估-Claude.html)（评估）、[`docs/Qlib深入解读-Claude.html`](Qlib深入解读-Claude.html)（qlib 机制）。
+> 配套阅读：[`docs/research/ml-qlib-evaluation_claude_20260718.html`](../research/ml-qlib-evaluation_claude_20260718.html)（评估）、[`docs/research/qlib-deep-dive_claude_20260718.html`](../research/qlib-deep-dive_claude_20260718.html)（qlib 机制）。
 
 ---
 

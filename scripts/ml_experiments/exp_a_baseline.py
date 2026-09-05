@@ -1,4 +1,4 @@
-"""实验 A（docs/ML_UPGRADE_PLAN.md §3.1 原脚本，只读）：当前 LightGBM 分位模型 vs 波动率缩放朴素基线 vs 加特征版（同 purged 切分，CQR off，α=0.2/0.8）。"""
+"""实验 A（docs/plans/ml-upgrade-plan_claude_20260904.md §3.1 原脚本，只读）：当前 LightGBM 分位模型 vs 波动率缩放朴素基线 vs 加特征版（同 purged 切分，CQR off，α=0.2/0.8）。"""
 import warnings; warnings.filterwarnings("ignore")
 import numpy as np, pandas as pd
 from mystock.ml import config as mlcfg, data as mldata

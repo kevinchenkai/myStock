@@ -19,7 +19,7 @@
 
 ## 来自 ML-UPGRADE-20260904
 
-来源：[Claude 审查报告](ML_UPGRADE_CLAUDE_REVIEW_2026-09-04.md)（编号定义处）与 [修复回执](ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md)（延期说明）。
+来源：[Claude 审查报告](records/ml-upgrade-review_claude_20260904.md)（编号定义处）与 [修复回执](records/ml-upgrade-claude-review-fixes_codex_20260905.md)（延期说明）。
 该轮已合入 main（`99848c9`）并部署，以下为**当时明确延期**的项，编号沿用原审查报告。
 
 ### P2 —— 建议在后续第一批处理
@@ -48,7 +48,7 @@
 
 | 项 | 事实 | 状态 |
 | --- | --- | --- |
-| E0–E5 无候选晋级 | 等股票权重 raw pinball ≥5%、skill ≥3%、4/6 股票方向改善的门槛均未达成 | 已如实记录为负结果，见[实验汇总](ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md)。**不调低门槛**；后续若做 E6–E8 属新一轮范围 |
+| E0–E5 无候选晋级 | 等股票权重 raw pinball ≥5%、skill ≥3%、4/6 股票方向改善的门槛均未达成 | 已如实记录为负结果，见[实验汇总](records/ml-upgrade-experiment-results_codex_20260904.md)。**不调低门槛**；后续若做 E6–E8 属新一轮范围 |
 | 前向 shadow 未开始 | 历史重建**不是** live、也不是前向 shadow | 待办（需真实等待未来交易日，无法压缩） |
 
 ---
@@ -57,6 +57,13 @@
 
 | 项 | 出处 | 状态 |
 | --- | --- | --- |
-| 早期“regime 感知优于堆 RL”主张 | [早期概览快照](https://github.com/kevinchenkai/myStock/blob/e23bb4e184bdbcfff930d57589a6a368f893bc40/docs/ML_OVERVIEW.md)、[Tier1 复检](ML_TIER1_ROBUSTNESS.md) | 已判定不按该结论推进：现有 HMM 增强已被多时段复检推翻；新 regime 研究只能作为待独立验证的候选，不能沿用未经证明的优先级 |
-| 离线 RL（P4/CQL） | [早期概览快照](https://github.com/kevinchenkai/myStock/blob/e23bb4e184bdbcfff930d57589a6a368f893bc40/docs/ML_OVERVIEW.md)、[当前概览](ML_OVERVIEW.md) | 已判定不修 —— 既有实验为负结果，**不上线**；原因不能单凭结果归于样本量。重启须新工单、数据与独立验证协议 |
-| Tier1 决策层增强（风险调整 reward、HMM regime 软切换） | [`ML_TIER1_ROBUSTNESS.md`](ML_TIER1_ROBUSTNESS.md) | 已判定不修 —— 多时段检验胜率 42%，判为噪声并移除。**不因单次好结果复活** |
+| 早期“regime 感知优于堆 RL”主张 | [早期概览快照](https://github.com/kevinchenkai/myStock/blob/e23bb4e184bdbcfff930d57589a6a368f893bc40/docs/ML_OVERVIEW.md)、[Tier1 复检](records/ml-tier1-robustness_claude_20260718.md) | 已判定不按该结论推进：现有 HMM 增强已被多时段复检推翻；新 regime 研究只能作为待独立验证的候选，不能沿用未经证明的优先级 |
+| 离线 RL（P4/CQL） | [早期概览快照](https://github.com/kevinchenkai/myStock/blob/e23bb4e184bdbcfff930d57589a6a368f893bc40/docs/ML_OVERVIEW.md)、[当前概览](guides/ml-overview_claude_20260623.md) | 已判定不修 —— 既有实验为负结果，**不上线**；原因不能单凭结果归于样本量。重启须新工单、数据与独立验证协议 |
+| Tier1 决策层增强（风险调整 reward、HMM regime 软切换） | [`ml-tier1-robustness_claude_20260718.md`](records/ml-tier1-robustness_claude_20260718.md) | 已判定不修 —— 多时段检验胜率 42%，判为噪声并移除。**不因单次好结果复活** |
+
+
+## 文档治理来源待确认（2026-09-05）
+
+| 编号 | 事项 | 当前处理 | 状态 |
+| --- | --- | --- | --- |
+| DOC-01 | 原始需求 v1 的生成者无法从正文或批量导入记录确认 | [原始需求](plans/requirements-v1_unknown_20260621.md) 暂标 unknown；若后续获得作者证据，更新 [清单](catalog.json) 并按 [治理规范](GOVERNANCE.md) 迁移，保留所有旧名 | 待确认来源，不阻塞使用 |
