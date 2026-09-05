@@ -1,6 +1,6 @@
 # myStock ML 升级执行工单
 
-> 工单：ML-UPGRADE-20260904；负责人：Codex Sol（用户已选择，独立执行任务）。
+> 工单：ML-UPGRADE-20260904；负责人：Codex Astra（按用户最新指示，独立执行任务）。
 > 状态：已授权启动工程实施；按本工单顺序完成四批代码、测试和离线验证。
 > 代码／数据备份基线：`3b80d12c0070a01f1019f9ae46205132b946730e`。
 > 方案：[Codex v1.4](ML_CODEX_UPGRADE_PLAN_2026-09-04.md)；讨论：[Claude v0.2.1](ML_CLAUDE_UPGRADE_MERGED.md)；恢复依据：[升级前备份记录](ML_PRE_UPGRADE_BACKUP_2026-09-04.md)。
