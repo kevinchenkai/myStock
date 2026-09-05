@@ -8,10 +8,19 @@ from . import config, sessions
 def receipt_path():
     return Path(os.environ.get('MYSTOCK_ML_RECEIPT', str(config.ML_DIR/'pipeline-status.json')))
 
-def write_status(rows, artifact, db_path=None):
+def write_data_status(rows, failures, warnings):
+    # A data receipt must never replace or authorize a train artifact.
+    p = receipt_path().with_suffix('.data.json')
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text(json.dumps(dict(run_id=os.environ.get('MYSTOCK_ML_RUN_ID'), phase='data',
+                                status='data_failed' if failures else 'data_complete',
+                                markets=rows, failures=failures, warnings=warnings), indent=2))
+    return p
+
+def write_status(rows, artifact, db_path=None, *, warnings=None):
     status = 'failed' if any(r['status']=='failed' for r in rows) else ('partial' if artifact and any(r['status']!='generated' for r in rows) else 'generated' if artifact else 'all_skipped')
     p=receipt_path(); p.parent.mkdir(parents=True,exist_ok=True)
-    result=dict(run_id=os.environ.get('MYSTOCK_ML_RUN_ID'),status=status,markets=rows,
+    result=dict(run_id=os.environ.get('MYSTOCK_ML_RUN_ID'),status=status,markets=rows,warnings=warnings or [],
                 artifact=str(Path(artifact).resolve()) if artifact else None,
                 db_path=str(Path(db_path or config.ML_DB_PATH).resolve()),
                 sha256=hashlib.sha256(Path(artifact).read_bytes()).hexdigest() if artifact else None)

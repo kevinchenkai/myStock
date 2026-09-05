@@ -241,10 +241,24 @@ def run(full: bool = False) -> None:
     conn = mldb.get_ml_connection()
     now = mldb.now_str()
     failures = []
+    outcomes = []
+    warnings = sessions.calendar_warnings(sessions.utc(now))
     try:
+        for warning in warnings:
+            print(f"Calendar warning: {warning}")
+            mldb.log_sync(conn, 'calendar', status=warning['status'], message=str(warning))
         for code in mlcfg.TARGETS:
             sym = futu_to_yf(code)
-            st = sessions.state(code, sessions.utc(now))
+            try:
+                st = sessions.state(code, sessions.utc(now))
+            except sessions.Unavailable as e:
+                detail = str(e)
+                outcomes.append(dict(code=code, status=e.status, detail=detail))
+                failures.append(f'{sym}:{e.status}: {detail}')
+                mldb.log_sync(conn, 'session', symbol=sym, status=e.status, message=detail)
+                print(f'  {sym}: {e.status}: {detail}')
+                continue
+            outcomes.append(dict(code=code, **st))
             if st["status"] != "ready":
                 mldb.log_sync(conn, "session", symbol=sym, status=st["status"])
                 continue
@@ -288,12 +302,21 @@ def run(full: bool = False) -> None:
                   f"positions={counts['ml_positions']}")
         else:
             print(f"  [prod] 跳过：生产库 {mlcfg.PROD_DB_PATH} 不存在（H20 上无需）")
+    except Exception as e:
+        failures.append(f'{type(e).__name__}: {e}')
+        raise
     finally:
         conn.close()
+        from .pipeline import write_data_status
+        write_data_status(outcomes, failures, warnings)
     if failures: raise RuntimeError(";".join(failures))
     print(f"完成 → {mlcfg.ML_DB_PATH}")
 
 
 if __name__ == "__main__":
     import sys
-    run(full="--full" in sys.argv)
+    try:
+        run(full="--full" in sys.argv)
+    except RuntimeError as e:
+        print(f'采集未完成：{e}', file=sys.stderr)
+        raise SystemExit(1)

@@ -6,13 +6,31 @@ The checked-in schedule is generated, never inferred from available quote rows.
 from __future__ import annotations
 from datetime import datetime, timezone, timedelta
 from functools import lru_cache
+from bisect import bisect_left, bisect_right
 from pathlib import Path
 import csv
 import math
 from zoneinfo import ZoneInfo
 
-CALENDAR_VERSION = 'pmc-5.1.3-xhkg-4.11.1-2020-2026-cas-weather-v2'
-START, END = '2020-01-01', '2026-12-31'
+CALENDAR_VERSION = 'pmc-5.1.3-xhkg-4.11.1-2020-2027-cas-weather-v3'
+START, END = '2020-01-01', '2027-12-31'
+
+CALENDAR_ACTION = ('请按交易所公告核验新年份，在隔离工具环境运行 '
+                   'python -m scripts.ml_experiments.freeze_calendar --end YYYY-12-31，'
+                   '同步更新 sessions.END / CALENDAR_VERSION 并通过日历测试后重试。')
+
+def calendar_days_left(now=None):
+    return (datetime.fromisoformat(END).date() - utc(now or utc_now()).date()).days
+
+def calendar_warnings(now=None):
+    left = calendar_days_left(now)
+    return ([dict(status='calendar_expiring' if left >= 0 else 'calendar_expired',
+                  calendar_days_left=left, calendar_end=END, message=CALENDAR_ACTION)]
+            if left < 60 else [])
+
+def _check_range(start, end):
+    if not START <= start <= end <= END:
+        raise Unavailable('unavailable', 'Calendar outside verified range. ' + CALENDAR_ACTION)
 
 class Unavailable(ValueError):
     def __init__(self, status, detail=''):
@@ -39,29 +57,39 @@ def calendar(mkt):
     with (Path(__file__).parent / 'calendars' / f'{mkt}.csv').open() as f:
         return {r['date']: r for r in csv.DictReader(f)}
 
+@lru_cache(maxsize=2)
+def calendar_dates(mkt):
+    return tuple(sorted(calendar(mkt)))
+
 @lru_cache(maxsize=12000)
 def session(code, day):
     day = str(day)[:10]
-    if not START <= day <= END: raise Unavailable('unavailable', 'Calendar outside verified range')
+    _check_range(day, day)
     r = calendar(market(code)).get(day)
     if not r: raise Unavailable('not_session', day)
     return {k: utc(v) if k != 'date' and v else v for k,v in r.items()}
 
 def session_days(code, start, end):
-    if not START <= start <= end <= END: raise Unavailable('unavailable', 'Calendar outside verified range')
-    return [d for d in calendar(market(code)) if start <= d <= end]
+    _check_range(start, end)
+    ds = calendar_dates(market(code))
+    return list(ds[bisect_left(ds, start):bisect_right(ds, end)])
 
 def next_session(code, day):
-    dates = session_days(code, str(day)[:10], END)
-    dates = [d for d in dates if d > str(day)[:10]]
-    if not dates: raise Unavailable('unavailable', 'Next session unavailable')
-    return dates[0]
+    day = str(day)[:10]
+    _check_range(day, day)
+    dates = calendar_dates(market(code))
+    i = bisect_right(dates, day)
+    if i == len(dates):
+        raise Unavailable('unavailable', 'Next session unavailable. ' + CALENDAR_ACTION)
+    return dates[i]
 
 def window(code, end, n):
     if not 1 <= n <= 400: raise ValueError('days must be 1..400')
-    ds = session_days(code, START, end)
-    if len(ds) < n: raise Unavailable('unavailable', 'Insufficient calendar history')
-    return ds[-n:]
+    _check_range(START, end)
+    ds = calendar_dates(market(code))
+    i = bisect_right(ds, end)
+    if i < n: raise Unavailable('unavailable', 'Insufficient calendar history')
+    return list(ds[i-n:i])
 
 def state(code, now=None):
     now = utc(now or utc_now())

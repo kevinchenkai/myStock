@@ -21,7 +21,7 @@ ML 管线（ml.sh data/train）────────────────�
   仍是「只读」边界——**Web 绝不写 ML 库、绝不触发训练/抓取**，计算走 `mystock/ml/` 里的纯函数（如 `strategy.run_many`）。
   反向依赖依然禁止：`mystock/ml/` 不得 import `mystock/web/`。ML 库缺失时相关接口返回 503，不影响其余页面。
 - 数据表（见 [`mystock/schema.sql`](mystock/schema.sql)）：`positions`、`orders`、`deals`、`daily_quotes`、`stock_profiles`、`fx_rates`、`account_funds`、`capital_flow`，外加 `sync_log`、`quote_skiplist`。
-- ML 库表（见 [`mystock/ml/schema.sql`](mystock/ml/schema.sql)）：`ml_quotes_1d`、`ml_quotes_1h`、`ml_predictions`、`ml_deals`、`ml_orders`、`ml_positions`、`ml_sync_log`。
+- ML 库表（见 [`mystock/ml/schema.sql`](mystock/ml/schema.sql)）：`ml_quotes_1d`、`ml_quotes_1h`、`ml_predictions`、`ml_prediction_versions`、`ml_deals`、`ml_orders`、`ml_positions`、`ml_sync_log`。
 
 ## 关键模块
 
@@ -57,7 +57,7 @@ bash scripts/server.sh    # 启动 Web（127.0.0.1:8888），仅读库
 conda activate mk && python -m pytest tests/ -q
 ```
 
-测试需在 `mk` 环境（base anaconda python 无 yfinance 会报 YFError）。当前 `tests/` 共 16 个文件、167 条用例：web 侧 `test_code_map` / `test_db` / `test_pnl` / `test_capital_flow` / `test_futu_funds` / `test_yf_client`，ML 侧 `test_ml_*`（calibrator / cv / fetch / nan_guard / offline_rl / policy / review / signal_eval / simulator / strategy）。`pnl.py` 与 `code_map.py` 是纯函数，新逻辑优先写成可单测的纯函数。
+测试需在 `mk` 环境（base Python 缺 yfinance 等依赖可能报错）。文件数／用例数随分支变化，以 `python -m pytest tests --collect-only -q` 为准；本次验证见 [Claude 修复回执](docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md)。多数测试为合成数据；少数既有 ML 测试读取本地库并拟合模型，完整验证在隔离工作树副本运行。
 
 前端无构建工具，改动后用 `node --check mystock/web/static/app.js` 做语法检查。
 
@@ -73,6 +73,17 @@ conda activate mk && python -m pytest tests/ -q
 - **资产趋势 / 组合概览口径**：均从已入库 `positions` 快照聚合，**零新抓取**（Web 只读边界）。跨币种（USD/HKD）**不相加**，按市场各画一条线 / 各一张卡；快照不可从富途回补（富途只给当前持仓），历史空缺只能随 `update.sh` 自然积累。
 - **价格走势图**：用 vendored Lightweight-Charts（`static/vendor/`，离线、无构建步骤）。该库需真实 DOM 容器 + 创建后注入数据，故 `renderChart` 只产出占位容器，`openStock` 在 `innerHTML` 写入后调 `mountChart()` 挂载；浮窗关闭 / 切复盘时须 `destroyChart()` 释放。颜色从 CSS 变量读取以适配红涨绿跌 + 深浅主题。资金流向柱图同一套两段式（`renderCapitalFlow` 占位 → `loadCapitalFlow` 取数 → `mountFlowChart` 挂载），其销毁挂在 `destroyChart()` 里一并触发，不必在每个关闭点各调一次。
 - **资金流向（`capital_flow`）**：富途独有（yfinance 无），`get_capital_flow(PeriodType.DAY)` **只给近 1 年**日频 —— 回补起点经 `CAPITAL_FLOW_MAX_DAYS`（370 天）抬高，传更早的 start 只是白跑。`start`/`end` 均为**闭区间**（与 yfinance 的 `end` 排他相反，勿套用 `_end_inclusive`）。金额为标的**本币**（HK→HKD、US→USD）且 `main_in_flow`（主力）≈ 超大单 + 大单，**不是**各档之和，六个字段勿相加。首次 `update.sh` 无同步点 → 自动回补近 1 年（38 只约 1 分钟），之后每天只重抓当天。
+
+## ML 升级运行约定
+
+- `/ml-next` 使用共享主题；`/api/ml/v2/{latest,review,compare,facts}` 只读 ML 库。历史回溯默认显示明确标注的重建，下一目标日卡片只取 live；不得把 recomputed 当成当天生成或前向 shadow。
+- `ml_prediction_versions` 按 run 追加不可覆盖版本；`ml_predictions` 为旧版投影，仅后续有效 live 写入，已有混合来源逐行标注。审计迁移不追认历史时间。
+- `data/ml/runs/<id>/` 保存私有冻结 input.db 与 manifest；`receipts/` 保存训练回执和独立 `.data.json` 数据回执；`reports/runs/<id>/` 是本地报告归档。
+- `mystock/ml/calendars/` 为 2020–2027 冻结日历；剩余不足 60 天日志／回执预警，越界拒绝。US 决策截止 09:30 ET，HK 09:00；生成器依赖只在隔离工具环境使用。
+- 全部人工触发：迁移副本 → `update.sh` → `ml.sh data` → `ml.sh train`。首次 train 前先 data 确认收盘缓存；feature_gap 先修行情缺口。`ml.sh` 无参数仅帮助，没有 cron。
+- `train` 打印回执；换终端用 `bash scripts/ml.sh publish <回执路径>`，校验产物哈希、run（如显式指定）和目标截止。不自动选择旧文件，仅覆盖公网 index.html，不上传日期归档。`all` 包含公网发布；任一采集失败仍会中止 all。详细演练见 [交接流程](docs/ML_UPGRADE_REVIEW_AND_RELEASE_2026-09-04.md)。
+- Web 顶层 import ML API → service → pandas/numpy；缺 ML 数据库可返回接口错误，但缺这些 Python 依赖可能阻止 Web 启动，不能声称全部延迟导入。
+- legacy 的 US 10/HK 100 为模拟参数，不是证券实际交易单位；v2 lot/tick 仍需人工核验，规则快照尚未完整接入。
 
 ## 安全 / 隐私（提交前务必检查）
 

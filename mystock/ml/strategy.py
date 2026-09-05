@@ -6,7 +6,7 @@
 撮合复用 simulator.match_limit_order（1h K 线），能判断盘中先触低还是先触高——
 拿日线 low/high 直接比会把"先冲高后砸低"与反过来混为一谈，成交价也不对。
 
-手数按市场分档（LOT_BY_MARKET）：美股 10 股、港股 100 股（港股按板块最小单位）。
+手数按市场分档（LOT_BY_MARKET）：美股 10 股、港股 100 股（仅为旧版模拟参数，非证券实际交易单位）。
 
 盈亏口径：
   cash_flow = 卖出额 − 买入额（已实现现金流）
@@ -78,13 +78,11 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
             return _empty(code, days)
         bars_by_day = mldata.intraday_bars_by_day(code, db_path)
         dates = [str(d) for d in daily["date"]]
-        nxt = {d: sessions.next_session(code, d) for d in dates}
         dmap = {str(r["date"]): r for _, r in daily.iterrows()}
         preds = {p["as_of"]: p for p in mldb.load_predictions(conn, code)}
 
         targets = sessions.window(code, dates[-1], days)
-        previous = {sessions.next_session(code,d):d for d in sessions.session_days(code,sessions.START,dates[-1])}
-        usable = [previous[d] for d in targets]
+        usable = [sessions.window(code, targets[0], 2)[0], *targets[:-1]]
 
         lot = lot_for(code)
         pos = 0
@@ -102,6 +100,7 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
             if status != 'ok':
                 close = _f(dmap.get(day, {}).get('close'))
                 rows.append(dict(as_of=as_of, date=day, status=status, pos=pos, cash=cash,
+                                 source=preds.get(as_of, {}).get('source', 'unknown'),
                                  equity=cash+pos*close if close else None, close=close,
                                  l_hat=None,h_hat=None,low=None,high=None,buy_price=None,sell_price=None))
                 continue
@@ -136,6 +135,7 @@ def run_strategy(code: str, days: int = 30, conn=None, db_path=None) -> dict:
                 peak_exposure = max(peak_exposure, abs(pos) * close)
             rows.append({
                 "as_of": as_of, "date": day, "status": "ok",
+                "source": p.get('source', 'unknown'),
                 "l_hat": _r(L), "h_hat": _r(H),
                 "low": _r(_f(bar["low"])), "high": _r(_f(bar["high"])),
                 "close": _r(close),

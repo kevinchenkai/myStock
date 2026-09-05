@@ -255,11 +255,18 @@ def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
     if code is None and not historical:
         raise sessions.Unavailable('unavailable', 'code required for live session guard')
     clock = clock or sessions.utc_now
+    expected_as_of = str(daily['date'].max()) if not daily.empty else None
     if code:
         daily = sessions.prepare_daily(daily, code, clock(), live=not historical)
+        if not historical:
+            expected_as_of = str(daily['date'].iloc[-1])
     df = build_features(daily)
+    df = df.replace([float('inf'), float('-inf')], float('nan'))
     train = df.dropna(subset=FEATURE_COLS + ["y_high_ret", "y_low_ret"])
-    last = df.dropna(subset=FEATURE_COLS).iloc[[-1]]  # 最新一行（标签 NaN，用于推理）
+    valid = df.dropna(subset=FEATURE_COLS)
+    if valid.empty or str(valid.iloc[-1]['date']) != expected_as_of:
+        raise sessions.Unavailable('feature_gap', f'No complete features for {expected_as_of}; repair input gaps first')
+    last = valid.iloc[[-1]]
     model = IntervalModel(
         seed=seed, high_alpha=high_alpha, low_alpha=low_alpha,
         conformal=conformal, target_coverage=target_coverage, cal_frac=cal_frac,

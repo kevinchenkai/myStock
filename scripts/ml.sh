@@ -4,6 +4,15 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 CMD="${1:-help}"
+if [ "$CMD" = publish ] && [ -n "${2:-}" ]; then
+  export MYSTOCK_ML_RECEIPT="$2"
+fi
+# Standalone publish consumes an explicit receipt; never invent a fresh run or
+# silently choose an older report. The Python validator still checks hash/time.
+if [ "$CMD" = publish ] && [ -z "${MYSTOCK_ML_RECEIPT:-}" ]; then
+  echo 'Usage: ml.sh publish <receipt.json> (use the receipt printed by train)' >&2
+  exit 2
+fi
 PYTHON="${MYSTOCK_ML_PYTHON:-python}"
 if [ -z "${MYSTOCK_ML_PYTHON:-}" ] && [ "$CMD" != help ]; then
   if command -v conda >/dev/null 2>&1; then
@@ -11,12 +20,17 @@ if [ -z "${MYSTOCK_ML_PYTHON:-}" ] && [ "$CMD" != help ]; then
     set +u; conda activate "${MYSTOCK_ML_ENV:-mk}"; set -u
   fi
 fi
-export MYSTOCK_ML_RUN_ID="${MYSTOCK_ML_RUN_ID:-$(date -u +%Y%m%dT%H%M%S)-$$}"
-export MYSTOCK_ML_RECEIPT="${MYSTOCK_ML_RECEIPT:-data/ml/receipts/${MYSTOCK_ML_RUN_ID}.json}"
+if [ "$CMD" != publish ]; then
+  export MYSTOCK_ML_RUN_ID="${MYSTOCK_ML_RUN_ID:-$(date -u +%Y%m%dT%H%M%S)-$$}"
+  export MYSTOCK_ML_RECEIPT="${MYSTOCK_ML_RECEIPT:-data/ml/receipts/${MYSTOCK_ML_RUN_ID}.json}"
+fi
 PUB_HOST="${PUB_HOST:-ubuntu@211.159.177.55}"
 PUB_DIR="${PUB_DIR:-/www/wwwroot/g.ismayday.mobi/mystock}"
 do_data() { "$PYTHON" -m mystock.ml.fetch; }
-do_train() { "$PYTHON" -m mystock.ml.report; }
+do_train() {
+  "$PYTHON" -m mystock.ml.report
+  printf 'Train receipt: %s\nPublish before target deadline: bash scripts/ml.sh publish %q\n' "$MYSTOCK_ML_RECEIPT" "$MYSTOCK_ML_RECEIPT"
+}
 do_publish() {
   local artifact
   artifact="$("$PYTHON" -m mystock.ml.pipeline)" || return $?
@@ -33,6 +47,6 @@ case "$CMD" in
    # All skipped: no artifact, no stale report publication.
    if "$PYTHON" -c 'import json,os,sys; r=json.load(open(os.environ["MYSTOCK_ML_RECEIPT"])); sys.exit(0 if r["artifact"] else 1)'; then do_publish; fi
    ;;
- help) echo 'Manual usage: ml.sh {data|train|publish|all}; publish requires MYSTOCK_ML_RUN_ID and matching receipt from train.' ;;
+ help) echo 'Manual usage: ml.sh {data|train|all}; ml.sh publish <receipt.json>. Train prints the receipt; publish checks its artifact hash and target deadline. No automatic receipt selection.' ;;
  *) exit 2 ;;
 esac

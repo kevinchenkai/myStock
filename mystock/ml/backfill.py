@@ -84,8 +84,7 @@ def collect(reports_dir: Path | None = None) -> list[dict]:
 
 
 def run(reports_dir: Path | None = None, db_path=None) -> int:
-    """回填入库。返回写入行数。已存在的 (code, as_of) 会被覆盖为 HTML 版本，
-    故仅在**首次**建表后跑一次即可；重复跑无害（同源同值）。"""
+    """HTML 追加到审计版本，不覆盖 legacy 或 live；同源同值重跑幂等。"""
     rows = collect(reports_dir)
     if not rows:
         return 0
@@ -100,13 +99,16 @@ def run(reports_dir: Path | None = None, db_path=None) -> int:
 
 
 def missing_dates(conn, code: str, daily, since: str = "") -> list[str]:
-    """该标的在 daily 里、但 ml_predictions 中没有留档的交易日（升序）。
+    """该标的在 daily 里、但 legacy / 有效版本中没有留档的交易日（升序）。
 
     末日也算缺口——那天确实可以预测（次日未知不影响"给出预测"这个动作），
     复盘时会因无次日而判 pending，不进命中率统计。
     """
     have = {r[0] for r in conn.execute(
         "SELECT as_of FROM ml_predictions WHERE code=?", (code,))}
+    have.update(r[0] for r in conn.execute(
+        "SELECT as_of FROM ml_prediction_versions WHERE code=? "
+        "AND status IN ('generated','published','recomputed')", (code,)))
     dates = [str(d) for d in daily["date"]]
     return [d for d in dates if d not in have and (not since or d >= since)]
 
@@ -200,14 +202,11 @@ def _backend() -> str:
 
 
 def run_if_empty(db_path=None) -> int:
-    """仅当 ml_predictions 为空时回填（供 ml.sh 每次执行安全调用）。
-
-    表非空说明已回填过 / 已有实时留档 —— 此时不该再用历史 HTML 覆盖，
-    否则会把字段齐全的 live 行退化成字段稀疏的 backfill 行。
-    """
+    """仅当 legacy 与版本表均为空时显式导入 HTML；ml.sh 不自动调用。"""
     conn = mldb.get_ml_connection(db_path)
     try:
-        n = conn.execute("SELECT COUNT(*) FROM ml_predictions").fetchone()[0]
+        n = conn.execute("SELECT (SELECT COUNT(*) FROM ml_predictions) + "
+                         "(SELECT COUNT(*) FROM ml_prediction_versions)").fetchone()[0]
     finally:
         conn.close()
     return 0 if n else run(db_path=db_path)

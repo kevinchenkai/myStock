@@ -11,7 +11,6 @@ import html
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-from . import backfill as mlbackfill
 from . import config as mlcfg
 from . import data as mldata
 from . import db as mldb
@@ -514,6 +513,7 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
     from .pipeline import write_status
     clock = clock or sessions.utc_now
     statuses = []
+    warnings = sessions.calendar_warnings(clock())
     from . import runs, versions
     run_manifest = manifest_path = None
     rcfg = rcfg or _ReportCfg()
@@ -524,7 +524,12 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
 
     # 冻结本次输入；历史 HTML 仅经显式离线导入，不混入 live 留档。
     mldb.init_ml_db(db_path)
+    with mldb.get_ml_connection(db_path) as conn:
+        for warning in warnings:
+            print(f"Calendar warning: {warning}")
+            mldb.log_sync(conn, 'calendar', status=warning['status'], message=str(warning))
     run_manifest, manifest_path = runs.start(db_path)
+    run_manifest['warnings'] = warnings
     input_db = run_manifest["input_path"]
     run_manifest['seed'] = cfg.seed
     out_dir = out_dir or (mlcfg.REPORTS_DIR / 'runs' / run_manifest['run_id'])
@@ -535,7 +540,7 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
         try:
             daily = sessions.prepare_daily(mldata.load_daily(code, input_db), code, clock())
         except sessions.Unavailable as e:
-            statuses.append({'code':code, 'status':e.status})
+            statuses.append({'code':code, 'status':e.status, 'detail':str(e)})
             continue
         # 按股自适应 CQR 目标覆盖率（收窄区间；与 ALPHA_BY_CODE 同模式）
         cov = mlcfg.coverage_for(code)
@@ -554,7 +559,7 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
                                     high_alpha=hi_a, low_alpha=lo_a,
                                     conformal=cfg.conformal, target_coverage=cov)
         except sessions.Unavailable as e:
-            statuses.append({'code':code,'status':e.status})
+            statuses.append({'code':code,'status':e.status, 'detail':str(e)})
             continue
         except Exception as e:
             statuses.append({'code':code,'status':'failed','error':type(e).__name__})
@@ -600,10 +605,10 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
         for code in expired: summary_rows = re.sub(r"<tr><td>" + re.escape(code) + r"</td>.*?</tr>", "", summary_rows)
     if expired: sections = [section for section in sections if not any(c in section for c in expired)]
     with mldb.get_ml_connection(db_path) as status_conn:
-        for st in statuses: mldb.log_sync(status_conn,'prediction_guard',symbol=st['code'],status=st['status'])
+        for st in statuses: mldb.log_sync(status_conn,'prediction_guard',symbol=st['code'],status=st['status'],message=st.get('detail',''))
     if not pred_rows:
         runs.finish(run_manifest, manifest_path, pred_rows, statuses)
-        write_status(statuses, None, db_path)
+        write_status(statuses, None, db_path, warnings=warnings)
         return None
     conn = mldb.get_ml_connection(db_path)
     try:
@@ -659,7 +664,7 @@ h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}
     run_manifest['artifact_path'] = str(index.resolve())
     run_manifest['artifact_sha256'] = hashlib.sha256(index.read_bytes()).hexdigest()
     runs.finish(run_manifest, manifest_path, pred_rows, statuses)
-    write_status(statuses, index, db_path)
+    write_status(statuses, index, db_path, warnings=warnings)
     return index
 
 

@@ -81,14 +81,8 @@ PRED_COLS = [
 
 
 def upsert_predictions(conn: sqlite3.Connection, rows: Iterable[dict]) -> int:
-    """写入次日区间预测（PK code+as_of，重复生成覆盖）。缺列补 None。
-
-    统一补齐 PRED_COLS 再走通用 upsert——回填行（历史 HTML 只能解析出
-    close/l_hat/h_hat）与实时行（字段齐全）列集不同，不补齐会因 executemany
-    的列名取自首行而错位。
-    """
+    """按 run 追加不可覆盖预测版本；仅有效 live 同步到旧表投影。"""
     from .versions import append, digest
-    from .runs import start, finish
     rows = [dict(r) for r in rows]
     if not rows: return 0
     # Imports/backfills use deterministic source identity, live reports supply run.

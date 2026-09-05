@@ -13,7 +13,7 @@ def test_calendar_holidays_dst_halfday_lunch():
     assert s.session('US.NVDA','2026-03-09')['open'].hour==13
     assert s.state('HK.00700',s.utc('2026-09-04T04:30:00Z'))['status']=='skipped_in_session'
     assert s.session('HK.00700','2026-12-24')['final_at'].hour==4
-    with pytest.raises(s.Unavailable):s.session('US.NVDA','2027-01-04')
+    with pytest.raises(s.Unavailable):s.session('US.NVDA','2028-01-04')
 
 def test_stale_and_intraday_not_final():
     b=bar('2026-09-04','2026-09-04T18:00:00Z')

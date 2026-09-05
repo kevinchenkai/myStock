@@ -47,7 +47,19 @@ def test_script_all_skip_and_failure_never_calls_publish(tmp_path):
     import os,subprocess
     from pathlib import Path
     fake=tmp_path/'python';calls=tmp_path/'calls'
-    fake.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$CALLS"\ncase "$*" in\n *mystock.ml.fetch*) exit "${FETCH_RC:-0}";;\n *mystock.ml.report*) exit 0;;\n *mystock.ml.pipeline*) exit 88;;\n *) exit 1;;\nesac\n')
+    import sys
+    fake.write_text(f'#!{sys.executable}\n' + r'''import json, os, sys
+with open(os.environ['CALLS'], 'a') as f: f.write(' '.join(sys.argv[1:]) + '\n')
+if sys.argv[1:] == ['-m', 'mystock.ml.fetch']:
+    sys.exit(int(os.environ.get('FETCH_RC', '0')))
+if sys.argv[1:] == ['-m', 'mystock.ml.report']:
+    with open(os.environ['MYSTOCK_ML_RECEIPT'], 'w') as f:
+        json.dump({'status':'all_skipped', 'artifact':None}, f)
+    sys.exit(0)
+if sys.argv[1] == '-c':
+    exec(sys.argv[2])
+sys.exit(88)
+''')
     fake.chmod(0o755)
     env={**os.environ,'MYSTOCK_ML_PYTHON':str(fake),'CALLS':str(calls),'MYSTOCK_ML_RECEIPT':str(tmp_path/'receipt')}
     root=Path(__file__).resolve().parents[1]

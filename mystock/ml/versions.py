@@ -41,12 +41,12 @@ def append(conn, rows, *, run_id, manifest_path=None, status='generated'):
             conn.execute('insert into ml_prediction_versions values (?,?,?,?,?,?,?,?,?,?,?,?,?)',
                          (pid,run_id,p['code'],p['as_of'],target,source,rowstatus,p.get('generated_at'),
                           p.get('decision_at'),p.get('published_at'),str(manifest_path) if manifest_path else None,canonical(p),h))
-            # Compatibility is deterministic: keep historical projection until a
-            # validated live generation arrives; backfill never replaces live.
-            cols=PRED_COLS
-            vals=[p.get(k) for k in cols]
-            conn.execute(f"insert or ignore into ml_predictions ({','.join(cols)}) values ({','.join('?' for _ in cols)})",vals)
+            # Only verified live generation enters the legacy projection. Existing
+            # historical rows stay intact and are explicitly source-labelled in UI.
             if source=='live' and rowstatus=='generated':
+                cols=PRED_COLS
+                vals=[p.get(k) for k in cols]
+                conn.execute(f"insert or ignore into ml_predictions ({','.join(cols)}) values ({','.join('?' for _ in cols)})",vals)
                 updates=[c for c in cols if c not in ('code','as_of')]
                 conn.execute(f"update ml_predictions set {','.join(c+'=?' for c in updates)} where code=? and as_of=?",
                              [p.get(c) for c in updates]+[p['code'],p['as_of']])
