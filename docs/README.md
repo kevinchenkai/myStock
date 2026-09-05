@@ -8,14 +8,14 @@
 
 [命名规范与旧名迁移表](GOVERNANCE.md) · [作者／日期依据清单](catalog.json)。固定入口保留在 docs 根目录；原始需求作者无法确认，已明确标为 unknown。
 
-## 当前讨论：Web 优化（暂不执行）
+## 当前工单：Web 两项 P0 与依赖升级
 
-用户已暂缓多分位概率／波动率归一化模型升级。本轮先讨论 Web 功能与依赖版本；尚未派发 Astra，未开始实现或依赖升级。
+用户已批准升级 yfinance／futu-api，并只选择数据更新时间与异常提示、个股缓存快照两个 P0，执行方为原 Astra 任务。实际升级／实施结果以执行回执为准；其余候选和 ML 模型升级继续暂缓。
 
 | 文档 | 用途 |
 | --- | --- |
 | [Web API 优化调研](research/web-api-opportunities_codex_20260905.md) | Futu／yfinance 能力、代码缺口、最新版本与候选功能 |
-| [Web 升级工单讨论稿](records/web-data-upgrade-work-order_codex_20260905.md) | 功能待用户选择，实施条款尚未生效 |
+| [Web 两项 P0 与依赖升级工单](records/web-data-upgrade-work-order_codex_20260905.md) | 已批准 DEP-01／WEB-01／WEB-02，包含验证、回退和交付范围 |
 
 ## 接手与日常使用
 

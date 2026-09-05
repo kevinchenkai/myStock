@@ -394,12 +394,12 @@
     {
       "path": "docs/records/web-data-upgrade-work-order_codex_20260905.md",
       "legacy_paths": [],
-      "title": "Web 数据可用性升级工单（讨论稿，暂不执行）",
+      "title": "Web 两项 P0 与依赖升级工单",
       "category": "records",
       "document_date": "2026-09-05",
       "producer": "codex",
-      "status": "draft",
-      "provenance": "用户请求 API 调研与 Web 工单；后续明确先讨论、不执行。Codex 于 2026-09-05 撰写；基线 b2a2e15。",
+      "status": "current",
+      "provenance": "Codex 于 2026-09-05 基于 b2a2e15 撰写；讨论后用户确认仅升级两包与两个 P0，替代当日讨论稿。",
       "first_commit": null,
       "governed_at": "2026-09-05"
     },
