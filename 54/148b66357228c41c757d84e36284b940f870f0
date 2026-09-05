@@ -1,0 +1,48 @@
+mystock/ml/db.py
+  s_2bf7efc16166a2::t_a19491b65b7c82 83-88,90-95
+mystock/ml/cv.py
+  s_2bf7efc16166a2::t_a19491b65b7c82 53
+mystock/ml/report.py
+  s_2bf7efc16166a2::t_a19491b65b7c82 517-518,530-531,536,543,567-568,591-593,596,649
+mystock/ml/predictor.py
+  s_2bf7efc16166a2::t_a19491b65b7c82 58,182,208-209
+mystock/ml/schema.sql
+  s_2bf7efc16166a2::t_a19491b65b7c82 120-143
+mystock/ml/runs.py
+  s_2bf7efc16166a2::t_a19491b65b7c82 1-32
+mystock/ml/backfill.py
+  s_2bf7efc16166a2::t_a19491b65b7c82 66,77-82
+mystock/ml/versions.py
+  s_2bf7efc16166a2::t_a19491b65b7c82 1-38,40-81
+  s_2bf7efc16166a2::t_505482ed99bf1c 39
+docs/ML_UPGRADE_EXECUTION_LOG_2026-09-04.md
+  s_2bf7efc16166a2::t_f09da66dc01b95 18-25
+mystock/ml/evaluation.py
+  s_2bf7efc16166a2::t_83b32c4c84471d 1-45
+scripts/ml_experiments/exp_a_baseline.py
+  s_2bf7efc16166a2::t_0aa937b1975e57 6-9,27,51
+scripts/ml_experiments/exp_b_touch_economics.py
+  s_2bf7efc16166a2::t_880ebd727c6edd 1-6,8,10-42
+scripts/ml_experiments/frozen_cv_446e657.py
+  s_2bf7efc16166a2::t_07e8835d40dc2f 1-63
+tests/test_ml_prediction_versions.py
+  s_2bf7efc16166a2::t_bfda89f4b93a93 1-41
+tests/test_ml_review.py
+  s_2bf7efc16166a2::t_bcd4cba34e7072 156-157,165-168
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "54148b66357228c41c757d84e36284b940f870f0",
+  "prompts": {},
+  "sessions": {
+    "s_2bf7efc16166a2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a07004-42a0-7961-8865-50856804f1b9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
