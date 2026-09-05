@@ -1,0 +1,12 @@
+  <script>
+    // 首屏即应用主题，避免深/浅切换闪烁（FOUC）。
+    // localStorage 存 'light' / 'dark' / 'system'（或未设置=跟随系统）。
+    (function () {
+      try {
+        var t = localStorage.getItem("mystock-theme");
+        if (t === "light" || t === "dark") {
+          document.documentElement.setAttribute("data-theme", t);
+        }
+      } catch (e) {}
+    })();
+  </script>
