@@ -1,0 +1,21 @@
+README.md
+  s_612cad8e12fb53::t_c2e9263b42f6b4 323,325,329-333,335,341,347-348,351,361,363,369,372,374,382,392,435-440,456-462
+  s_612cad8e12fb53::t_bcd09912020841 220-221,366,510-511
+  s_612cad8e12fb53::t_be136aa9351c72 10,12,23-37,202,209,216,218,222,238-239,243,251-253,255,266,276,317-319,321
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "885e8f74e05e1841f126733d440b4ff23c7ab2db",
+  "prompts": {},
+  "sessions": {
+    "s_612cad8e12fb53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a06fa0-7445-7b73-84c4-5ea66f7dc7a6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
