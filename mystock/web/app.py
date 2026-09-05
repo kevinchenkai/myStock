@@ -35,6 +35,8 @@ from .. import db as dbmod
 from ..pnl import compute_pnl, analyze_stock, yearly_finance
 
 app = Flask(__name__)
+from .ml_api import bp as ml_blueprint
+app.register_blueprint(ml_blueprint)
 
 # stock_profiles 列名 -> 前端展示用中文标签（顺序即展示顺序）
 _PROFILE_LABELS = [
@@ -84,6 +86,11 @@ def handle_no_db(e):
 
 
 # ---------------- 页面 ----------------
+@app.route("/ml-next")
+def ml_next():
+    return render_template("ml_next.html")
+
+
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -246,6 +253,16 @@ def api_ml_strategy():
     延迟导入 ml 模块：它会拖起 pandas/ml 依赖链，且 ML 库可能未初始化——
     放模块顶层会让整个 web 应用在没跑过 ml.sh 的环境里起不来。
     """
+    if request.args.get("mode", "legacy") == "inventory":
+        from .ml_api import compare
+        try:
+            return compare()
+        except ValueError as e:
+            return jsonify({'schema_version':2,'error':str(e)}),400
+        except (FileNotFoundError, sqlite3.OperationalError):
+            return jsonify({'schema_version':2,'error':'ML database/schema unavailable'}),503
+    if request.args.get("mode", "legacy") != "legacy":
+        return jsonify({"error":"invalid mode"}),400
     try:
         from ..ml import config as mlcfg
         from ..ml.strategy import aggregate_returns, run_many
@@ -274,6 +291,7 @@ def api_ml_strategy():
 
     results = run_many(codes, days, db_path=ml_path)
     return jsonify({
+        "schema_version": 1, "mode": "legacy",
         "days": days,
         "codes": codes,
         "targets": list(mlcfg.TARGETS),

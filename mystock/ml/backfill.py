@@ -126,11 +126,15 @@ def recompute_gaps(since: str = "", db_path=None, *, verbose: bool = True) -> in
     与 live 行的区别只在 source='recomputed'——诚实标注"这条是事后补的，
     不是当天真的跑出来的"，便于日后甄别。
     """
+    from . import runs, sessions
+    mldb.init_ml_db(db_path)
+    manifest, manifest_path = runs.start(db_path, protocol='recomputed-gap-v1')
     conn = mldb.get_ml_connection(db_path)
     total = 0
+    all_rows = []
     try:
         for code in mlcfg.TARGETS:
-            daily = mldata.load_daily(code, db_path)
+            daily = mldata.load_daily(code, manifest["input_path"])
             if daily.empty:
                 continue
             gaps = missing_dates(conn, code, daily, since)
@@ -163,8 +167,12 @@ def recompute_gaps(since: str = "", db_path=None, *, verbose: bool = True) -> in
                     "conformal": int(bool(p["conformal"])), "q_ret": p["q_ret"],
                     "target_coverage": p["target_coverage"],
                     "backend": _backend(), "source": "recomputed",
+                    "target_session": sessions.next_session(code,p["as_of"]),
+                    "generated_at": sessions.utc_now().isoformat(),
+                    "run_id": manifest["run_id"], "manifest_path": str(manifest_path.resolve()),
                 })
             if rows:
+                all_rows.extend(rows)
                 total += mldb.upsert_predictions(conn, rows)
                 if verbose:
                     print(f"  {code}: 补 {len(rows)} 条（{rows[0]['as_of']} ~ {rows[-1]['as_of']}）")
@@ -172,6 +180,7 @@ def recompute_gaps(since: str = "", db_path=None, *, verbose: bool = True) -> in
             mldb.log_sync(conn, "recompute_predictions", row_count=total)
     finally:
         conn.close()
+    runs.finish(manifest,manifest_path,all_rows,[{"status":"offline_recomputed"}])
     return total
 
 

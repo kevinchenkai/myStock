@@ -5,6 +5,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 CMD="${1:-help}"
 PYTHON="${MYSTOCK_ML_PYTHON:-python}"
+if [ -z "${MYSTOCK_ML_PYTHON:-}" ] && [ "$CMD" != help ]; then
+  if command -v conda >/dev/null 2>&1; then
+    source "$(conda info --base)/etc/profile.d/conda.sh"
+    set +u; conda activate "${MYSTOCK_ML_ENV:-mk}"; set -u
+  fi
+fi
 export MYSTOCK_ML_RUN_ID="${MYSTOCK_ML_RUN_ID:-$(date -u +%Y%m%dT%H%M%S)-$$}"
 export MYSTOCK_ML_RECEIPT="${MYSTOCK_ML_RECEIPT:-data/ml/receipts/${MYSTOCK_ML_RUN_ID}.json}"
 PUB_HOST="${PUB_HOST:-ubuntu@211.159.177.55}"
@@ -15,6 +21,7 @@ do_publish() {
   local artifact
   artifact="$("$PYTHON" -m mystock.ml.pipeline)" || return $?
   scp -o ConnectTimeout=20 "$artifact" "${PUB_HOST}:${PUB_DIR}/index.html" || return $?
+  "$PYTHON" -m mystock.ml.pipeline --record-published
 }
 case "$CMD" in
  data) do_data ;;

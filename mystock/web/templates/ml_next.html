@@ -1,0 +1,30 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ML 预测与库存回溯 · myStock</title><link rel="stylesheet" href="/static/ml_next.css">
+<script defer src="/static/vendor/lightweight-charts.standalone.production.js"></script><script defer src="/static/ml_next.js"></script></head>
+<body><header><a href="/">← myStock</a><span>研究预览 · 人工触发 · v2</span></header><main>
+<h1>下一目标日与库存回溯</h1><p class="muted">风险覆盖区间与模拟报价分开。每只股票独立本币账户；历史重建不等于当时可用，也不代表前向成绩。</p>
+<div id="latest" class="cards" aria-live="polite"></div>
+<section><h2>复盘场景</h2><form id="scenario">
+<div class="fields"><label>股票<select id="codes"><option>US.NVDA</option><option>US.TSLA</option><option>US.PDD</option><option>HK.00700</option><option>HK.09988</option><option>HK.01810</option></select></label>
+<label>市场 session 窗口<select id="days"><option>20</option><option selected>60</option><option>120</option></select></label>
+<label>截至日期<input id="end" type="date"></label>
+<label>预测来源<select id="source"><option value="live">有时间证据的 live</option><option value="recomputed">包含离线历史重建</option></select></label></div>
+<p id="scenario-source" class="notice">请填写场景参数。以下不是实盘预算；费用留空时仅显示 gross / 费用缺失。</p>
+<div class="fields">
+<label>初始现金（本币）<input id="initial_cash" type="number" min="0" step="any" required></label>
+<label>初始库存（股）<input id="initial_inventory" type="number" min="0" step="any" required></label>
+<label>初始持仓参考价<input id="initial_price" type="number" min="0" step="any"></label>
+<label>每笔数量（股）<input id="order_qty" type="number" min="1" required></label>
+<label>库存上限（股）<input id="max_inventory" type="number" min="1" required></label>
+<label>最长持有 session<input id="max_holding" type="number" min="1" max="400" required></label>
+<label>证券 lot（股）<input id="lot_size" type="number" min="1" required></label>
+<label>价格 tick（未知可空）<input id="tick_size" type="number" min="0" step="any"></label>
+<label>费用 bps（可空）<input id="fee_bps" type="number" min="0" step="any"></label>
+<label>每单固定费（本币）<input id="fee_flat" type="number" min="0" step="any"></label>
+</div><div class="actions"><button type="submit">重新模拟当前窗口</button><button id="fixture" type="button" class="secondary">填入合成测试场景</button></div></form>
+<p class="muted">20/60/120 各自从填写的初始状态重新模拟。下表是本次连续回放的逐日切片；切换窗口会重新初始化。lot / tick 为显式场景近似，需按证券和历史生效日确认。</p>
+</section><div id="status" role="status" aria-live="polite"></div><div id="compare"></div>
+<section><h2>逐 session 复盘</h2><p class="muted">选择日期叠加该次风险边界与模拟报价。K 线采用 ML 库未复权价格；真实委托仅显示事实，不能从快照推断完整生命周期。</p>
+<div id="chart" aria-label="ML 同价基 K 线"></div><div id="selected" class="notice"></div><div class="scroll"><table><thead><tr><th>目标日</th><th>as_of</th><th>数据状态</th><th>预测来源</th><th>风险区间</th><th>实际低 / 高</th><th>覆盖</th></tr></thead><tbody id="review"></tbody></table></div>
+<h3>选中日期的真实委托事实</h3><div id="orders">未选中日期。</div></section>
+</main></body></html>

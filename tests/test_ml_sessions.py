@@ -40,3 +40,27 @@ def test_hourly_only_complete_and_no_lunch():
     assert not s.hourly_final('HK.00700',r,s.utc('2026-09-04T03:45:00Z'))
     assert s.hourly_final('HK.00700',r,s.utc('2026-09-04T04:00:00Z'))
     r['ts_utc']='2026-09-04 04:00:00';assert not s.hourly_final('HK.00700',r,s.utc('2026-09-04T06:00:00Z'))
+
+
+def test_predictor_cannot_train_on_current_partial_or_cross_deadline(monkeypatch):
+    import numpy as np
+    from mystock.ml import predictor
+    rows=[]
+    for i,d in enumerate(s.session_days('US.NVDA','2026-05-01','2026-09-04')):
+        c=100+i*.2+(i%3)*.1
+        rows.append(dict(date=d,open=c,high=c+2,low=c-2,close=c+.1,adj_close=c+.1,volume=100+i,synced_at='2026-09-04T22:00:00Z'))
+    daily=pd.DataFrame(rows)
+    stale=daily.copy();stale.loc[stale.index[-1],'synced_at']='2026-09-04T18:00:00Z'
+    with pytest.raises(s.Unavailable,match='awaiting_final_data'):
+        predictor.predict_next_day(stale,code='US.NVDA',clock=lambda:s.utc('2026-09-04T22:00Z'))
+    fit_dates=[]
+    class Model:
+        q=0
+        def __init__(self,**kw):pass
+        def fit(self,df):fit_dates.extend(df.date.tolist());return self
+        def predict_prices(self,last):return np.array([90.]),np.array([110.])
+    monkeypatch.setattr(predictor,'IntervalModel',Model)
+    times=iter([s.utc('2026-09-04T22:00Z'),s.utc('2026-09-08T13:30Z')])
+    with pytest.raises(s.Unavailable,match='missed_deadline'):
+        predictor.predict_next_day(daily,code='US.NVDA',clock=lambda:next(times))
+    assert max(fit_dates)=='2026-09-03' and '2026-09-04' not in fit_dates

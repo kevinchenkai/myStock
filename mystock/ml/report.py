@@ -521,14 +521,14 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
         conformal=rcfg.conformal, target_coverage=rcfg.target_coverage,
     )
     today = dt.date.today().isoformat()
-    out_dir = out_dir or (mlcfg.REPORTS_DIR / today)
-    out_dir.mkdir(parents=True, exist_ok=True)
 
-    # 预测留档：建表 → 首次自动回填历史 HTML（表非空则跳过，见 backfill.run_if_empty）
-    # 每次生成报告都执行，保证 ml.sh 跑一次数据就同步一次，无需人工干预。
+    # 冻结本次输入；历史 HTML 仅经显式离线导入，不混入 live 留档。
     mldb.init_ml_db(db_path)
     run_manifest, manifest_path = runs.start(db_path)
     input_db = run_manifest["input_path"]
+    run_manifest['seed'] = cfg.seed
+    out_dir = out_dir or (mlcfg.REPORTS_DIR / 'runs' / run_manifest['run_id'])
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     sections, summary_rows, pred_rows = [], "", []
     for code in mlcfg.TARGETS:
@@ -540,7 +540,11 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
         # 按股自适应 CQR 目标覆盖率（收窄区间；与 ALPHA_BY_CODE 同模式）
         cov = mlcfg.coverage_for(code)
         cfg_i = cfg if cfg.target_coverage == cov else replace(cfg, target_coverage=cov)
-        bt = run_backtest(code, cfg_i, db_path=input_db, daily=daily)
+        try:
+            bt = run_backtest(code, cfg_i, db_path=input_db, daily=daily)
+        except Exception as e:
+            statuses.append({'code':code,'status':'failed','error':type(e).__name__})
+            continue
         if "error" in bt:
             statuses.append({"code":code,"status":"failed","error":str(bt["error"])})
             continue
@@ -552,9 +556,12 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
         except sessions.Unavailable as e:
             statuses.append({'code':code,'status':e.status})
             continue
+        except Exception as e:
+            statuses.append({'code':code,'status':'failed','error':type(e).__name__})
+            continue
         statuses.append({'code':code,'status':'generated','target_session':pred['target_session']})
         sections.append(_stock_section(code, bt, pred))
-        # 本次预测留档（PK code+as_of，当天重跑覆盖）——供后续报告做复盘对照
+        # 本次预测按 run 追加；同日多版本并存。
         pred_rows.append({
             "code": code, "as_of": pred["as_of"], "close": pred["close"],
             "l_hat": pred["L_hat"], "h_hat": pred["H_hat"],
@@ -592,9 +599,11 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
         import re
         for code in expired: summary_rows = re.sub(r"<tr><td>" + re.escape(code) + r"</td>.*?</tr>", "", summary_rows)
     if expired: sections = [section for section in sections if not any(c in section for c in expired)]
+    with mldb.get_ml_connection(db_path) as status_conn:
+        for st in statuses: mldb.log_sync(status_conn,'prediction_guard',symbol=st['code'],status=st['status'])
     if not pred_rows:
         runs.finish(run_manifest, manifest_path, pred_rows, statuses)
-        write_status(statuses, None)
+        write_status(statuses, None, db_path)
         return None
     conn = mldb.get_ml_connection(db_path)
     try:
@@ -604,7 +613,7 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
                           range_end=today)
         reviews = {
             code: mlreview.review_predictions(
-                mldb.load_predictions(conn, code), mldata.load_daily(code, db_path))
+                versions.load(conn, code, source="live"), mldata.load_daily(code, db_path))
             for code in mlcfg.TARGETS
         }
     finally:
@@ -646,8 +655,11 @@ h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}
     # latest.html 指向最新
     latest = mlcfg.REPORTS_DIR / "latest.html"
     latest.write_text(page, encoding="utf-8")
+    import hashlib
+    run_manifest['artifact_path'] = str(index.resolve())
+    run_manifest['artifact_sha256'] = hashlib.sha256(index.read_bytes()).hexdigest()
     runs.finish(run_manifest, manifest_path, pred_rows, statuses)
-    write_status(statuses, index)
+    write_status(statuses, index, db_path)
     return index
 
 

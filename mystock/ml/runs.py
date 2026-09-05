@@ -23,6 +23,7 @@ def start(db_path=None, run_id=None, root=None, protocol=None):
                   input_path=str(snap.resolve()),input_sha256=hashlib.sha256(snap.read_bytes()).hexdigest(),
                   source_path=str(source),dependencies={n:importlib.metadata.version(n) for n in ['numpy','pandas','lightgbm','scikit-learn']})
     from .features import FEATURE_COLS
+    manifest['source_hashes']={n:hashlib.sha256((Path(__file__).parent/n).read_bytes()).hexdigest() for n in ['features.py','predictor.py','sessions.py','calibrator.py']}
     manifest['features']=FEATURE_COLS;manifest['model']='IntervalModel-legacy-capacity-explicit-bagging0'
     path=dest/'manifest.json';path.write_text(canonical(manifest));return manifest,path
 

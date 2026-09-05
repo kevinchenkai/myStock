@@ -54,6 +54,8 @@ def init_ml_db(db_path: Optional[str] = None) -> None:
 
 def upsert(conn: sqlite3.Connection, table: str, rows: Iterable[dict]) -> int:
     """通用 UPSERT（按表主键冲突时覆盖）。返回写入行数。"""
+    if table in ("ml_predictions", "ml_prediction_versions"):
+        raise ValueError("Use the versioned prediction write entry")
     rows = list(rows)
     if not rows:
         return 0

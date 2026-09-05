@@ -288,7 +288,11 @@ if __name__ == "__main__":
     import os
     do_cqr = os.environ.get("MYSTOCK_ML_CQR", "1") != "0"
     for code in mlcfg.TARGETS:
-        daily = sessions.prepare_daily(mldata.load_daily(code), code)
+        try:
+            daily = sessions.prepare_daily(mldata.load_daily(code), code)
+        except sessions.Unavailable as e:
+            print(f'{code}: {e.status}')
+            continue
         lo_a, hi_a = mlcfg.alpha_for(code)  # 与回测/报告同口径（按股自适应分位）
         target = mlcfg.coverage_for(code)
         res = walk_forward_eval(daily, code, high_alpha=hi_a, low_alpha=lo_a,

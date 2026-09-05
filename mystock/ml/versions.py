@@ -33,9 +33,11 @@ def append(conn, rows, *, run_id, manifest_path=None, status='generated'):
                 try:
                     if not p.get('decision_at'): raise sessions.Unavailable('unknown_timestamp')
                     decision=sessions.utc(p['decision_at'])
+                    if not p.get('generated_at') or sessions.utc(p['generated_at']) > decision: raise sessions.Unavailable('invalid_generation_time')
                     if decision < sessions.session(p['code'],p['as_of'])['final_at']: raise sessions.Unavailable('premature')
                     sessions.check_deadline(p['code'],target,decision)
                 except (sessions.Unavailable,ValueError): rowstatus='audit_invalid_timing'
+            if run_id.startswith('legacy-'): rowstatus='audit_unknown_timing'
             conn.execute('insert into ml_prediction_versions values (?,?,?,?,?,?,?,?,?,?,?,?,?)',
                          (pid,run_id,p['code'],p['as_of'],target,source,rowstatus,p.get('generated_at'),
                           p.get('decision_at'),p.get('published_at'),str(manifest_path) if manifest_path else None,canonical(p),h))
@@ -73,7 +75,7 @@ def select_by_target(rows, *, allow_recomputed=False):
     selected={}
     for r in rows:
         if r['source']=='recomputed' and not allow_recomputed: continue
-        if r['status'].startswith('audit'):continue
+        if r['status'] not in ('generated','published','recomputed'):continue
         key=r['target_session']
         old=selected.get(key)
         if old and old['source']=='live' and r['source']!='live':continue

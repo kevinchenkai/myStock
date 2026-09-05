@@ -109,6 +109,11 @@ def hourly_final(code, row, now=None):
         if s.get('break_start') and s['break_start'] <= start and start+timedelta(hours=1) <= s['break_end']: return False
         stop=min(start+timedelta(hours=1),s['close'])
         if s.get('break_start') and start < s['break_start']: stop=min(stop,s['break_start'])
+        stamp=row.get('synced_at')
+        if stamp:
+            try: fetched=utc(str(stamp))
+            except (Unavailable,ValueError): fetched=datetime.fromisoformat(str(stamp)).replace(tzinfo=timezone.utc)-timedelta(hours=14)
+            if fetched < stop: return False
         return ohlc_ok(row) and utc(now or utc_now()) >= stop
     except (Unavailable,ValueError): return False
 

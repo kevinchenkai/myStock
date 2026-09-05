@@ -42,7 +42,7 @@ def load_hourly(symbol_or_code: str, db_path: Optional[str] = None) -> pd.DataFr
     sym = futu_to_yf(symbol_or_code) if "." in symbol_or_code else symbol_or_code
     with _conn(db_path) as c:
         df = pd.read_sql_query(
-            "SELECT ts_utc, ts_et, open, high, low, close, volume "
+            "SELECT ts_utc, ts_et, open, high, low, close, volume, synced_at "
             "FROM ml_quotes_1h WHERE symbol=? ORDER BY ts_utc",
             c, params=(sym,),
         )
@@ -94,7 +94,7 @@ def complete_bars(code, bars, now=None):
     day=bars[0].get('ts_et','')[:10]
     try:
         s=sessions.session(code,day)
-        if not all(sessions.ohlc_ok(b) for b in bars):return False
+        if not all(sessions.hourly_final(code,b,now) for b in bars):return False
         stamps=[sessions.utc(b['ts_utc'].replace(' ','T')+'+00:00') for b in bars]
         expected=[];t=s['open']
         while t<s['close']:
