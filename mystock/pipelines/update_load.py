@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import sys
 
 from .. import db
 from ..config import CONFIG
@@ -46,6 +47,9 @@ def run() -> int:
     db.init_db()
     conn = db.get_connection()
     try:
+        # Collectors finish independent sources after an error. Inspect only new
+        # logs, so an old failed attempt does not poison a successful retry.
+        log_start = conn.execute("SELECT COALESCE(MAX(id), 0) FROM sync_log").fetchone()[0]
         # 持仓：始终覆盖当天快照
         init_load.collect_positions(conn)
         # 账户资金：每天覆盖一条快照（综合账户，只查一次）
@@ -73,9 +77,17 @@ def run() -> int:
         # 回退 start_date，再被 CAPITAL_FLOW_MAX_DAYS 抬到近 1 年 → 自动完成回补。
         capflow_start = _incremental_start(conn, "futu_capflow", "date")
         init_load.collect_capital_flow(conn, capflow_start, end_date)
+        failed_sources = [row[0] for row in conn.execute(
+            "SELECT DISTINCT source FROM sync_log WHERE id > ? AND status = 'error' "
+            "ORDER BY source", (log_start,),
+        )]
     finally:
         conn.close()
 
+    if failed_sources:
+        print("增量更新未全部成功：" + ", ".join(failed_sources)
+              + "；成功数据已保留，请检查 sync_log 后重试。", file=sys.stderr)
+        return 1
     print("增量更新完成。")
     return 0
 

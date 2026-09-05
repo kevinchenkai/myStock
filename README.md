@@ -122,6 +122,8 @@ cp config.example.yaml config.yaml    # config.yaml 已在 .gitignore，不会�
 
 > ML 侧另有独立入口 `bash scripts/ml.sh`（data / train / publish / all），与上面三个脚本互不干扰，见 [§2.3](#23-模块与运行)。
 
+`update.sh` 会继续更新独立数据源，但本轮出现采集异常时最终返回非零，并列出失败来源；成功写入的数据保留。行情／资料／资金流向部分失败也记为 `error`，不推进该来源的成功同步点，修复连接后可重试。空结果与已知跳过名单仍按原有口径记录，不等同于异常。
+
 典型流程：
 
 ```bash

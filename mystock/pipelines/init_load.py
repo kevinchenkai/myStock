@@ -160,7 +160,8 @@ def collect_quotes(conn, start: str, end: str) -> None:
             print(f"  ✗ {code}: {e}", file=sys.stderr)
 
     msg = f"{ok_codes} ok / {empty_codes} empty / {err_codes} err / {len(skip)} skipped"
-    db.write_sync_log(conn, "yfinance", start, end, grand_total, "ok", msg)
+    db.write_sync_log(conn, "yfinance", start, end, grand_total,
+                      "error" if err_codes else "ok", msg)
     print(f"[quotes] 完成：{msg}，共 {grand_total} 条")
 
 
@@ -201,7 +202,8 @@ def collect_profiles(conn) -> None:
             print(f"  ✗ {code}: {e}", file=sys.stderr)
 
     msg = f"{ok_codes} ok / {empty_codes} empty / {err_codes} err / {len(skip)} skipped"
-    db.write_sync_log(conn, "yf_profile", None, None, ok_codes, "ok", msg)
+    db.write_sync_log(conn, "yf_profile", None, None, ok_codes,
+                      "error" if err_codes else "ok", msg)
     print(f"[profiles] 完成：{msg}")
 
 
@@ -277,7 +279,8 @@ def collect_capital_flow(conn, start: str, end: str) -> None:
         return
 
     msg = f"{ok_codes} ok / {empty_codes} empty / {err_codes} err"
-    db.write_sync_log(conn, "futu_capflow", eff_start, end, grand_total, "ok", msg)
+    db.write_sync_log(conn, "futu_capflow", eff_start, end, grand_total,
+                      "error" if err_codes else "ok", msg)
     print(f"[capflow] 完成：{msg}，共 {grand_total} 条")
 
 
