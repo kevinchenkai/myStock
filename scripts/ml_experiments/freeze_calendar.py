@@ -12,7 +12,10 @@ def main():
     for market in ['US','HK']:
         if market=='US':
             s=pmc.get_calendar('NYSE').schedule('2020-01-01','2026-12-31').rename(columns={'market_open':'open','market_close':'close'})
-        else: s=xc.get_calendar('XHKG',start='2020-01-01',end='2026-12-31').schedule
+        else:
+            s=xc.get_calendar('XHKG',start='2020-01-01',end='2026-12-31').schedule
+            # Confirmed HKEX full-day weather closures, see calendars/README.md.
+            s=s.loc[~s.index.strftime('%Y-%m-%d').isin(['2023-09-01', '2023-09-08'])]
         o=pd.DataFrame(index=s.index)
         o['date']=s.index.strftime('%Y-%m-%d');o['open']=s.open;o['close']=s.close
         o['deadline']=s.open-pd.Timedelta(minutes=30 if market=='HK' else 0)

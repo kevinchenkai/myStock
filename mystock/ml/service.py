@@ -87,6 +87,7 @@ def review(path,code,days=60,end=None,*,allow_recomputed=False,now=None):
         hit=None
         if p and final:hit=bool(d['low']>=p['l_hat'] and d['high']<=p['h_hat'])
         rows.append(dict(date=date,status=status,prediction=prediction,daily=d if final else None,
+                         hourly_sources=sorted({b.get('data_source') or 'yfinance' for b in bars}),
                          bars=bars if complete and final else [],bar_status='complete' if complete else 'missing_bars',
                          hit=hit,price_basis='yfinance_unadjusted_same_as_prediction',
                          prediction_status='recomputed' if p and p['source']=='recomputed' else 'available' if p else 'missing_prediction'))

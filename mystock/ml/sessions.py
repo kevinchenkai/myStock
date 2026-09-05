@@ -11,7 +11,7 @@ import csv
 import math
 from zoneinfo import ZoneInfo
 
-CALENDAR_VERSION = 'pmc-5.1.3-xhkg-4.11.1-2020-2026-cas-v1'
+CALENDAR_VERSION = 'pmc-5.1.3-xhkg-4.11.1-2020-2026-cas-weather-v2'
 START, END = '2020-01-01', '2026-12-31'
 
 class Unavailable(ValueError):

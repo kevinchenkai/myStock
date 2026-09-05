@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS ml_quotes_1h (
     close           REAL,
     volume          REAL,
     synced_at       TEXT,
+    data_source     TEXT NOT NULL DEFAULT 'yfinance',
+    source_ref      TEXT,                 -- SHA256 of original fallback-provider evidence
     PRIMARY KEY (symbol, ts_utc)
 );
 

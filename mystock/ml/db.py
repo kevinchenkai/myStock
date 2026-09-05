@@ -47,6 +47,11 @@ def init_ml_db(db_path: Optional[str] = None) -> None:
     try:
         with open(mlcfg.SCHEMA_PATH, "r", encoding="utf-8") as f:
             conn.executescript(f.read())
+        columns = {r[1] for r in conn.execute('PRAGMA table_info(ml_quotes_1h)')}
+        if 'data_source' not in columns:
+            conn.execute("ALTER TABLE ml_quotes_1h ADD COLUMN data_source TEXT NOT NULL DEFAULT 'yfinance'")
+        if 'source_ref' not in columns:
+            conn.execute('ALTER TABLE ml_quotes_1h ADD COLUMN source_ref TEXT')
         conn.commit()
     finally:
         conn.close()
