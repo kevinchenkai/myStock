@@ -1,0 +1,21 @@
+README.md
+  s_612cad8e12fb53::t_96d55374442e13 189
+docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md
+  s_612cad8e12fb53::t_96d55374442e13 3
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "446e657146fc18968cc580bc449f7d76be5ac4bb",
+  "prompts": {},
+  "sessions": {
+    "s_612cad8e12fb53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a06fa0-7445-7b73-84c4-5ea66f7dc7a6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
