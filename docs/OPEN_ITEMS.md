@@ -42,7 +42,7 @@
 | **P3-6** | `report.py` 用正则从 HTML 里删除过期标的的行／段落，脆弱；应在渲染前按 code 过滤数据，而非事后改 HTML | 待办 |
 | **P3-7** | `service.read_inputs` 自行拼 yf 代码，应复用 `code_map.futu_to_yf` | 待办 |
 | **P3-8** | 模块级 `OrderedDict` 缓存无锁（Flask 默认多线程）。风险低 | 待办 |
-| **P3-9** | `report` 的 `_stock_section` 等仍按旧「回测 + bandit」口径渲染；`本次状态：{statuses}` 直接 `str(list)` 进 HTML，可读性差 | 待办 |
+| **P3-9** | 2026-09-05 已修复状态列表直接输出：`report._status_panel` 按市场、状态和目标日分组，展示中文结果并转义字段；技术设置折叠。`_stock_section` 的旧「回测 + bandit」口径仍待改造 | 部分完成（状态展示已修复，见本行所在修复提交） |
 
 ### 模型侧
 

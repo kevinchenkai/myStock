@@ -507,6 +507,32 @@ def _mode_banner(cfg: BTConfig) -> str:
     return " · ".join(tags)
 
 
+def _status_panel(statuses: list[dict]) -> str:
+    """Human-readable per-market outcomes; diagnostic payload stays in receipt."""
+    labels = {
+        'generated': '已生成', 'skipped_in_session': '交易时段内，已跳过',
+        'awaiting_final_data': '等待收盘数据确认', 'feature_gap': '特征数据不完整',
+        'missed_deadline': '已过预测截止时间', 'failed': '生成失败',
+        'unavailable': '暂不可用',
+    }
+    groups = {}
+    for row in statuses:
+        code = str(row.get('code') or '未知标的')
+        market = '美股' if code.startswith('US.') else '港股' if code.startswith('HK.') else '其他标的'
+        key = (market, row.get('status'), str(row.get('target_session') or ''))
+        groups.setdefault(key, []).append(code)
+    items = []
+    for (market, status, target), codes in groups.items():
+        label = labels.get(status, '暂不可用')
+        date = f' · 预测交易日 {html.escape(target)}' if target else ''
+        items.append(f'<li><b>{market} · {label}</b>{date}'
+                     f'<div style="color:#666;font-size:12px">{html.escape("、".join(codes))}</div></li>')
+    generated = sum(row.get('status') == 'generated' for row in statuses)
+    return (f'<section aria-label="本次预测状态" style="padding:12px 16px;background:#f6f8fa;border:1px solid #e1e5ea;border-radius:8px">'
+            f'<b>本次预测：{generated} / {len(statuses)} 支已生成</b>'
+            f'<ul style="margin:8px 0 0;padding-left:20px">{"".join(items)}</ul></section>')
+
+
 def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
                  rcfg: _ReportCfg | None = None, *, db_path=None, clock=None) -> Path | None:
     from . import sessions
@@ -635,9 +661,9 @@ body{{font:14px/1.6 -apple-system,sans-serif;max-width:840px;margin:24px auto;pa
 h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}
 {_REVIEW_CSS}</style></head><body>
 <h1>myStock ML 回测报告 · {today}</h1>
-<p>本次状态：{statuses}</p>
-<p style="color:#888">3 美股(USD) + 3 港股(HKD)，各股独立账户本币计价 · 目标=最大化达成交易净值 · 红涨绿跌 · 离线产物（不碰 web）</p>
-<p style="color:#666;font-size:12px">口径：{_mode_banner(cfg)}</p>
+{_status_panel(statuses)}
+<p style="color:#888">3 美股(USD) + 3 港股(HKD)，各股独立账户、本币计价 · 红涨绿跌 · 历史模拟，不代表实际账户收益</p>
+<details style="color:#666;font-size:12px"><summary>模型与回测设置</summary><p>{_mode_banner(cfg)}</p></details>
 {_metrics_guide()}
 <h2>总览：Bandit vs 买入持有 + 次日预测</h2>
 <table style="border-collapse:collapse;min-width:560px">
