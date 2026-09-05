@@ -80,3 +80,30 @@ def load_orders(code: str, db_path: Optional[str] = None) -> pd.DataFrame:
             c, params=(code,),
         )
     return df
+
+
+def complete_bars(code, bars, now=None):
+    """Accept full regular-session coverage on exchange or Yahoo's anchored grid.
+
+    HK Yahoo hourly buckets can straddle lunch (12:30 contains 13:00–13:30).
+    Entirely inactive buckets are excluded; partial/missing sets stay unavailable.
+    """
+    from . import sessions
+    from datetime import timedelta
+    if not bars: return False
+    day=bars[0].get('ts_et','')[:10]
+    try:
+        s=sessions.session(code,day)
+        if not all(sessions.ohlc_ok(b) for b in bars):return False
+        stamps=[sessions.utc(b['ts_utc'].replace(' ','T')+'+00:00') for b in bars]
+        expected=[];t=s['open']
+        while t<s['close']:
+            end=min(t+timedelta(hours=1),s['close'])
+            if not s.get('break_start') or not (t>=s['break_start'] and end<=s['break_end']):expected.append(t)
+            t+=timedelta(hours=1)
+        segmented=[]
+        periods=[(s['open'],s['break_start']),(s['break_end'],s['close'])] if s.get('break_start') else [(s['open'],s['close'])]
+        for t,end in periods:
+            while t<end:segmented.append(t);t+=timedelta(hours=1)
+        return len(stamps)==len(set(stamps)) and (set(stamps)==set(expected) or set(stamps)==set(segmented)) and sessions.utc(now or sessions.utc_now())>=s['final_at']
+    except (sessions.Unavailable, ValueError, KeyError):return False

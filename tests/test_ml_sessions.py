@@ -39,4 +39,4 @@ def test_hourly_only_complete_and_no_lunch():
     r=bar('2026-09-04','');r['ts_utc']='2026-09-04 03:30:00'
     assert not s.hourly_final('HK.00700',r,s.utc('2026-09-04T03:45:00Z'))
     assert s.hourly_final('HK.00700',r,s.utc('2026-09-04T04:00:00Z'))
-    r['ts_utc']='2026-09-04 04:30:00';assert not s.hourly_final('HK.00700',r,s.utc('2026-09-04T06:00:00Z'))
+    r['ts_utc']='2026-09-04 04:00:00';assert not s.hourly_final('HK.00700',r,s.utc('2026-09-04T06:00:00Z'))

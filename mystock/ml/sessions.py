@@ -106,7 +106,7 @@ def hourly_final(code, row, now=None):
         zone=ZoneInfo('Asia/Hong_Kong' if market(code)=='HK' else 'America/New_York')
         s=session(code,start.astimezone(zone).date().isoformat())
         if not s['open'] <= start < s['close']: return False
-        if s.get('break_start') and s['break_start'] <= start < s['break_end']: return False
+        if s.get('break_start') and s['break_start'] <= start and start+timedelta(hours=1) <= s['break_end']: return False
         stop=min(start+timedelta(hours=1),s['close'])
         if s.get('break_start') and start < s['break_start']: stop=min(stop,s['break_start'])
         return ohlc_ok(row) and utc(now or utc_now()) >= stop
