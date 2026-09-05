@@ -1,0 +1,31 @@
+docs/ML_UPGRADE_EXECUTION_LOG_2026-09-04.md
+  s_2bf7efc16166a2::t_7f4e8bdca39497 26-31
+docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md
+  s_2bf7efc16166a2::t_94a0f381b5eeee 1-150
+mystock/ml/data.py
+  s_2bf7efc16166a2::t_9973c77d8a1db6 83-109
+mystock/ml/sessions.py
+  s_2bf7efc16166a2::t_ea35585f15d5d9 109
+scripts/ml_experiments/summarize_upgrade.py
+  s_2bf7efc16166a2::t_78ff430eff5f66 1-44
+scripts/ml_experiments/upgrade_matrix.py
+  s_2bf7efc16166a2::t_7f039b45c906f0 1-121
+tests/test_ml_sessions.py
+  s_2bf7efc16166a2::t_4dc8b2e950983c 42
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "f701ea732470b5f183127d3f01ba3575b3821ef8",
+  "prompts": {},
+  "sessions": {
+    "s_2bf7efc16166a2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a07004-42a0-7961-8865-50856804f1b9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
