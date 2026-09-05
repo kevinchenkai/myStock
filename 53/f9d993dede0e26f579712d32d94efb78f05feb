@@ -1,0 +1,19 @@
+docs/ML_UPGRADE_PLAN.md
+  s_f7487065228dda::t_495ba1371d52fb 1-392
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "53f9d993dede0e26f579712d32d94efb78f05feb",
+  "prompts": {},
+  "sessions": {
+    "s_f7487065228dda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a05e02b4-d666-43dd-a149-dc060c4a0ea7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
