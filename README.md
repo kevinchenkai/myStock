@@ -29,11 +29,11 @@
 | 升级前备份 | 已备份 Web、ML、完整 data、配置与 Git 历史；137 个文件解压哈希和两库 integrity_check 通过。[备份记录与恢复说明](docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md) |
 | 执行负责人 | **Codex Astra**，在 `codex/ml-upgrade-20260904` 隔离工作树及数据副本实施。[执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md) |
 | 已观察到的进展 | 四批工程已实现：session 守卫、不可覆盖版本、E0–E5 实验、受约束回放与 `/ml-next`；历史副本已补齐 20/60/120 session。Claude 合并前修复及验证见 [修复回执](docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md) |
-| 后续范围 | Claude 复核、部署副本迁移演练及合并；E0–E5 无候选达模型晋级门槛，证券规则历史与快照保留策略等继续跟踪 |
-| 运行边界 | **升级分支尚未合入 main，当前服务和原数据库未切换**；近期人工触发，自动调度后议；前向 shadow 与生产切换另行进行 |
+| 后续范围 | 工程已获确认、合入并部署；E0–E5 无候选达模型晋级门槛，证券规则历史与快照保留策略等继续跟踪 |
+| 运行边界 | **已合入 main 并推送，8888 服务已重启，ML 数据／历史重建／训练／公网报告发布验收通过**；仍人工触发，无自动下单或自动任务。[部署回执](docs/ML_DEPLOYMENT_2026-09-05.md) |
 | 方案／讨论 | [Codex v1.4](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)、[Claude 合并稿 v0.2.1](docs/ML_CLAUDE_UPGRADE_MERGED.md)、[Claude 原方案](docs/ML_UPGRADE_PLAN.md) |
 
-以下说明以本升级分支代码为准，保留 main `885e8f7` 的已核实限制。分支实现与测试结果不等于生产已生效；详细执行日志和实验结果随分支交付。
+以下说明以已部署 main 代码为准，保留 `885e8f7` 的已核实限制。工程部署不等于模型晋级；详细运行与验收证据见部署回执。
 
 ---
 
@@ -199,7 +199,7 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 > 一页速览见 [`docs/ML_OVERVIEW.md`](docs/ML_OVERVIEW.md)；完整方案与决策记录见 [`docs/ML_PLAN.md`](docs/ML_PLAN.md)。
 > 代码在 [`mystock/ml/`](mystock/ml/)，独立库 `data/ml/mystock_ml.db`，与 Web 生产库分库。
 
-升级已经进入 Astra 隔离分支实施，进度与备份入口见文首状态表。本分支已提供收盘／发布守卫及不可覆盖预测留档，尚未切换生产；具体修复与验收见 [执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md)。
+升级工程已合入 main 并完成本机与报告部署，进度与备份入口见文首状态表。当前已提供收盘／发布守卫及不可覆盖预测留档；具体修复与验收见 [执行工单](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md)。
 
 **对外页面**：<https://g.ismayday.com/mystock/>（人工运行并发布报告后更新；当前 publish 仅更新首页；新历史归档留在本地 reports/runs/）
 
