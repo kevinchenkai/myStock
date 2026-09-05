@@ -10,6 +10,8 @@
 <body>
   {% include '_site_header.html' %}
 
+  <details class="cache-overview" id="data-status"><summary>数据状态 · 加载中</summary><div class="cache-body"></div></details>
+
   <div class="tabs">
     <div class="tab active" data-tab="positions">我的持仓</div>
     <div class="tab" data-tab="trades">我的交易</div>
@@ -157,5 +159,6 @@
   <script src="{{ url_for('static', filename='vendor/lightweight-charts.standalone.production.js') }}"></script>
   <script src="{{ url_for('static', filename='theme.js') }}"></script>
   <script src="{{ url_for('static', filename='app.js') }}"></script>
+  <script src="{{ url_for('static', filename='data-status.js') }}"></script>
 </body>
 </html>

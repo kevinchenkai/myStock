@@ -72,6 +72,17 @@ CREATE TABLE IF NOT EXISTS daily_quotes (
 
 -- 股票通用信息（公司 / 估值），来自 yfinance Ticker.info。
 -- 随每日 update 刷新；按 futu_code 覆盖（UPSERT）。
+-- Latest per-stock collection attempt; successful cache is kept separately.
+CREATE TABLE IF NOT EXISTS collection_status (
+    source TEXT NOT NULL,
+    code TEXT NOT NULL,
+    status TEXT NOT NULL CHECK(status IN ('ok','partial','empty','error','unsupported','unknown')),
+    last_attempt_at TEXT NOT NULL,
+    last_success_at TEXT,
+    reason TEXT,
+    PRIMARY KEY (source, code)
+);
+
 CREATE TABLE IF NOT EXISTS stock_profiles (
     futu_code           TEXT PRIMARY KEY,     -- 富途代码，如 HK.00700 / US.AAPL
     yf_symbol           TEXT,                 -- yfinance 代码
@@ -97,6 +108,17 @@ CREATE TABLE IF NOT EXISTS stock_profiles (
     amplitude           REAL,                 -- 振幅%（当日）
     week52_high         REAL,                 -- 52 周最高价（本币）
     week52_low          REAL,                 -- 52 周最低价（本币）
+    snapshot_time_raw   TEXT,                 -- 来源原文，不补造历史时区
+    snapshot_timezone   TEXT,                 -- IANA 来源时区
+    snapshot_time_utc   TEXT,                 -- 标准 UTC，有歧义时为 NULL
+    last_price          REAL,
+    prev_close_price    REAL,
+    open_price          REAL,
+    high_price          REAL,
+    low_price           REAL,
+    volume_ratio        REAL,
+    suspension          INTEGER,              -- 1 / 0 / NULL（未知）
+    sec_status          TEXT,
     snap_synced_at      TEXT,                 -- 盘面字段入库时间（独立于 synced_at）
     synced_at           TEXT                  -- 入库时间
 );

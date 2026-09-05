@@ -18,6 +18,7 @@ import numpy as np
 import pandas as pd
 
 from ..config import CONFIG
+from .snapshot import fields as snapshot_values
 from ..code_map import futu_market_of
 
 try:
@@ -427,9 +428,8 @@ def quote_ctx():
         ctx.close()
 
 
-# get_market_snapshot 单次最多 400 标的，限频 30s/60 次。本项目标的数远小于
-# 400，一次批量取全。仅取 yfinance 缺的盘面字段（换手率/振幅/52 周高低）
-# 合并进 stock_profiles。
+# get_market_snapshot 单次最多 400 标的，限频 30s/60 次。
+# 管线负责分批和记录逐股结果；本函数仅执行一个批次。
 
 def fetch_snapshots(codes: list[str]) -> pd.DataFrame:
     """批量抓取行情快照，返回原始 DataFrame（含全部快照列）。
@@ -440,6 +440,8 @@ def fetch_snapshots(codes: list[str]) -> pd.DataFrame:
     _require_futu()
     if not codes:
         return pd.DataFrame()
+    if len(codes) > 400:
+        raise ValueError("snapshot batch exceeds 400 codes")
     with quote_ctx() as ctx:
         ret, data = ctx.get_market_snapshot(list(codes))
     if ret != RET_OK:
@@ -456,6 +458,8 @@ def snapshot_fields(df: pd.DataFrame, now: str) -> list[dict]:
     UPSERT 时只更新这些列，不干扰 collect_profiles 写的公司/估值字段）。
     """
     rows = []
+    if df is None or df.empty:
+        return rows
     for _, r in df.iterrows():
         code = _g(r, "code", default="")
         if not code:
@@ -470,6 +474,7 @@ def snapshot_fields(df: pd.DataFrame, now: str) -> list[dict]:
             "lot_size": _num(_g(r, "lot_size")),
             "price_spread": _num(_g(r, "price_spread")),
             "rules_effective_from": now[:10],
+            **snapshot_values(code, r),
         })
     return rows
 

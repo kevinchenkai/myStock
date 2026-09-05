@@ -66,7 +66,7 @@ yfinance（行情 / 汇率 / 通用信息）──────┘               
 
 采集层从富途 OpenD 与 yfinance 拉数据，清洗后写入 SQLite；Web 层只读。
 
-八张数据表：`positions`（持仓快照）、`orders`（历史订单）、`deals`（历史成交）、`daily_quotes`（日线行情）、`stock_profiles`（股票通用信息：公司/估值 + 富途盘面字段，随每日更新刷新）、`fx_rates`（外汇日线，当前为美元兑人民币 USDCNY）、`account_funds`（账户资金每日快照）、`capital_flow`（个股日频资金流向），外加 `sync_log`（同步日志）与 `quote_skiplist`（行情跳过名单）。详见 [`mystock/schema.sql`](mystock/schema.sql)。
+八张数据表：`positions`（持仓快照）、`orders`（历史订单）、`deals`（历史成交）、`daily_quotes`（日线行情）、`stock_profiles`（股票通用信息：公司/估值 + 富途盘面字段，随每日更新刷新）、`fx_rates`（外汇日线，当前为美元兑人民币 USDCNY）、`account_funds`（账户资金每日快照）、`capital_flow`（个股日频资金流向），外加 `sync_log`（同步日志）、`quote_skiplist`（行情跳过名单）与 `collection_status`（逐股采集尝试）。详见 [`mystock/schema.sql`](mystock/schema.sql)。
 
 字段级数据字典（含取值分布与已知坑点）见 [`docs/guides/data-dictionary_claude_20260623.md`](docs/guides/data-dictionary_claude_20260623.md)。
 
@@ -95,7 +95,7 @@ conda env create -f environment.yml   # 创建名为 mk 的环境
 conda activate mk
 ```
 
-依赖：`futu-api`、`yfinance`、`Flask`、`PyYAML`、`pandas`（见 [`environment.yml`](environment.yml)）。
+依赖：`futu-api==10.10.7008`、`yfinance==1.7.0`、`Flask`、`PyYAML`、`pandas`（见 [`environment.yml`](environment.yml)）。2026-09-05 已在实际 mk 验证升级，新增 lxml 6.1.3；其余包版本未变。隔离验收与离线回退见 [Web 执行回执](docs/records/web-data-upgrade-execution_codex_20260905.md)。生产 Web 尚待迁移／重启，此状态与依赖升级分开。
 
 ### 1.3.2 配置文件
 
@@ -152,7 +152,8 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 - **市场筛选**：「我的持仓」「我的交易」「交易盈亏」面板顶部均有 **全部 / 美股 / 港股** 筛选条，点击即时过滤（纯前端，不重新请求后端）。交易 Tab 的筛选对「按订单 / 按成交」两个子表同时生效。
 - **表头排序（持仓 / 交易盈亏）**：点击**数值列表头**排序，**循环切换**：倒序 ▼ → 正序 ▲ → 取消（恢复原始顺序）。可与市场筛选叠加；空值恒排末尾。
 - **单支股票下钻**：在任意表格中**点击代码**，弹出个股详情：
-  - **数据时间提醒**（置顶一行）：显示该股最新日线数据日期与距今天数，绿点=新鲜、琥珀点=滞后（超过 3 天时提示运行 `update.sh`），便于识别行情是否需要更新；
+  - **数据状态**：首页可折叠查看来源及个股缓存；个股日线按交易所时区／日历显示应覆盖的最近确认收盘日，区分业务日期、采集时间、来源汇总与逐股失败，未知时间不会显示新鲜；
+  - **Futu 缓存快照**：显示本币价格、涨跌、日内高低、量比、停牌、每手股数和来源时间；失败或字段不完整保留原缓存。新只读接口为 `/api/data-status`、`/api/stock/<code>/snapshot`，旧库只提示需升级，不在 Web 中迁移；
   - **通用信息**：公司名、板块、行业、交易所、市值、流通股本、市盈率(TTM)/预期市盈率、市净率、每股收益、股息率、Beta、目标均价、分析师评级、货币、官网。读自 `stock_profiles` 表（随每日更新刷新）；**市值 / 目标均价 / 每股收益按标的本币标注单位**（如港股显示「市值(百万HKD)」），不误标美元；
   - **价格走势（K线）**：蜡烛图 + 成交量副图（红涨绿跌、十字光标、滚轮缩放 / 拖动），基于本地内置的 [Lightweight-Charts](https://github.com/tradingview/lightweight-charts)（vendored 于 `static/vendor/`，离线可用，前端仍无构建步骤）+ 日线表格；
   - **主力资金流向（近 60 日）**：日频**主力净流入**柱状图（红=净流入 / 绿=净流出，与 K 线时间轴对齐），上方一行汇总「近 N 日合计 + 流入/流出天数」。数据来自富途 `get_capital_flow`（yfinance 无此数据），金额为**标的本币**；

@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
@@ -41,6 +41,12 @@ def get_connection_readonly(db_path=None):
 # 新增可空列，幂等，旧库升级时自动补齐；无需手写 ALTER。
 _COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
     "stock_profiles": [
+        ("snapshot_time_raw", "TEXT"), ("snapshot_timezone", "TEXT"),
+        ("snapshot_time_utc", "TEXT"), ("last_price", "REAL"),
+        ("prev_close_price", "REAL"), ("open_price", "REAL"),
+        ("high_price", "REAL"), ("low_price", "REAL"),
+        ("volume_ratio", "REAL"), ("suspension", "INTEGER"),
+        ("sec_status", "TEXT"),
         ("lot_size", "INTEGER"), ("price_spread", "REAL"),
         ("rules_effective_from", "TEXT"),
         ("turnover_rate", "REAL"),
@@ -77,7 +83,7 @@ def init_db(db_path: Optional[str] = None) -> None:
 
 
 def now_str() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
 
 
 def today_str() -> str:
@@ -302,3 +308,14 @@ def purge_code(conn: sqlite3.Connection, futu_code: str) -> dict:
         deleted[table] = cur.rowcount
     conn.commit()
     return deleted
+
+
+def write_collection_status(conn, source, code, status, attempted_at, reason=None):
+    """Keep the last fully successful attempt when a newer attempt fails."""
+    conn.execute('''INSERT INTO collection_status VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(source,code) DO UPDATE SET status=excluded.status,
+        last_attempt_at=excluded.last_attempt_at,
+        last_success_at=COALESCE(excluded.last_success_at,collection_status.last_success_at),
+        reason=excluded.reason''',
+        (source, code, status, attempted_at, attempted_at if status == 'ok' else None, reason))
+    conn.commit()

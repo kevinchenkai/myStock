@@ -82,7 +82,7 @@ def rows_to_list(cur) -> list[dict]:
 
 @app.errorhandler(FileNotFoundError)
 def handle_no_db(e):
-    return jsonify({"error": str(e)}), 503
+    return jsonify({"error": "数据库不可用，请联系维护者检查初始化状态。"}), 503
 
 
 # ---------------- 页面 ----------------
@@ -478,6 +478,29 @@ def main() -> None:
         )
     print(f"myStock Web 服务启动: http://{host}:{port}")
     app.run(host=host, port=port, debug=False)
+
+@app.route('/api/data-status')
+def api_data_status():
+    from . import data_status
+    from ..ml.sessions import utc_now
+    conn = get_db()
+    try:
+        return jsonify(data_status.overview(conn, app.config.get('DATA_STATUS_NOW') or utc_now()))
+    finally:
+        conn.close()
+
+
+@app.route('/api/stock/<code>/snapshot')
+def api_snapshot(code):
+    from . import data_status
+    from ..ml.sessions import utc_now
+    if not data_status.valid_code(code):
+        return jsonify(error='无效股票代码'), 400
+    conn = get_db()
+    try:
+        return jsonify(data_status.stock_status(conn, code, app.config.get('DATA_STATUS_NOW') or utc_now()))
+    finally:
+        conn.close()
 
 
 if __name__ == "__main__":

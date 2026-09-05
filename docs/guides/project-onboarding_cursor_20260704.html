@@ -963,6 +963,13 @@ account_funds               账户级每日快照，不含 code，无法与个�
 </section>
 
 <!-- ============ 17. 运维 ============ -->
+<section id="web-cache-upgrade">
+  <h2>Web 数据状态与缓存快照 · 2026-09-05</h2>
+  <p>实际 mk 已升级 yfinance 1.7.0 / futu-api 10.10.7008，新增 lxml 6.1.3；其他包版本保持不变。生产 8888 与运行库尚未部署本轮 Web 改动，详见 <a href="../records/web-data-upgrade-execution_codex_20260905.md">执行与回退回执</a>。</p>
+  <p>首页可折叠查看来源与个股数据状态；详情展示 Futu 缓存价格、涨跌、停牌、每手股数和来源时间。日线按交易所日历判断最近确认收盘日；无时区、缺失、部分失败不会被称为新鲜。缓存不是实时行情。</p>
+  <p>只读接口 <code>/api/data-status</code> 和 <code>/api/stock/&lt;code&gt;/snapshot</code> 不抓取、不迁移；旧库提示需要维护者升级。新增 <code>collection_status</code> 记录逐股尝试，失败保留旧缓存；快照时间与 yfinance 资料时间分开。新采集时间使用带 UTC 偏移的 ISO 文本，历史未知时区不补造。</p>
+</section>
+
 <section id="ops">
   <h2>17 · 运维与维护</h2>
   <h3>人工流程</h3>

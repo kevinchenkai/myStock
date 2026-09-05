@@ -90,6 +90,9 @@ def test_snapshot_fields_extracts_pan_mian():
         "futu_code", "turnover_rate", "amplitude",
         "week52_high", "week52_low", "snap_synced_at",
         "lot_size", "price_spread", "rules_effective_from",
+        "snapshot_time_raw", "snapshot_timezone", "snapshot_time_utc",
+        "last_price", "prev_close_price", "open_price", "high_price", "low_price",
+        "volume_ratio", "suspension", "sec_status",
     }
     assert r0["futu_code"] == "HK.00700"
     assert r0["turnover_rate"] == 0.399
@@ -115,4 +118,5 @@ def test_snapshot_fields_handles_na_and_missing_code():
 
 
 def test_snapshot_fields_empty():
+    assert snapshot_fields(None, "now") == []
     assert snapshot_fields(pd.DataFrame(), "now") == []

@@ -10,10 +10,11 @@
 
 ## 当前工单：Web 两项 P0 与依赖升级
 
-用户已批准升级 yfinance／futu-api，并只选择数据更新时间与异常提示、个股缓存快照两个 P0，执行方为原 Astra 任务。实际升级／实施结果以执行回执为准；其余候选和 ML 模型升级继续暂缓。
+用户已批准升级 yfinance／futu-api，并只选择数据更新时间与异常提示、个股缓存快照两个 P0，执行方为原 Astra 任务。实际 mk 已升级、两个 P0 已完成隔离验收，生产 Web 部署待执行；其余候选和 ML 模型升级继续暂缓。
 
 | 文档 | 用途 |
 | --- | --- |
+| [Web 两项 P0 执行回执](records/web-data-upgrade-execution_codex_20260905.md) | 实际依赖升级、代码验收、预览与部署／回退边界 |
 | [Web API 优化调研](research/web-api-opportunities_codex_20260905.md) | Futu／yfinance 能力、代码缺口、最新版本与候选功能 |
 | [Web 两项 P0 与依赖升级工单](records/web-data-upgrade-work-order_codex_20260905.md) | 已批准 DEP-01／WEB-01／WEB-02，包含验证、回退和交付范围 |
 

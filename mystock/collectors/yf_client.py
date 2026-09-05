@@ -242,14 +242,14 @@ _PROFILE_VALUE_COLS = (
 def fetch_profile(futu_code: str, now: str = "") -> Optional[dict]:
     """抓取单个标的的通用信息（公司/估值），返回 stock_profiles 入库 dict。
 
-    实时调用 yfinance Ticker.info。失败或无有效资料返回 None。
+    实时调用 yfinance Ticker.info。无有效资料返回 None；异常交由采集入口记录。
     """
     _require_yf()
     yf_symbol = futu_to_yf(futu_code)
     try:
         info = yf.Ticker(yf_symbol).info or {}
-    except Exception:  # noqa: BLE001 — 资料缺失不应中断整体流程
-        return None
+    except Exception as e:
+        raise YFError("公司资料请求失败") from e
     if not info:
         return None
     profile = _profile_from_info(info)

@@ -143,6 +143,7 @@ def collect_quotes(conn, start: str, end: str) -> None:
             rows = yc.fetch_daily(code, start=start, end=end, now=now)
             if not rows:
                 # 抓到空数据：计数 +1，达阈值后自动进入跳过名单
+                db.write_collection_status(conn, "yfinance", code, "empty", now, "not_returned")
                 cnt = db.record_quote_empty(conn, code, yc.futu_to_yf(code))
                 empty_codes += 1
                 hint = "（已加入跳过名单）" if cnt >= db.SKIP_THRESHOLD else f"（空 {cnt} 次）"
@@ -150,12 +151,14 @@ def collect_quotes(conn, start: str, end: str) -> None:
                 continue
             n = db.upsert_quotes(conn, rows)
             grand_total += n
+            db.write_collection_status(conn, "yfinance", code, "ok", now)
             ok_codes += 1
             db.clear_quote_skip(conn, code)  # 重新有数据则移出名单
             print(f"  ✓ {code}: {n} 条")
         except Exception as e:  # noqa: BLE001
             # 真正的异常（网络/解析等）才记 error，单标的失败不中断整体
             err_codes += 1
+            db.write_collection_status(conn, "yfinance", code, "error", now, "request_failed")
             db.write_sync_log(conn, "yfinance", start, end, 0, "error", f"{code}: {e}")
             print(f"  ✗ {code}: {e}", file=sys.stderr)
 
@@ -192,13 +195,16 @@ def collect_profiles(conn) -> None:
             row = yc.fetch_profile(code, now=now)
             if not row:
                 empty_codes += 1
+                db.write_collection_status(conn, "yf_profile", code, "empty", now, "not_returned")
                 print(f"  · {code}: 无资料")
                 continue
             db.upsert_profiles(conn, [row])
+            db.write_collection_status(conn, "yf_profile", code, "ok", now)
             ok_codes += 1
             print(f"  ✓ {code}: {row.get('long_name') or ''}")
         except Exception as e:  # noqa: BLE001
             err_codes += 1
+            db.write_collection_status(conn, "yf_profile", code, "error", now, "request_failed")
             print(f"  ✗ {code}: {e}", file=sys.stderr)
 
     msg = f"{ok_codes} ok / {empty_codes} empty / {err_codes} err / {len(skip)} skipped"
@@ -208,26 +214,37 @@ def collect_profiles(conn) -> None:
 
 
 def collect_market_snapshot(conn) -> None:
-    """富途行情快照的盘面增量字段（换手率/振幅/52 周高低），合并进 stock_profiles。
-
-    一次批量取全（标的数 << 400 上限）。OpenD 未开 / 查询失败不中断整体，
-    仅记 sync_log。仅更新盘面列，不影响 yfinance 写的公司/估值字段。
-    """
+    """Bounded batches; record per-stock attempts without discarding good caches."""
+    from collections import Counter
+    from ..collectors.snapshot import outcome
     now = _now()
-    all_codes = db.all_traded_codes(conn)
-    if not all_codes:
-        db.write_sync_log(conn, "futu_snapshot", None, None, 0, "ok", "no codes")
-        print("[snapshot] 无可抓取的代码，跳过")
-        return
-    try:
-        df = fc.fetch_snapshots(all_codes)
-        rows = fc.snapshot_fields(df, now)
-        n = db.upsert_profiles(conn, rows) if rows else 0
-        db.write_sync_log(conn, "futu_snapshot", None, None, n, "ok")
-        print(f"[snapshot] 盘面字段 UPSERT {n} 条（换手率/振幅/52 周高低）")
-    except Exception as e:  # noqa: BLE001
-        db.write_sync_log(conn, "futu_snapshot", None, None, 0, "error", str(e))
-        print(f"[snapshot] 失败: {e}", file=sys.stderr)
+    codes = db.all_traded_codes(conn)
+    counts = Counter()
+    for offset in range(0, len(codes), 400):
+        batch = codes[offset:offset + 400]
+        if offset:
+            time.sleep(0.6)  # below 60 requests / 30 seconds
+        try:
+            frame = fc.fetch_snapshots(batch)
+            rows = {r['futu_code']: r for r in fc.snapshot_fields(frame, now)}
+            columns = frame.columns if frame is not None else []
+        except Exception:  # API errors stay private; public reason is a fixed code
+            for code in batch:
+                db.write_collection_status(conn, 'futu_snapshot', code, 'error', now, 'request_failed')
+                counts['error'] += 1
+            continue
+        for code in batch:
+            row = rows.get(code)
+            status, reason = outcome(row, columns) if row else ('empty', 'not_returned')
+            # Partial or invalid responses cannot relabel an old cache as fresh.
+            if status == 'ok':
+                db.upsert_profiles(conn, [row])
+            db.write_collection_status(conn, 'futu_snapshot', code, status, now, reason)
+            counts[status] += 1
+    aggregate = 'error' if any(k != 'ok' and n for k, n in counts.items()) else 'ok'
+    db.write_sync_log(conn, 'futu_snapshot', None, None, counts['ok'], aggregate,
+                      ', '.join(f'{k}={v}' for k, v in sorted(counts.items())) or 'no codes')
+    print(f"[snapshot] {aggregate}: {dict(counts)}")
 
 
 def collect_capital_flow(conn, start: str, end: str) -> None:

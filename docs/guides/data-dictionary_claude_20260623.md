@@ -392,3 +392,16 @@ ML 只读生产事实再写入自己的数据库；Web 连接只读 ML 库。数
 - **窗口与权益**：20／60／120 是各市场 session 数，每个窗口独立初始化。各股独立本币账户；费用未填标 gross，不把 legacy 成交额收益率与库存初始权益收益率直接比较。
 - **真实订单边界**：只有订单快照，缺完整生命周期；事实通过 `/api/ml/v2/review?selected=YYYY-MM-DD` 返回，没有独立 facts 路由。不把事后替换订单当作真实可执行收益。
 - **只读与写入**：分析和 Web 只读；采集、修复、迁移、重建均有写入边界，应先备份并明确目标库。历史 repair／rebuild 命令见 [历史补齐记录](../records/ml-history-refresh_codex_20260905.md)，部署后的现状以 [部署回执](../records/ml-deployment_codex_20260905.md) 为准。
+
+
+## 11. Web 数据状态与缓存快照（2026-09-05）
+
+实现／部署状态见 [Web 执行回执](../records/web-data-upgrade-execution_codex_20260905.md)。以下为 additive schema 与接口定义，运行库尚未迁移。
+
+`stock_profiles` 新增 `snapshot_time_raw`（来源原文）、`snapshot_timezone`（HK=Asia/Hong_Kong，US=America/New_York）、`snapshot_time_utc`（规范 UTC），以及 `last_price`、`prev_close_price`、`open_price`、`high_price`、`low_price`、`volume_ratio`、`suspension`（1／0／NULL）、`sec_status`。价格按 HKD／USD 标注；未知值为 NULL，量比 0 保留。`snap_synced_at` 是该份完整快照采集时间，与 yfinance 的 `synced_at` 独立；旧字段 `lot_size` 仅为观测值，`price_spread` 是当前向上报价档位间隔。
+
+新表 `collection_status` 主键 `(source, code)`，保存 `status`、`last_attempt_at`、`last_success_at`、固定代码 `reason`。状态为 ok／partial／empty／error／unsupported／unknown；只有完整 ok 更新成功时间。后续快照／日线／资料记录逐股尝试；快照非 ok 保留原有效缓存，日志汇总不冒充逐股成功。该表为最新尝试投影，不是完整快照版本历史；`sync_log` 仍保留来源级审计。
+
+新主库采集时间为带 UTC 偏移的 ISO 文本，旧无时区值不改写，前端标“时区未知”。业务订单／成交时间保持原交易所语义。`data_as_of` 是来源业务时间／日线日期，`collected_at` 是当前缓存采集时间，`last_attempt_at`／`last_success_at` 是尝试结果；资料的业务截至时间未知，返回 null。
+
+`GET /api/data-status` 返回来源汇总及最多 400 个已有持仓／交易代码的状态（超限标 truncated）；`GET /api/stock/<code>/snapshot` 返回该股日线／资料／快照。日线状态按最近确认收盘 session 判定，未知市场、日历越界、无时区或未来时间不称新鲜。快照 freshness 的 cached 表示来源时间至少覆盖当前／最近交易日开盘，不是实时或收盘价保证；具体时间始终显示。来源级 scope=source_summary，后续逐股记录 scope=stock。

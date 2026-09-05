@@ -1057,24 +1057,13 @@ function mountFxChart() {
 
 // ---------- 个股详情下钻 ----------
 const overlay = document.getElementById("overlay");
-document.getElementById("detail-close").addEventListener("click", () => { overlay.classList.remove("open"); destroyChart(); });
-overlay.addEventListener("click", (e) => { if (e.target === overlay) { overlay.classList.remove("open"); destroyChart(); } });
+document.getElementById("detail-close").addEventListener("click", () => { ++stockRequestToken; overlay.classList.remove("open"); destroyChart(); });
+overlay.addEventListener("click", (e) => { if (e.target === overlay) { ++stockRequestToken; overlay.classList.remove("open"); destroyChart(); } });
 
-// 数据新鲜度提示：把最新日线日期与滞后天数亮出来。
-// 行情为只读库、天然慢一拍（当天 bar 次日入），滞后 > 3 天则提示可能需 update。
-function dataFreshnessBanner(quotes) {
-  if (!quotes || !quotes.length) return "";
-  const last = quotes[quotes.length - 1].date;
-  const today = new Date();
-  const lag = Math.round((today - new Date(last + "T00:00:00")) / 86400000);
-  const stale = lag > 3;
-  const lagTxt = lag <= 0 ? "今日" : `${lag} 天前`;
-  return `<div class="freshness${stale ? " stale" : ""}">
-    <span class="freshness-dot"></span>
-    最新数据时间：<b>${esc(last)}</b>（${lagTxt}）${stale ? " · 数据可能滞后，建议运行 update.sh" : ""}</div>`;
-}
+let stockRequestToken = 0;
 
 async function openStock(code) {
+  const requestToken = ++stockRequestToken;
   destroyChart();   // 重开前销毁上一个图表实例
   overlay.classList.add("open");
   document.getElementById("detail-title").textContent = code;
@@ -1082,10 +1071,11 @@ async function openStock(code) {
   body.innerHTML = `<div class="empty">加载中…</div>`;
   try {
     const d = await getJSON(`/api/stock/${encodeURIComponent(code)}`);
+    if (requestToken !== stockRequestToken || !overlay.classList.contains("open")) return;
     document.getElementById("detail-title").textContent =
       d.name ? `${code} · ${d.name}` : code;
     body.innerHTML =
-      dataFreshnessBanner(d.quotes) +
+      `<div id="detail-cache"><div class="empty">读取缓存状态…</div></div>` +
       section("通用信息", `<div id="detail-profile"><div class="empty">加载通用信息中…</div></div>`) +
       section("价格走势（K线）", renderChart(d.quotes)) +
       section("主力资金流向（近 60 日）", renderCapitalFlow()) +
@@ -1094,15 +1084,18 @@ async function openStock(code) {
       section(`我的成交（${d.deals.length} 条）`, renderDetailDeals(d.deals));
     bindSectionToggles(body);
     mountChart();          // 占位容器已入 DOM，挂载蜡烛图 + 成交量
-    loadProfile(code);     // 通用信息走 yfinance 实时接口，异步填充
+    loadCacheSnapshot(code);
+    loadProfile(code);     // 通用信息只读本地缓存
     loadCapitalFlow(code); // 资金流向读库，异步填充后挂载柱图
   } catch (e) {
+    if (requestToken !== stockRequestToken || !overlay.classList.contains("open")) return;
     body.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
   }
 }
 
 // ---------- 交易复盘浮窗（与个股详情共用 overlay）----------
 async function openAnalysis(code) {
+  const requestToken = ++stockRequestToken;
   destroyChart();   // 复盘浮窗不含图表，复用 overlay 前先销毁残留实例
   overlay.classList.add("open");
   document.getElementById("detail-title").textContent = `${code} · 交易复盘`;
@@ -1110,6 +1103,7 @@ async function openAnalysis(code) {
   body.innerHTML = `<div class="empty">加载中…</div>`;
   try {
     const d = await getJSON(`/api/stock/${encodeURIComponent(code)}/analysis`);
+    if (requestToken !== stockRequestToken || !overlay.classList.contains("open")) return;
     const a = d.analysis;
     const s = a.summary, st = a.stats;
     document.getElementById("detail-title").textContent =
@@ -1121,6 +1115,7 @@ async function openAnalysis(code) {
       section(`我的成单交易（${(d.deals || []).length} 笔）`, renderAnalysisDeals(d.deals || []));
     bindSectionToggles(body);
   } catch (e) {
+    if (requestToken !== stockRequestToken || !overlay.classList.contains("open")) return;
     body.innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
   }
 }
@@ -1261,6 +1256,7 @@ function fmtFlow(v) {
   return `${sign}${abs.toFixed(0)}`;
 }
 
+let _flowObserver = null;
 let _flowHandle = null;   // 资金流向图实例
 let _flowData = null;     // 待挂载数据
 
@@ -1270,6 +1266,7 @@ function renderCapitalFlow() {
 }
 
 function destroyFlowChart() {
+  if (_flowObserver) { _flowObserver.disconnect(); _flowObserver = null; }
   if (_flowHandle) {
     try { _flowHandle.remove(); } catch (e) {}
     _flowHandle = null;
@@ -1282,6 +1279,7 @@ async function loadCapitalFlow(code) {
   if (!wrap) return;
   try {
     const r = await getJSON(`/api/stock/${encodeURIComponent(code)}/capital-flow?days=60`);
+    if (!wrap.isConnected || !overlay.classList.contains("open")) return;
     const rows = (r.rows || []).filter((x) => x.main_in_flow !== null && x.main_in_flow !== undefined);
     if (!rows.length) {
       wrap.innerHTML = `<div class="empty">暂无资金流向数据（需运行 update.sh 抓取）</div>`;
@@ -1341,6 +1339,7 @@ function mountFlowChart() {
   });
   ro.observe(host);
 
+  _flowObserver = ro;
   _flowHandle = chart;
 }
 
@@ -1349,6 +1348,7 @@ async function loadProfile(code) {
   if (!wrap) return;
   try {
     const r = await getJSON(`/api/stock/${encodeURIComponent(code)}/profile`);
+    if (!wrap.isConnected || !overlay.classList.contains("open")) return;
     if (!r.profile) {
       wrap.innerHTML = `<div class="empty">暂无通用信息（可能未上市 / yfinance 无资料）</div>`;
       return;
@@ -1393,6 +1393,7 @@ function renderProfile(p) {
 // ---------- 价格走势：蜡烛图 + 成交量（Lightweight-Charts）----------
 // 该库需真实 DOM 容器 + 创建后注入数据，故 renderChart 只产出占位容器，
 // 数据暂存到 _chartData，待 DOM 插入后由 mountChart 挂载。
+let _chartObserver = null;
 let _chartHandle = null;   // 当前图表实例（浮窗关闭时销毁）
 let _chartData = null;     // 待挂载的 quotes
 
@@ -1422,6 +1423,7 @@ function chartColors() {
 // 销毁当前图表（浮窗关闭/重开时调用），避免内存泄漏与重复挂载。
 // 资金流向图与 K 线同生共死（同一浮窗），一并销毁，免得每处关闭都要记着调两个。
 function destroyChart() {
+  if (_chartObserver) { _chartObserver.disconnect(); _chartObserver = null; }
   if (_chartHandle) {
     try { _chartHandle.remove(); } catch (e) {}
     _chartHandle = null;
@@ -1489,6 +1491,7 @@ function mountChart() {
   });
   ro.observe(host);
 
+  _chartObserver = ro;
   _chartHandle = chart;
 }
 
