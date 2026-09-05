@@ -1,0 +1,21 @@
+docs/ML_CLAUDE_UPGRADE_MERGED.md
+  s_f7487065228dda::t_8379513191555f 191-193
+  s_f7487065228dda::t_fe1f624983e57e 10-11
+  s_f7487065228dda::t_9a2f292a5e6cc0 81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "9720a9430e75d6b08141b4e090ef249d126d04d9",
+  "prompts": {},
+  "sessions": {
+    "s_f7487065228dda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a05e02b4-d666-43dd-a149-dc060c4a0ea7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
