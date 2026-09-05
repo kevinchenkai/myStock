@@ -29,3 +29,11 @@
 私有备份、采集／训练／发布日志、历史导入证据、验证明细均在运行目录的 `data/deployments/20260905-ml-upgrade/`；训练回执位于 `data/ml/receipts/`，冻结输入与 manifest 位于 `data/ml/runs/`。这些文件、配置和真实账户数据不进入 Git。
 
 此次为工程部署，未更换生产模型、未晋级 E0–E5 候选、未自动下单，也未配置自动任务。证券规则历史、输入快照保留、采集按市场部分失败等延期问题继续按 [Claude 修复回执](ml-upgrade-claude-review-fixes_codex_20260905.md) 跟踪。
+
+## 同日补充：修复公网状态列表展示
+
+基线 `e1e4263`，修复提交 `1502e9b`；在本地主目录 `/Users/kk/Work/Workpace/GitHub/Seattle/myStock` 的 main 直接修复。用户指出公网把 Python statuses 列表作为正文显示，属于原 P3-9 的状态展示部分；已改为按市场／生成状态／目标日分组的中文面板，技术设置折叠，字段转义。旧 bandit 报告口径仍按 OPEN_ITEMS 跟踪。
+
+混合／跳过／未知／HTML 转义人工检查通过；6 项 pipeline 测试、文档校验通过。执行新 run `report-status-20260905` 的 train 和按回执 publish，六股均成功；公网 HTTPS 200、正文哈希与新产物一致，已核对不再出现原始状态列表。原报告及预测版本保留；没有改旧回执的哈希来绕过发布校验。
+
+本轮直接在 main 提交并推送，没有额外分支合并；主库未写入，运行 ML 库只由 train 追加预测及日志、publish 记录实际发布时间；未重启 8888（静态报告发布不需要），未补采行情、未重算 720 条历史预测、未新增自动调度、未进行真实下单或交易。私有执行证据在 `data/deployments/20260905-report-status/`，未提交公开仓库。
