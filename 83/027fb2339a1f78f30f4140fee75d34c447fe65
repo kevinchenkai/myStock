@@ -1,0 +1,21 @@
+docs/ML_HISTORY_REFRESH_2026-09-05.md
+  s_2bf7efc16166a2::t_081b787ef94fdf 1-66
+docs/ML_UPGRADE_REVIEW_AND_RELEASE_2026-09-04.md
+  s_2bf7efc16166a2::t_99395a0fc3dbcb 5,9-10,15,81
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "83027fb2339a1f78f30f4140fee75d34c447fe65",
+  "prompts": {},
+  "sessions": {
+    "s_2bf7efc16166a2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a07004-42a0-7961-8865-50856804f1b9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
