@@ -1,0 +1,25 @@
+docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md
+  s_612cad8e12fb53::t_9ff53a2a4284a7 1-47
+docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md
+  s_612cad8e12fb53::t_bddc62115a5648 6
+docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md
+  s_612cad8e12fb53::t_9ff53a2a4284a7 1-129
+README.md
+  s_612cad8e12fb53::t_bddc62115a5648 189-190
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "903b5b783d2f979300d6efd52d8c83cc60ba2415",
+  "prompts": {},
+  "sessions": {
+    "s_612cad8e12fb53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a06fa0-7445-7b73-84c4-5ea66f7dc7a6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
