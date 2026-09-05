@@ -79,9 +79,9 @@ def _mark_price(daily: pd.DataFrame, i: int) -> float:
     return float(daily.iloc[i]["close"])
 
 
-def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None) -> dict:
+def run_backtest(code: str, cfg: BTConfig | None = None, db_path=None, daily=None) -> dict:
     cfg = cfg or BTConfig()
-    daily = mldata.load_daily(code, db_path)
+    daily = mldata.load_daily(code, db_path) if daily is None else daily
     feat = build_features(daily).reset_index(drop=True)
     bars_by_day = mldata.intraday_bars_by_day(code, db_path)
 

@@ -29,11 +29,20 @@ def get_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
     return conn
 
 
+def get_connection_readonly(db_path=None):
+    conn = sqlite3.connect(Path(db_path or CONFIG.db_path).resolve().as_uri() + '?mode=ro', uri=True)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA query_only=ON')
+    return conn
+
+
 # 轻量列迁移：对已存在的表按需补齐新增列（schema.sql 的 CREATE TABLE
 # IF NOT EXISTS 不会给旧表加列）。key=表名，value=[(列名, 列定义), ...]。
 # 新增可空列，幂等，旧库升级时自动补齐；无需手写 ALTER。
 _COLUMN_MIGRATIONS: dict[str, list[tuple[str, str]]] = {
     "stock_profiles": [
+        ("lot_size", "INTEGER"), ("price_spread", "REAL"),
+        ("rules_effective_from", "TEXT"),
         ("turnover_rate", "REAL"),
         ("amplitude", "REAL"),
         ("week52_high", "REAL"),

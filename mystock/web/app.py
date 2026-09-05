@@ -63,12 +63,13 @@ _PROFILE_LABELS = [
 
 
 def get_db() -> sqlite3.Connection:
-    path = CONFIG.db_path
+    path = app.config.get("DB_PATH", CONFIG.db_path)
     if not Path(path).exists():
         raise FileNotFoundError(
             f"数据库不存在: {path}。请先运行 `bash scripts/init.sh` 初始化。"
         )
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(Path(path).resolve().as_uri() + "?mode=ro", uri=True)
+    conn.execute("PRAGMA query_only=ON")
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -251,7 +252,8 @@ def api_ml_strategy():
     except ImportError as e:  # ML 子包依赖缺失
         return jsonify({"error": f"ML 模块不可用: {e}"}), 503
 
-    if not Path(mlcfg.ML_DB_PATH).exists():
+    ml_path = app.config.get("ML_DB_PATH", mlcfg.ML_DB_PATH)
+    if not Path(ml_path).exists():
         return jsonify({
             "error": f"ML 数据库不存在: {mlcfg.ML_DB_PATH}。"
                      f"请先运行 `bash scripts/ml.sh data`。"
@@ -260,14 +262,17 @@ def api_ml_strategy():
     raw = request.args.get("codes", "")
     want = [c.strip().upper() for c in raw.split(",") if c.strip()]
     # 只接受 TARGETS 内的代码——库里没有其他标的的预测与 1h bars，放行只会得到空结果
-    codes = [c for c in want if c in mlcfg.TARGETS] or ML_DEFAULT_CODES
+    if any(c not in mlcfg.TARGETS for c in want):
+        return jsonify({"error": "invalid code"}), 400
+    codes = list(dict.fromkeys(want)) or ML_DEFAULT_CODES
     try:
         days = int(request.args.get("days", 30))
     except ValueError:
-        days = 30
-    days = max(1, min(days, ML_MAX_DAYS))
+        return jsonify({"error": "invalid days"}), 400
+    if not 1 <= days <= ML_MAX_DAYS:
+        return jsonify({"error": "days out of range"}), 400
 
-    results = run_many(codes, days)
+    results = run_many(codes, days, db_path=ml_path)
     return jsonify({
         "days": days,
         "codes": codes,

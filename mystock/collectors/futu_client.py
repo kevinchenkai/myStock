@@ -467,6 +467,9 @@ def snapshot_fields(df: pd.DataFrame, now: str) -> list[dict]:
             "week52_high": _num(_g(r, "highest52weeks_price")),
             "week52_low": _num(_g(r, "lowest52weeks_price")),
             "snap_synced_at": now,
+            "lot_size": _num(_g(r, "lot_size")),
+            "price_spread": _num(_g(r, "price_spread")),
+            "rules_effective_from": now[:10],
         })
     return rows
 

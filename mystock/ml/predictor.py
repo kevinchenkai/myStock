@@ -21,6 +21,7 @@ import pandas as pd
 from .features import FEATURE_COLS, build_features
 from . import calibrator as calib
 from . import signal_eval as sig
+from . import sessions
 from .cv import PurgedConfig, purged_walk_forward
 
 
@@ -243,11 +244,19 @@ def walk_forward_eval(
 def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
                      high_alpha: float = 0.9, low_alpha: float = 0.1,
                      conformal: bool = False, target_coverage: float = 0.8,
-                     cal_frac: float = 0.25) -> dict:
+                     cal_frac: float = 0.25, code: str | None = None, clock=None,
+                     historical: bool = False) -> dict:
     """用全历史 fit，对最新交易日预测次日 [L_hat, H_hat]。供推理/报告用。
 
     conformal=True 时启用 CQR（从训练末尾切 cal_frac 校准，ret 空间半宽 q 应用到次日）。
     """
+    if code is None:
+        code = daily.attrs.get('code')
+    if code is None and not historical:
+        raise sessions.Unavailable('unavailable', 'code required for live session guard')
+    clock = clock or sessions.utc_now
+    if code:
+        daily = sessions.prepare_daily(daily, code, clock(), live=not historical)
     df = build_features(daily)
     train = df.dropna(subset=FEATURE_COLS + ["y_high_ret", "y_low_ret"])
     last = df.dropna(subset=FEATURE_COLS).iloc[[-1]]  # 最新一行（标签 NaN，用于推理）
@@ -257,7 +266,10 @@ def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
     ).fit(train)
     L, H = model.predict_prices(last)
     close = float(last["close"].iloc[0])
+    target = sessions.next_session(code, str(last['date'].iloc[0])) if code else None
+    if code and not historical: sessions.check_deadline(code, target, clock())
     return {
+        'target_session': target,
         "as_of": str(last["date"].iloc[0]),
         "close": round(close, 4),
         "L_hat": round(float(L[0]), 4),
@@ -276,7 +288,7 @@ if __name__ == "__main__":
     import os
     do_cqr = os.environ.get("MYSTOCK_ML_CQR", "1") != "0"
     for code in mlcfg.TARGETS:
-        daily = mldata.load_daily(code)
+        daily = sessions.prepare_daily(mldata.load_daily(code), code)
         lo_a, hi_a = mlcfg.alpha_for(code)  # 与回测/报告同口径（按股自适应分位）
         target = mlcfg.coverage_for(code)
         res = walk_forward_eval(daily, code, high_alpha=hi_a, low_alpha=lo_a,

@@ -20,10 +20,8 @@ from ..code_map import futu_to_yf
 
 
 def _conn(db_path: Optional[str] = None) -> sqlite3.Connection:
-    path = str(db_path or mlcfg.ML_DB_PATH)
-    conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-    conn.row_factory = sqlite3.Row
-    return conn
+    from .db import get_ml_connection_readonly
+    return get_ml_connection_readonly(db_path)
 
 
 def load_daily(symbol_or_code: str, db_path: Optional[str] = None) -> pd.DataFrame:
@@ -31,7 +29,7 @@ def load_daily(symbol_or_code: str, db_path: Optional[str] = None) -> pd.DataFra
     sym = futu_to_yf(symbol_or_code) if "." in symbol_or_code else symbol_or_code
     with _conn(db_path) as c:
         df = pd.read_sql_query(
-            "SELECT date, open, high, low, close, adj_close, volume, dividends, splits "
+            "SELECT date, open, high, low, close, adj_close, volume, dividends, splits, synced_at "
             "FROM ml_quotes_1d WHERE symbol=? ORDER BY date",
             c, params=(sym,),
         )

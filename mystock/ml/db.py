@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable, Optional
 
@@ -13,7 +13,7 @@ from . import config as mlcfg
 
 
 def now_str() -> str:
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return datetime.now(timezone.utc).isoformat()
 
 
 def get_ml_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
@@ -25,9 +25,17 @@ def get_ml_connection(db_path: Optional[str] = None) -> sqlite3.Connection:
     return conn
 
 
-def get_prod_connection_readonly() -> sqlite3.Connection:
+def get_ml_connection_readonly(db_path=None):
+    path = Path(db_path or mlcfg.ML_DB_PATH).resolve()
+    conn = sqlite3.connect(path.as_uri() + '?mode=ro', uri=True)
+    conn.row_factory = sqlite3.Row
+    conn.execute('PRAGMA query_only=ON')
+    return conn
+
+
+def get_prod_connection_readonly(db_path=None) -> sqlite3.Connection:
     """生产库**只读**连接（URI mode=ro，写操作会直接报错）。"""
-    uri = f"file:{mlcfg.PROD_DB_PATH}?mode=ro"
+    uri = Path(db_path or mlcfg.PROD_DB_PATH).resolve().as_uri() + "?mode=ro"
     conn = sqlite3.connect(uri, uri=True)
     conn.row_factory = sqlite3.Row
     return conn

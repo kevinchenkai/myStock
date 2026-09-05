@@ -125,7 +125,7 @@ def recompute_gaps(since: str = "", db_path=None, *, verbose: bool = True) -> in
     total = 0
     try:
         for code in mlcfg.TARGETS:
-            daily = mldata.load_daily(code)
+            daily = mldata.load_daily(code, db_path)
             if daily.empty:
                 continue
             gaps = missing_dates(conn, code, daily, since)
@@ -137,7 +137,8 @@ def recompute_gaps(since: str = "", db_path=None, *, verbose: bool = True) -> in
             cov = mlcfg.coverage_for(code)
             rows = []
             for as_of in gaps:
-                sub = daily[daily["date"] <= as_of]
+                sub = daily[daily["date"] <= as_of].copy()
+                sub.attrs["code"] = code
                 # 特征需要 ~20 行热身 + CQR 校准集，样本太少直接跳过（宁缺勿造）
                 if len(sub) < 60:
                     continue
@@ -173,7 +174,7 @@ def _predict(sub, lo_a: float, hi_a: float, cov: float) -> dict:
     """延迟导入 predictor——它会拖起 lightgbm/sklearn，解析 HTML 那条路径用不上。"""
     from .predictor import predict_next_day
     return predict_next_day(sub, high_alpha=hi_a, low_alpha=lo_a,
-                            conformal=True, target_coverage=cov)
+                            conformal=True, target_coverage=cov, historical=True, code=sub.attrs.get("code"))
 
 
 def _backend() -> str:
