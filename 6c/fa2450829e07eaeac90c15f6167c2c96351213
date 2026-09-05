@@ -1,0 +1,41 @@
+scripts/ml_experiments/import_futu_hourly.py
+  s_2bf7efc16166a2::t_0374d6c5afed1c 48-52,76-77
+  s_2bf7efc16166a2::t_61823d5cf374bb 1-47,53-75,78-82
+tests/test_ml_history_rebuild.py
+  s_2bf7efc16166a2::t_0374d6c5afed1c 64-95
+  s_2bf7efc16166a2::t_3696da51bb1c3f 1-63
+mystock/ml/sessions.py
+  s_2bf7efc16166a2::t_3696da51bb1c3f 14
+mystock/ml/service.py
+  s_2bf7efc16166a2::t_61823d5cf374bb 90
+mystock/ml/db.py
+  s_2bf7efc16166a2::t_61823d5cf374bb 50-54
+scripts/ml_experiments/rebuild_history.py
+  s_2bf7efc16166a2::t_3696da51bb1c3f 118-123
+  s_2bf7efc16166a2::t_6f43258428777d 124
+  s_2bf7efc16166a2::t_914b387d0b1db3 1-117,125-174
+mystock/web/static/ml_next.js
+  s_2bf7efc16166a2::t_61823d5cf374bb 14,44
+mystock/ml/schema.sql
+  s_2bf7efc16166a2::t_61823d5cf374bb 33-34
+mystock/ml/calendars/README.md
+  s_2bf7efc16166a2::t_3696da51bb1c3f 1-10
+scripts/ml_experiments/freeze_calendar.py
+  s_2bf7efc16166a2::t_3696da51bb1c3f 15-18
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "6cfa2450829e07eaeac90c15f6167c2c96351213",
+  "prompts": {},
+  "sessions": {
+    "s_2bf7efc16166a2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a07004-42a0-7961-8865-50856804f1b9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
