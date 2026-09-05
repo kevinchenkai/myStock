@@ -17,7 +17,7 @@
 | [ML 当前概览](guides/ml-overview_claude_20260623.md) | 业务目标、页面使用、版本／来源、人工发布、当前限制 |
 | [ML 工程交接](records/ml-upgrade-handoff_codex_20260904.md) | 已部署状态、排错、恢复及隔离复现；文件日期为工单起始日，正文标记最后更新 |
 | [数据字典](guides/data-dictionary_claude_20260623.md) | 当前生产／ML 表与数据口径；6 月统计仅为历史快照 |
-| [开发约定](../CLAUDE.md) | 开发边界、命令与隐私约定 |
+| [共用项目约定](../AGENTS.md) / [Claude 入口](../CLAUDE.md) | 极简开发边界、验证与隐私规则；通用约定统一维护 |
 | [Codex × Claude 协作](COLLABORATION.md) | 通过 docs/ + git 交接、按阶段留档 |
 | [未尽事项](OPEN_ITEMS.md) | 跨轮次唯一待办入口，保留问题编号与出处 |
 | [交易日历说明](../mystock/ml/calendars/README.md) | 2020–2027 日历、来源、生成与时区／截止维护 |
