@@ -1,0 +1,37 @@
+scripts/ml_experiments/exp_a_baseline.py
+  s_f7487065228dda::t_666bdc94a40836 1-61
+docs/ML_CLAUDE_UPGRADE_MERGED.md
+  s_f7487065228dda::t_c584704db90297 89
+  s_f7487065228dda::t_69414e3ba4281d 82
+  s_f7487065228dda::t_a655f47d678139 29
+  s_f7487065228dda::t_ce109797f9b131 46
+  s_f7487065228dda::t_a34dbda2930115 1
+  s_f7487065228dda::t_24d0ea84e96cf5 9-10
+  s_f7487065228dda::t_d825ee4dc3277f 77-79
+  s_f7487065228dda::t_895d4039242ec0 85
+  s_f7487065228dda::t_c78fb37a3d0071 48-65
+  s_f7487065228dda::t_c2b1177e92d1c7 93-94
+  s_f7487065228dda::t_9d78ab630baaf5 141
+  s_f7487065228dda::t_52b9a309d4d63c 166-189
+  s_f7487065228dda::t_8a846c2b150489 47
+scripts/ml_experiments/README.md
+  s_f7487065228dda::t_666bdc94a40836 1-19
+scripts/ml_experiments/exp_b_touch_economics.py
+  s_f7487065228dda::t_666bdc94a40836 1-35
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "1d79dd645b1b2d59057316a68870b00f436299b8",
+  "prompts": {},
+  "sessions": {
+    "s_f7487065228dda": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "a05e02b4-d666-43dd-a149-dc060c4a0ea7",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
