@@ -184,9 +184,9 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 > 一页速览见 [`docs/ML_OVERVIEW.md`](docs/ML_OVERVIEW.md)；完整方案与决策记录见 [`docs/ML_PLAN.md`](docs/ML_PLAN.md)。
 > 代码在 [`mystock/ml/`](mystock/ml/)，独立库 `data/ml/mystock_ml.db`，与 Web 生产库分库。
 
-**升级讨论（2026-09-04，尚未实施）**：[Codex 方案 v1.3](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)包含核心目标、合并反馈取舍、四批交付、历史重算及 API 特征调研；讨论输入见 [Claude 合并稿](docs/ML_CLAUDE_UPGRADE_MERGED.md)与 [Claude 原方案](docs/ML_UPGRADE_PLAN.md)。以下说明仍描述既有系统，升级方案不代表当前功能已经改变。
+**升级讨论（2026-09-04，尚未实施）**：[Codex 方案 v1.4](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)包含核心目标、合并反馈共识、收盘／发布守卫、四批交付、历史重算及 API 特征调研；讨论输入见 [Claude 合并稿 v0.2.1](docs/ML_CLAUDE_UPGRADE_MERGED.md)与 [Claude 原方案](docs/ML_UPGRADE_PLAN.md)。近期人工触发，自动调度后议；收盘守卫尚未实现，以下现有功能不代表升级已经完成。
 
-**对外页面**：<https://g.ismayday.com/mystock/>（每工作日 cron 自动更新；首页 = 最新报告，`.../<date>/` = 历史归档）
+**对外页面**：<https://g.ismayday.com/mystock/>（人工运行并发布报告后更新；首页 = 最新报告，`.../<date>/` = 历史归档）
 
 ## 2.1 要解决的问题与设计
 
@@ -267,19 +267,22 @@ bash scripts/server.sh   # 浏览器打开 http://localhost:8888
 bash scripts/ml.sh data       # ① 例行更新数据（增量优先）
 bash scripts/ml.sh train      # ② 训练/评估：撮合校准 → 预测 → 回测 → 生成报告
 bash scripts/ml.sh publish    # ③ 发布 HTML 报告到公网
-bash scripts/ml.sh all        # 三步一条龙（默认；供 cron）
+bash scripts/ml.sh all        # 三步一条龙（默认；包含公网发布）
 ```
 
 > **增量缓存**：`data` 采集增量优先——库中最新日期距今 ≤5 天则只抓短窗（日线近 1 月 / 1h 近 5 天），UPSERT 与全量历史在库内合并，不重抓 5 年（例行从 ~30s 降到 ~11s）。日线 / 1h **各按自身缺口挑档**，避免 1h 连续失败时被日线新鲜度掩盖成永久空洞。首次或补全历史用 `python -m mystock.ml.fetch --full`。
 
-**例行 cron**（工作日早 8 点北京时间，约对应前一晚美股收盘后）：
+**近期触发方式：人工运行，自动调度以后再议。** 生产数据更新用 `bash scripts/update.sh`；ML 可分步运行：
 
 ```bash
-0 8 * * 1-5  cd /path/to/myStock && bash scripts/ml.sh all >> data/ml/cron.log 2>&1
+bash scripts/ml.sh data       # 先更新 ML 行情与生产事实快照
+bash scripts/ml.sh train      # 使用更新后的数据训练、评估并生成本地报告
 ```
 
 **发布目标**可用环境变量覆盖：`PUB_HOST`、`PUB_DIR`、`MYSTOCK_ML_ENV`。
-`publish` 会把本地报告推到公网服务器，**须由用户自己执行或挂 cron**（报告含真实交易信息）。
+当前代码尚无完整收盘守卫，盘中运行可能把未收盘价格标为收盘；按目标市场确认收盘并更新数据后再生成报告。拟议的按市场跳过、缓存确认和发布截止检查见 [升级方案 §5.1](docs/ML_CODEX_UPGRADE_PLAN_2026-09-04.md)。`scripts/ml.sh` 中的 cron 注释属于旧示例，不表示已配置自动任务。
+
+`publish` 会把本地报告推到公网服务器，**须由用户自己执行**（报告含真实交易信息）；自动发布调度暂不配置。
 
 **GPU 相关脚本**（仅离线 RL 需要）：`ml_setup_h20.sh`（持久 prefix conda env）、`ml_sync_h20.sh`（同步代码）、`ml_vllm.sh`（训练前停 vllm、训练后恢复）。
 
@@ -330,7 +333,7 @@ bash scripts/ml.sh all        # 三步一条龙（默认；供 cron）
 
 ## 2.6 Web 端「ML 挂单回溯」Tab
 
-与每日 HTML 报告的分工 —— **报告是当日快照**（cron 产出、可发布、可离线存档）；**Web 端是实时查询**，参数一改立刻按当前库重算，适合调参与临时探查。入口在 `bash scripts/server.sh` 起的页面（:8888）「ML 挂单回溯」Tab。
+与每日 HTML 报告的分工 —— **报告是当日快照**（人工运行产出、可发布、可离线存档）；**Web 端是实时查询**，参数一改立刻按当前库重算，适合调参与临时探查。入口在 `bash scripts/server.sh` 起的页面（:8888）「ML 挂单回溯」Tab。
 
 - **策略**：基准日 T 收盘后拿到 `[L̂, Ĥ]` → 次一交易日**同时挂限价买 L̂ / 限价卖 Ĥ**，各一手。手数按市场分档（`strategy.LOT_BY_MARKET`）：**美股 10 股 / 港股 100 股**（港股板块最小单位）。
 - **撮合**复用 `simulator.match_limit_order`（1h K 线），能判盘中先触低还是先触高 —— 拿日线 low/high 直接比会把「先冲高后砸低」与反过来混为一谈，成交价也不对。
