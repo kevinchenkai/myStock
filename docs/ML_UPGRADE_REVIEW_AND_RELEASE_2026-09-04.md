@@ -2,15 +2,17 @@
 
 ## 当前建议
 
-本分支是待独立审查的工程候选，尚未合并 main 或部署。203 项测试通过不能替代独立审查与部署演练。审查阻塞项修复、复测及迁移演练通过后，可以合入工程改动，保留现有模型与 legacy 默认入口，另以 `/ml-next` 提供 v2 预览。
+本分支是待独立审查的工程候选，尚未合并 main 或部署。209 项测试通过不能替代独立审查与部署演练。审查阻塞项修复、复测及迁移演练通过后，可以合入工程改动，保留现有模型与 legacy 默认入口，另以 `/ml-next` 提供 v2 预览。
 
 本轮 E0–E5 开发样本没有支持模型晋级。工程合并与模型晋级是两个决定；新模型/策略改为生产默认仍需要独立 holdout、晋级复核及真实前向 60-session shadow，不能把历史 recomputed 当成前向成绩。
+
+后续历史补齐已在隔离工作树完成：六股近 120 session 行情完整，并新增 720 条逐日重建预测，详见 [2026-09-05 执行记录](ML_HISTORY_REFRESH_2026-09-05.md)。这些私有数据尚未迁移到原运行库；审查需包含逐日拟合、港股来源转换、日历修正和来源字段迁移。
 
 ## 给 Claude Code 的任务
 
 在本工作树启动 Claude Code，把下面这段作为审查任务即可；不需要先合并 main、部署或上传私有数据库。
 
-> 请对当前 `codex/ml-upgrade-20260904` 分支做独立 code review，先记录当前 HEAD SHA，完整审查 `446e657..HEAD` 的代码、测试和文档；不要只看最后一笔样式提交。先阅读 CLAUDE.md、docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md、docs/ML_UPGRADE_EXECUTION_LOG_2026-09-04.md、docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md、docs/ML_UPGRADE_HANDOFF_2026-09-04.md 和本文件。报告结论只是待核实证据，不要默认接受。
+> 请对当前 `codex/ml-upgrade-20260904` 分支做独立 code review，先记录当前 HEAD SHA，完整审查 `446e657..HEAD` 的代码、测试和文档；不要只看最后一笔样式提交。先阅读 CLAUDE.md、docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md、docs/ML_UPGRADE_EXECUTION_LOG_2026-09-04.md、docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md、docs/ML_UPGRADE_HANDOFF_2026-09-04.md、docs/ML_HISTORY_REFRESH_2026-09-05.md 和本文件。报告结论只是待核实证据，不要默认接受。
 >
 > 请重点检查：时间泄漏与市场日历/DST/半日市/HK 午休及 CAS；盘中缓存收盘后是否被误当最终数据；生成/决策/发布截止与不可覆盖版本；legacy 审计迁移的幂等性与兼容读取；实验 OOF、校准、共同样本、负结果和选择偏差；库存现金预留、到期退出、lot/tick、费用、公司行动与同 bar 歧义；Web 只读库、缺 ML 库/依赖时主站可用性、缓存隔离和失效、并发请求与错误状态；共享主题与原首页回归。确认离线重建不能混成 live 或 shadow，ML 不反向 import Web。
 >
@@ -76,4 +78,4 @@ bash scripts/ml.sh train
 
 ## 本次样式补充验证
 
-`ml-next` 复用 `style.css`、`theme.js` 及与首页共用的页头/首屏主题模板。卡片、表格、按钮、字体和红涨绿跌使用同一套变量；K 线主题切换原地更新，保留选中日期与价格叠加线。主题按钮禁止窄屏拆字。当前回归：203 项通过；另检查 JavaScript/脚本语法、首页模板、深浅主题、390px 手机布局及合成场景回放。具体提交见分支最新日志。
+`ml-next` 复用 `style.css`、`theme.js` 及与首页共用的页头/首屏主题模板。卡片、表格、按钮、字体和红涨绿跌使用同一套变量；K 线主题切换原地更新，保留选中日期与价格叠加线。主题按钮禁止窄屏拆字。当前回归：209 项通过；另检查 JavaScript/脚本语法、首页模板、深浅主题、390px 手机布局及合成场景回放。具体提交见分支最新日志。
