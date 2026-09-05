@@ -440,6 +440,8 @@ myStock/
 
 | 文档 | 内容 |
 | --- | --- |
+| [`docs/COLLABORATION.md`](docs/COLLABORATION.md) | **Codex × Claude 协作约定**：docs/ + git 为唯一信道、一轮的形状、文档命名与边界声明 |
+| [`docs/OPEN_ITEMS.md`](docs/OPEN_ITEMS.md) | **未尽事项清单**：跨轮次的唯一待办来源，开新工单前先读 |
 | [`docs/DATA.md`](docs/DATA.md) | 数据字典：全部表字段、取值特征、已知坑点 |
 | [`docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md`](docs/ML_UPGRADE_WORK_ORDER_2026-09-04.md) | 当前 Astra 执行工单：四批任务、文件范围、验证、数据隔离与交付边界 |
 | [`docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md`](docs/ML_PRE_UPGRADE_BACKUP_2026-09-04.md) | 升级前备份位置、覆盖范围、恢复验证和回滚原则 |

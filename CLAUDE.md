@@ -74,6 +74,17 @@ conda activate mk && python -m pytest tests/ -q
 - **价格走势图**：用 vendored Lightweight-Charts（`static/vendor/`，离线、无构建步骤）。该库需真实 DOM 容器 + 创建后注入数据，故 `renderChart` 只产出占位容器，`openStock` 在 `innerHTML` 写入后调 `mountChart()` 挂载；浮窗关闭 / 切复盘时须 `destroyChart()` 释放。颜色从 CSS 变量读取以适配红涨绿跌 + 深浅主题。资金流向柱图同一套两段式（`renderCapitalFlow` 占位 → `loadCapitalFlow` 取数 → `mountFlowChart` 挂载），其销毁挂在 `destroyChart()` 里一并触发，不必在每个关闭点各调一次。
 - **资金流向（`capital_flow`）**：富途独有（yfinance 无），`get_capital_flow(PeriodType.DAY)` **只给近 1 年**日频 —— 回补起点经 `CAPITAL_FLOW_MAX_DAYS`（370 天）抬高，传更早的 start 只是白跑。`start`/`end` 均为**闭区间**（与 yfinance 的 `end` 排他相反，勿套用 `_end_inclusive`）。金额为标的**本币**（HK→HKD、US→USD）且 `main_in_flow`（主力）≈ 超大单 + 大单，**不是**各档之和，六个字段勿相加。首次 `update.sh` 无同步点 → 自动回补近 1 年（38 只约 1 分钟），之后每天只重抓当天。
 
+## 多 agent 协作（Codex × Claude）
+
+**`docs/` + git 是唯一协作信道**——不读对方 session 状态、不看进程、不进对方工作树窥探进度。要知道对方做到哪了就读 `git log` 与该轮文档；要交东西给对方就提交进 git，没提交 = 没交付。对方没写进文档的就是没做，不替它脑补进度。
+
+完整约定见 [`docs/COLLABORATION.md`](docs/COLLABORATION.md)：一轮的形状（工单 → 执行 → 审查 → 修复 → 交接 → 部署）、文档命名、每份文档头三行必须交代的基线 SHA／分支／状态／边界。
+
+两条最容易出事的：
+
+- **边界要写「没做什么」**，逐条声明是否合并推送、是否碰过原运行库、是否重启 8888、是否发布公网、是否新增调度、是否有真实下单——这些不可逆或对外可见，审查方要能一眼确认，而不是从 diff 里推断。
+- **未尽事项登记到 [`docs/OPEN_ITEMS.md`](docs/OPEN_ITEMS.md)**，别留在某轮的收尾文档里沉底。开新一轮前先读这份清单。
+
 ## ML 升级运行约定
 
 - `/ml-next` 使用共享主题；`/api/ml/v2/{latest,review,compare,facts}` 只读 ML 库。历史回溯默认显示明确标注的重建，下一目标日卡片只取 live；不得把 recomputed 当成当天生成或前向 shadow。
