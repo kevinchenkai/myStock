@@ -1,0 +1,147 @@
+CLAUDE.md
+  s_2bf7efc16166a2::t_ce3f99570760b8 24,60,77-87
+README.md
+  s_2bf7efc16166a2::t_aafbffd5936c40 13,23,31-32,36,202,204,234,243-244,277,284-286,299-301,350,354,379-382,399,420-422,518
+docs/ML_HISTORY_REFRESH_2026-09-05.md
+  s_2bf7efc16166a2::t_0918e77cff9c3f 1-72
+docs/ML_UPGRADE_CLAUDE_FIXES_2026-09-05.md
+  s_2bf7efc16166a2::t_977c2dcf640661 1-51
+docs/ML_UPGRADE_CLAUDE_REVIEW_2026-09-04.md
+  s_2bf7efc16166a2::t_55f7bad112a934 1-164
+docs/ML_UPGRADE_EXECUTION_LOG_2026-09-04.md
+  s_2bf7efc16166a2::t_b595187ddc207c 1-46
+docs/ML_UPGRADE_EXPERIMENT_RESULTS_2026-09-04.md
+  s_2bf7efc16166a2::t_85f18a085113ab 1-180
+docs/ML_UPGRADE_HANDOFF_2026-09-04.md
+  s_2bf7efc16166a2::t_2b28f5388fbde2 1-52
+docs/ML_UPGRADE_REVIEW_AND_RELEASE_2026-09-04.md
+  s_2bf7efc16166a2::t_28e10dd652c567 1-90
+mystock/collectors/futu_client.py
+  s_2bf7efc16166a2::t_930fc85476be89 470-472
+mystock/db.py
+  s_2bf7efc16166a2::t_ed9b50b030f208 32-38,44-45
+mystock/ml/backfill.py
+  s_2bf7efc16166a2::t_4d99c3e5069d65 66,77-82,87,102,109-111,131-133,136,139,151-152,172-174,177,185,193,205,208-209
+mystock/ml/backtest.py
+  s_2bf7efc16166a2::t_5d7d5bcff4925e 82,84
+mystock/ml/calendars/HK.csv
+  s_2bf7efc16166a2::t_9c7b8a412fc7e8 1-1972
+mystock/ml/calendars/README.md
+  s_2bf7efc16166a2::t_a2008f70af7d95 1-23
+mystock/ml/calendars/US.csv
+  s_2bf7efc16166a2::t_6aad592a7e9c32 1-2011
+mystock/ml/cv.py
+  s_2bf7efc16166a2::t_ae36a70cad19bb 53
+mystock/ml/data.py
+  s_2bf7efc16166a2::t_64a006994bb922 23-24,32,45,83-109
+mystock/ml/db.py
+  s_2bf7efc16166a2::t_1aac9b4c68b562 8,16,28-36,38,50-54,62-63,84-89,91-96
+mystock/ml/evaluation.py
+  s_2bf7efc16166a2::t_33dfa1c584eb2d 1-45
+mystock/ml/execution.py
+  s_2bf7efc16166a2::t_0cfa19925249fa 1-151
+mystock/ml/fetch.py
+  s_2bf7efc16166a2::t_e87d2189b66017 21,66,105,183,243-245,247-249,252-264,273,277,281,287,291,295,305-307,310-312,318-322
+mystock/ml/pipeline.py
+  s_2bf7efc16166a2::t_422f5aed200c6c 1-62
+mystock/ml/predictor.py
+  s_2bf7efc16166a2::t_dd7deef4c83f5c 24,58,182,208-209,247-248,253-262,264,266-269,276-277,279,298-302
+mystock/ml/report.py
+  s_2bf7efc16166a2::t_58089674b598e9 511-518,525-536,540-544,548-552,554,557-567,569,578-580,598-613,621,638,663-667,673-675
+mystock/ml/review.py
+  s_2bf7efc16166a2::t_7c10a54532d47a 22,104
+mystock/ml/rules.py
+  s_2bf7efc16166a2::t_58acb170a1881d 1-39
+mystock/ml/runs.py
+  s_2bf7efc16166a2::t_2936ed9f8b5660 1-33
+mystock/ml/schema.sql
+  s_2bf7efc16166a2::t_59af8805576835 33-34,122-145
+mystock/ml/service.py
+  s_2bf7efc16166a2::t_d6c50d62595b78 1-133
+mystock/ml/sessions.py
+  s_2bf7efc16166a2::t_4f1bc3b1908471 1-162
+mystock/ml/strategy.py
+  s_2bf7efc16166a2::t_e97a21f5bc7a9a 9,50,74,84-85,96-106,109,137-138,150,302
+mystock/ml/versions.py
+  s_2bf7efc16166a2::t_e09f4ead2e083b 1-83
+mystock/web/app.py
+  s_2bf7efc16166a2::t_78bc67b1fff7d8 38-39,68,73-74,89-93,256-265,272-273,282-284,288-290,292,294
+mystock/web/ml_api.py
+  s_2bf7efc16166a2::t_c46ad8f0e59274 1-57
+mystock/web/static/app.js
+  s_2bf7efc16166a2::t_24e98a9a7430b8 1595-1596,1632
+mystock/web/static/ml_next.css
+  s_2bf7efc16166a2::t_727cf947ef3553 1-45
+mystock/web/static/ml_next.js
+  s_2bf7efc16166a2::t_385c5c22c1663c 1-64
+mystock/web/static/style.css
+  s_2bf7efc16166a2::t_1ada39c2b44dc2 150
+mystock/web/templates/_site_header.html
+  s_2bf7efc16166a2::t_67c6ab150101b3 1-9
+mystock/web/templates/_theme_head.html
+  s_2bf7efc16166a2::t_bb438419ab68e6 1-12
+mystock/web/templates/index.html
+  s_2bf7efc16166a2::t_48e50bb003864f 8,11,141
+mystock/web/templates/ml_next.html
+  s_2bf7efc16166a2::t_d2f1cdf1db3f11 1-39
+scripts/ml.sh
+  s_2bf7efc16166a2::t_2361b1a8c0b00d 2-4,6-26,29,31-32,35-38,40-51
+scripts/ml_experiments/README.md
+  s_2bf7efc16166a2::t_13102bc9f4baa7 1,3-7,11-16,19-37
+scripts/ml_experiments/archive_development.py
+  s_2bf7efc16166a2::t_017f8a8f56eb78 1-23
+scripts/ml_experiments/exp_a_baseline.py
+  s_2bf7efc16166a2::t_8b0b9337b14dda 6-9,27,51
+scripts/ml_experiments/exp_b_touch_economics.py
+  s_2bf7efc16166a2::t_3ea0f07f046cc6 1-6,8,10-42
+scripts/ml_experiments/freeze_calendar.py
+  s_2bf7efc16166a2::t_b35db6643582e4 1-29
+scripts/ml_experiments/frozen_cv_446e657.py
+  s_2bf7efc16166a2::t_29ad1f606208c8 1-63
+scripts/ml_experiments/import_futu_hourly.py
+  s_2bf7efc16166a2::t_8dec117559c6a3 1-82
+scripts/ml_experiments/rebuild_history.py
+  s_2bf7efc16166a2::t_d6d1f0b159701e 1-174
+scripts/ml_experiments/strategy_validation.py
+  s_2bf7efc16166a2::t_b38f9d3d530af7 1-31
+scripts/ml_experiments/summarize_upgrade.py
+  s_2bf7efc16166a2::t_959a439068f751 1-44
+scripts/ml_experiments/upgrade_matrix.py
+  s_2bf7efc16166a2::t_8ee3f35ff7dad9 1-121
+scripts/ml_preview.py
+  s_2bf7efc16166a2::t_c69e534ce969f9 1-10
+tests/test_futu_funds.py
+  s_2bf7efc16166a2::t_d8f78904e0e454 92
+tests/test_ml_api.py
+  s_2bf7efc16166a2::t_d656c6d9c2fc23 1-86
+tests/test_ml_claude_fixes.py
+  s_2bf7efc16166a2::t_5722107c0cb7e5 1-163
+tests/test_ml_execution.py
+  s_2bf7efc16166a2::t_281f4170d3640f 1-66
+tests/test_ml_history_rebuild.py
+  s_2bf7efc16166a2::t_ba38466eca4860 1-95
+tests/test_ml_pipeline_status.py
+  s_2bf7efc16166a2::t_b8da2666d99b2c 1-106
+tests/test_ml_prediction_versions.py
+  s_2bf7efc16166a2::t_b934a36a256a6a 1-41
+tests/test_ml_review.py
+  s_2bf7efc16166a2::t_60ced1fc2159df 156-157,165-168
+tests/test_ml_sessions.py
+  s_2bf7efc16166a2::t_fbaa2ff66600e3 1-66
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "99848c9ce414b410c0e64588be5edd13a85a9fab",
+  "prompts": {},
+  "sessions": {
+    "s_2bf7efc16166a2": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a07004-42a0-7961-8865-50856804f1b9",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
