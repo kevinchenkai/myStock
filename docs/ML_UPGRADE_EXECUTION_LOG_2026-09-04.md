@@ -15,3 +15,11 @@
 第一批回归修正了日历依赖的实际缺陷：PMC HKEX 将 2026-12-24 标成全日市，改用 exchange-calendars 4.11.1 XHKG 生成香港表，合成半日市用例覆盖该问题。历史临时天气中断不保证完整，相关缺行情仍保留 missing 状态，不能据此声称精准交易所事件回放。
 
 P01–P08 首轮代码和合成验收通过：176 passed、1 deselected；Shell 语法和 diff 检查通过。P06 固定 session 缺口用于 legacy 审计窗口；v2 的 pending/版本选择在后续批次接入。规则来自 Futu snapshot 的 lot_size/price_spread，按观测日生效并标 approximate；历史未知不反填。未连接 OpenD。
+
+## 第二批
+
+V01–V05：增加唯一新表 ml_prediction_versions（内容禁止 UPDATE/DELETE）；同 run 同内容重试幂等，不同内容冲突。generated/decision/published 分列，输入 SQLite online backup 与哈希记录于私有 runs manifest。兼容投影只允许有效 live 更新，backfill/recomputed 不覆盖 live；原无时区报告原文与日期证据保留，不编造午夜生成时刻。旧 HTML 同日不同报告均留档。
+
+迁移在工作树副本演练并重试，294 个 legacy 版本保留，默认可用信号为 0（缺乏可靠 decision 时间）；源输入副本未迁移。第二批回归 179 passed，1 deselected。CV 最后一折包含余数；raw pinball 从 CQR 指标中分离；bagging 明确为 0 保持冻结旧行为，bagging=1 另作候选。
+
+V06：冻结原 CV 于 `frozen_cv_446e657.py`，实验 A 只增加显式隔离输入路径和 CPU 单线程；按原按股 alpha（PDD 0.25/0.75，其余 0.2/0.8）、共同扩展特征掩码、四折等权复现，保留旧尾部丢弃协议，输出 `exp-a-frozen.txt`。修正矩阵另列协议，不将两者直接差值作为模型增益。B 改为条件事件诊断，5 session 不成熟为 pending、不截成最后现存日；不报告重叠独立回合作为组合收益。

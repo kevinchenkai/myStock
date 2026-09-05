@@ -63,6 +63,7 @@ def collect(reports_dir: Path | None = None) -> list[dict]:
     if not reports_dir.is_dir():
         return []
     dedup: dict[tuple, dict] = {}
+    from .versions import digest
     for sub in sorted(p for p in reports_dir.iterdir() if p.is_dir()):
         f = sub / "index.html"
         if not f.is_file():
@@ -73,8 +74,12 @@ def collect(reports_dir: Path | None = None) -> list[dict]:
             continue
         for row in parse_report_html(text):
             row["source"] = "backfill"
-            row["generated_at"] = f"{sub.name} 00:00:00"  # 以报告日期为准（原始时间已不可考）
-            dedup[(row["code"], row["as_of"])] = row
+            row["generated_at"] = None
+            row["report_date"] = sub.name
+            row["report_sha256"] = digest(text)
+            row["status"] = "audit_unknown_timing"
+            row["run_id"] = "html-" + digest(text)
+            dedup[(sub.name, row["code"], row["as_of"])] = row
     return [dedup[k] for k in sorted(dedup)]
 
 

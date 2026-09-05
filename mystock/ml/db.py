@@ -80,12 +80,19 @@ def upsert_predictions(conn: sqlite3.Connection, rows: Iterable[dict]) -> int:
     close/l_hat/h_hat）与实时行（字段齐全）列集不同，不补齐会因 executemany
     的列名取自首行而错位。
     """
-    norm = []
+    from .versions import append, digest
+    from .runs import start, finish
+    rows = [dict(r) for r in rows]
+    if not rows: return 0
+    # Imports/backfills use deterministic source identity, live reports supply run.
+    total = 0
     for r in rows:
-        r = dict(r)
-        r.setdefault("generated_at", now_str())
-        norm.append({c: r.get(c) for c in PRED_COLS})
-    return upsert(conn, "ml_predictions", norm)
+        rid = r.pop('run_id', None)
+        manifest_path = r.pop('manifest_path', None)
+        if rid is None:
+            rid = 'import-' + digest(r)
+        total += append(conn, [r], run_id=rid, manifest_path=manifest_path)
+    return total
 
 
 def load_predictions(

@@ -3,7 +3,10 @@ import warnings; warnings.filterwarnings("ignore")
 import numpy as np, pandas as pd
 from mystock.ml import config as mlcfg, data as mldata
 from mystock.ml.features import build_features, FEATURE_COLS
-from mystock.ml.cv import purged_walk_forward, PurgedConfig
+from scripts.ml_experiments.frozen_cv_446e657 import purged_walk_forward, PurgedConfig
+import os
+from pathlib import Path
+DB_PATH = Path(os.environ["MYSTOCK_EXPERIMENT_DB"]).resolve()
 from mystock.ml.predictor import _fit_quantile, pinball_loss, _predict_silent
 
 def extra_feats(df):
@@ -21,7 +24,7 @@ def extra_feats(df):
 EXTRA = ["ret_20d","vol_60d","vol_ratio_5_20","range_5d_mean","range_prev_vs_atr","dow","abs_ret_1d","hi_lo_pos_5"]
 
 def evaluate(code, lo_a, hi_a):
-    daily = mldata.load_daily(code)
+    daily = mldata.load_daily(code, DB_PATH)
     df = extra_feats(build_features(daily))
     cols_all = FEATURE_COLS + EXTRA
     df = df.dropna(subset=cols_all + ["y_high_ret","y_low_ret"]).reset_index(drop=True)
@@ -45,7 +48,7 @@ def evaluate(code, lo_a, hi_a):
 def _fitq(X, y, alpha, kw):
     import lightgbm as lgb
     p = dict(objective="quantile", alpha=alpha, n_estimators=300, learning_rate=0.03, num_leaves=15,
-             min_child_samples=30, subsample=0.8, colsample_bytree=0.8, random_state=0, verbose=-1)
+             min_child_samples=30, subsample=0.8, colsample_bytree=0.8, random_state=0, verbose=-1, n_jobs=1)
     p.update(kw); m = lgb.LGBMRegressor(**p); m.fit(X, y); return m
 
 def _rec(d, yl, yh, lo, hi, lo_a, hi_a):

@@ -55,7 +55,7 @@ def _fit_quantile(X, y, alpha: float, seed: int = 0):
         m = lgb.LGBMRegressor(
             objective="quantile", alpha=alpha, n_estimators=300,
             learning_rate=0.03, num_leaves=15, min_child_samples=30,
-            subsample=0.8, colsample_bytree=0.8, random_state=seed, verbose=-1,
+            subsample=0.8, subsample_freq=0, colsample_bytree=0.8, random_state=seed, verbose=-1, n_jobs=1,
         )
     else:
         m = GradientBoostingRegressor(
@@ -179,7 +179,7 @@ def walk_forward_eval(
         split_pairs = []
         for k in range(n_folds):
             tr_end = min_train + k * fold_size
-            te_end = min(tr_end + fold_size, n)
+            te_end = n if k == n_folds - 1 else min(tr_end + fold_size, n)
             if tr_end >= n or te_end <= tr_end:
                 break
             split_pairs.append((df.iloc[:tr_end], df.iloc[tr_end:te_end]))
@@ -205,8 +205,8 @@ def walk_forward_eval(
         hits.append(hit); hits_raw.append(hit_raw)
         width_pct_raw.append(float(np.mean(hi_raw - lo_raw)) * 100)
         width_pct_cal.append(float(np.mean(hi_ret - lo_ret)) * 100)
-        pin_h.append(pinball_loss(y_hi, hi_ret, high_alpha))
-        pin_l.append(pinball_loss(y_lo, lo_ret, low_alpha))
+        pin_h.append(pinball_loss(y_hi, hi_raw, high_alpha))
+        pin_l.append(pinball_loss(y_lo, lo_raw, low_alpha))
         mae_h.append(float(np.mean(np.abs(y_hi - hi_ret))))
         mae_l.append(float(np.mean(np.abs(y_lo - lo_ret))))
         # 借鉴③：折内信号 IC（宽度主 / 中点次）

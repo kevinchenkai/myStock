@@ -514,6 +514,8 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
     from .pipeline import write_status
     clock = clock or sessions.utc_now
     statuses = []
+    from . import runs, versions
+    run_manifest = manifest_path = None
     rcfg = rcfg or _ReportCfg()
     cfg = cfg or BTConfig(
         conformal=rcfg.conformal, target_coverage=rcfg.target_coverage,
@@ -525,18 +527,20 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
     # 预测留档：建表 → 首次自动回填历史 HTML（表非空则跳过，见 backfill.run_if_empty）
     # 每次生成报告都执行，保证 ml.sh 跑一次数据就同步一次，无需人工干预。
     mldb.init_ml_db(db_path)
+    run_manifest, manifest_path = runs.start(db_path)
+    input_db = run_manifest["input_path"]
 
     sections, summary_rows, pred_rows = [], "", []
     for code in mlcfg.TARGETS:
         try:
-            daily = sessions.prepare_daily(mldata.load_daily(code, db_path), code, clock())
+            daily = sessions.prepare_daily(mldata.load_daily(code, input_db), code, clock())
         except sessions.Unavailable as e:
             statuses.append({'code':code, 'status':e.status})
             continue
         # 按股自适应 CQR 目标覆盖率（收窄区间；与 ALPHA_BY_CODE 同模式）
         cov = mlcfg.coverage_for(code)
         cfg_i = cfg if cfg.target_coverage == cov else replace(cfg, target_coverage=cov)
-        bt = run_backtest(code, cfg_i, db_path=db_path, daily=daily)
+        bt = run_backtest(code, cfg_i, db_path=input_db, daily=daily)
         if "error" in bt:
             statuses.append({"code":code,"status":"failed","error":str(bt["error"])})
             continue
@@ -560,6 +564,8 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
             "target_coverage": pred["target_coverage"],
             "backend": bt["backend"], "source": "live",
             "target_session": pred["target_session"],
+            "run_id": run_manifest["run_id"], "manifest_path": str(manifest_path.resolve()),
+            "generated_at": clock().isoformat(), "decision_at": clock().isoformat(),
         })
         fe = bt["final_equity"]
         b, bh = fe.get("bandit"), fe.get("buy_hold")
@@ -582,8 +588,12 @@ def build_report(out_dir: Path | None = None, cfg: BTConfig | None = None,
     for st in statuses:
         if st['code'] in expired: st['status']='missed_deadline'
     pred_rows = [p for p in pred_rows if p['code'] not in expired]
+    if expired:
+        import re
+        for code in expired: summary_rows = re.sub(r"<tr><td>" + re.escape(code) + r"</td>.*?</tr>", "", summary_rows)
     if expired: sections = [section for section in sections if not any(c in section for c in expired)]
     if not pred_rows:
+        runs.finish(run_manifest, manifest_path, pred_rows, statuses)
         write_status(statuses, None)
         return None
     conn = mldb.get_ml_connection(db_path)
@@ -636,6 +646,7 @@ h1{{font-size:20px}} table{{font-size:13px}} td,th{{padding:4px 10px}}
     # latest.html 指向最新
     latest = mlcfg.REPORTS_DIR / "latest.html"
     latest.write_text(page, encoding="utf-8")
+    runs.finish(run_manifest, manifest_path, pred_rows, statuses)
     write_status(statuses, index)
     return index
 
