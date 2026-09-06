@@ -4,7 +4,7 @@
 > 约定见 [`COLLABORATION.md`](COLLABORATION.md) §4。
 >
 > 关闭一项时**标记完成并写明关闭它的提交／文档，不要删行**——删掉就看不出它曾被判断过。
-> 最后更新：2026-09-06（登记 ML 建模工具调研待决策项与 Codex 审查发现；未实施模型改动）。
+> 最后更新：2026-09-06（ML 建模工具调研按 Codex 追加审核修订为 v2：首批收缩为 B0／B1／S1／S2／L_raw，预测留档计数更正为两表口径；未实施模型改动）。
 
 ## 状态说明
 
@@ -50,7 +50,7 @@
 | --- | --- | --- |
 | E0–E5 无候选晋级 | 等股票权重 raw pinball ≥5%、skill ≥3%、4/6 股票方向改善的门槛均未达成 | 已如实记录为负结果，见[实验汇总](records/ml-upgrade-experiment-results_codex_20260904.md)。**不调低门槛**；后续若做 E6–E8 属新一轮范围 |
 | 前向 shadow 未开始 | 历史重建**不是** live、也不是前向 shadow | 待办（需真实等待未来交易日，无法压缩） |
-| 建模工具调研待决策 | [Claude 调研](research/ml-modeling-tools_claude_20260906.md)与 [Codex 审查](research/ml-review_codex_20260906.md)给出三批候选（尺度模型／线性分位／组合 → CatBoost／XGBoost／池化 → TabPFN 探针）与统一协议 | 待用户决定是否执行第一批；门槛不变，不为使用新工具更换生产模型 |
+| 建模工具调研待决策 | [Claude 调研](research/ml-modeling-tools_claude_20260906.md)与 [Codex 审查](research/ml-review_codex_20260906.md)给出三批候选（尺度模型／线性分位／组合 → CatBoost／XGBoost／池化 → TabPFN 探针）与统一协议 | 待用户决定是否执行修订后的首批（B0／B1／S1／S2／L_raw，冻结副本，除 EWMA／区间统计外不引入新依赖；调研 §10.4）；树模型组需另授权安装 catboost／xgboost；门槛不变，不为使用新工具更换生产模型 |
 
 ### 来自 Codex 审查 ML-REVIEW-20260906
 

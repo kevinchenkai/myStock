@@ -14,7 +14,7 @@
 
 | 文档 | 用途 |
 | --- | --- |
-| [Claude 建模工具调研](research/ml-modeling-tools_claude_20260906.md) | 归纳偏置视角的候选分组（尺度模型／线性分位／CatBoost／TabPFN）、与 Codex 审查的逐条对照、合并实验矩阵与协议 |
+| [Claude 建模工具调研](research/ml-modeling-tools_claude_20260906.md) | 归纳偏置视角的候选分组（尺度模型／线性分位／CatBoost／TabPFN）、与 Codex 审查的逐条对照、合并实验矩阵与协议；v2 已按 Codex 追加审核（§9）修订，回应见 §10 |
 | [Codex ML 审查](research/ml-review_codex_20260906.md) | 代码与文档审查、报告协议与 reward 口径问题、CatBoost／XGBoost／TabPFN／NGBoost 适配分析、有界实验设计 |
 
 ## 当前工单：Web 两项 P0 与依赖升级
