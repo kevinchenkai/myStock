@@ -20,6 +20,10 @@ EXTERNAL_BY_CODE: dict[str, str] = {
     'HK.09988': 'BABA',
     'HK.01810': 'XIACY',
 }
+# Pre-registered control proxy for the thin XIACY series (D4): a liquid China-internet ETF.
+EXTERNAL_ALT: dict[str, str] = {
+    'HK.01810': 'KWEB',
+}
 US_REFERENCE = 'US.NVDA'   # any US code: only used to read the US calendar
 PERIOD = '5y'
 SOURCE = 'yf_external_1d'
@@ -65,21 +69,22 @@ def _f(row, col):
         return None
 
 
-def fetch(for_code: str, now: str, *, period: str = PERIOD, max_retries: int = 3) -> list[dict]:
-    """Download the ADR history for `for_code` (network)."""
+def fetch(for_code: str, now: str, *, period: str = PERIOD, max_retries: int = 3, symbol: str | None = None) -> list[dict]:
+    """Download the external history serving `for_code` (network); default symbol is its ADR."""
     from .fetch import _require_yf, _yf_history
     _require_yf()
-    symbol = EXTERNAL_BY_CODE[for_code]
+    symbol = symbol or EXTERNAL_BY_CODE[for_code]
     df = _yf_history(symbol, period=period, interval='1d', max_retries=max_retries)
     if df is None or df.empty:
         return []
     return rows_from_history(df, symbol, for_code, now)
 
 
-def load_external(for_code: str, db_path: Optional[str] = None) -> pd.DataFrame:
-    """All external rows for `for_code`, date ascending: date, close, adj_close, available_at."""
+def load_external(for_code: str, db_path: Optional[str] = None, *, symbol: str | None = None) -> pd.DataFrame:
+    """External rows serving `for_code` for one symbol (default its ADR), date ascending."""
+    symbol = symbol or EXTERNAL_BY_CODE[for_code]
     with mldb.get_ml_connection_readonly(db_path) as c:
         df = pd.read_sql_query(
             'SELECT symbol, date, open, high, low, close, adj_close, volume, available_at, synced_at '
-            'FROM ml_external_1d WHERE for_code=? ORDER BY date', c, params=(for_code,))
+            'FROM ml_external_1d WHERE for_code=? AND symbol=? ORDER BY date', c, params=(for_code, symbol))
     return df
