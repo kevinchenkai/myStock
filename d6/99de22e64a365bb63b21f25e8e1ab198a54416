@@ -1,0 +1,21 @@
+docs/research/ml-modeling-tools_claude_20260906.md
+  s_e8a3869e1f94b1::t_42624f55310c5e 129
+  s_e8a3869e1f94b1::t_7ae9e1c98d2736 334
+  s_e8a3869e1f94b1::t_c158cb249957d1 3,31,46,50,52-56,59-60,125-128,320,331-333
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "d699de22e64a365bb63b21f25e8e1ab198a54416",
+  "prompts": {},
+  "sessions": {
+    "s_e8a3869e1f94b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "280953a0-bde7-47d8-a1f5-b9535307bb48",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
