@@ -143,3 +143,22 @@ BEFORE UPDATE OF prediction_id,run_id,code,as_of,target_session,source,generated
 ON ml_prediction_versions BEGIN SELECT RAISE(ABORT, 'immutable prediction content'); END;
 CREATE TRIGGER IF NOT EXISTS ml_versions_no_delete BEFORE DELETE ON ml_prediction_versions
 BEGIN SELECT RAISE(ABORT, 'immutable prediction history'); END;
+
+-- 隔夜跨市场外部日线（ADR 等）。每行带信息可用时刻，供港股开盘前决策特征做 as-of join。
+-- docs/plans/ml-overnight-plan_claude_20260906.md D1。只由独立采集脚本写入，生产预测器不读。
+CREATE TABLE IF NOT EXISTS ml_external_1d (
+    symbol          TEXT NOT NULL,        -- yfinance 代码，如 TCEHY
+    for_code        TEXT NOT NULL,        -- 服务的富途代码，如 HK.00700
+    date            TEXT NOT NULL,        -- 外部市场交易日（美东日期）
+    open            REAL,
+    high            REAL,
+    low             REAL,
+    close           REAL,
+    adj_close       REAL,
+    volume          REAL,
+    available_at    TEXT NOT NULL,        -- 该行信息可用的 UTC 时刻（= 该美股交易日的 final_at）
+    synced_at       TEXT NOT NULL,
+    data_source     TEXT NOT NULL DEFAULT 'yfinance',
+    PRIMARY KEY (symbol, date)
+);
+CREATE INDEX IF NOT EXISTS idx_ml_external_code ON ml_external_1d(for_code, date);

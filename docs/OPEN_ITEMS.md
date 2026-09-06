@@ -51,7 +51,7 @@
 | E0–E5 无候选晋级 | 等股票权重 raw pinball ≥5%、skill ≥3%、4/6 股票方向改善的门槛均未达成 | 已如实记录为负结果，见[实验汇总](records/ml-upgrade-experiment-results_codex_20260904.md)。**不调低门槛**；后续若做 E6–E8 属新一轮范围 |
 | 前向 shadow 未开始 | 历史重建**不是** live、也不是前向 shadow | 待办（需真实等待未来交易日，无法压缩） |
 | 建模工具调研待决策 | 首轮预注册矩阵已执行（B0／B1／S1／S2／S3／L_raw／B2／C1／X1），无候选过门槛，见 [模型矩阵回执](records/ml-model-matrix_claude_20260906.md)；方案见 [Claude 调研 v2.1](research/ml-modeling-tools_claude_20260906.md) 与 [Codex 审查](research/ml-review_codex_20260906.md) | ✅ 首轮已关闭（负结果）；是否开启误差归因或后置候选（TabPFN／HAR／池化）待用户决定，生产模型不变 |
-| 新一轮：港股时点前移＋隔夜信息 | 可行性预实验 O2 两侧改善 12.6%，3/3 股改善，见 [新一轮方案](plans/ml-overnight-plan_claude_20260906.md)；用户已认可方向并授权外部日线抓取 | 进行中（Claude，main）：D1 数据表→D2 时点→D3 特征→D4 正式实验→D5 前向 shadow；生产不切换；回执完成后交 Codex Astra 审核 |
+| 新一轮：港股时点前移＋隔夜信息 | D1–D3 已完成并验证，见 [D1–D3 回执](records/ml-overnight-d1d3_claude_20260906.md)；方案见 [新一轮方案](plans/ml-overnight-plan_claude_20260906.md) | 进行中（Claude，main）：D4 正式实验待用户决定 → D5 前向 shadow → D6 接入；生产不切换；回执完成后交 Codex Astra 审核 |
 
 ### 来自 Codex 审查 ML-REVIEW-20260906
 

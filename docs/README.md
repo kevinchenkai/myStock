@@ -16,6 +16,7 @@
 | --- | --- |
 | [Claude 建模工具调研](research/ml-modeling-tools_claude_20260906.md) | 归纳偏置视角的候选分组（尺度模型／线性分位／CatBoost／TabPFN）、与 Codex 审查的逐条对照、合并实验矩阵与协议；v2 已按 Codex 追加审核（§9）修订，回应见 §10 |
 | [新一轮方案：时点前移与隔夜信息](plans/ml-overnight-plan_claude_20260906.md) | 误差归因显示约一半方差来自隔夜跳空；港股加入 ADR／ETF／纳指隔夜特征的可行性预实验两侧改善 11–13%；含港股工单草案与美股口径说明 |
+| [隔夜信息 D1–D3 执行回执](records/ml-overnight-d1d3_claude_20260906.md) | 外部日线表带 `available_at`、港股开盘前决策窗口、V1 冻结／V2 特征与 as-of 拼接；端到端复现改善并通过后移泄漏检验 |
 | [模型矩阵首轮实验回执](records/ml-model-matrix_claude_20260906.md) | 九候选（冻结 LightGBM、naive_vol、EWMA／GK／GARCH 尺度、线性分位、LightGBM／CatBoost／XGBoost 小网格）同协议比较，全部不晋级；含预注册、成本与逐股表 |
 | [Codex ML 审查](research/ml-review_codex_20260906.md) | 代码与文档审查、报告协议与 reward 口径问题、CatBoost／XGBoost／TabPFN／NGBoost 适配分析、有界实验设计 |
 

@@ -160,3 +160,32 @@ def prepare_daily(daily, code, now=None, live=True):
 def check_deadline(code,target,now=None):
     if utc(now or utc_now()) >= session(code,target)['deadline']:
         raise Unavailable('missed_deadline')
+
+# ---- HK pre-open decision window (docs/plans/ml-overnight-plan_claude_20260906.md D2) ----
+US_CALENDAR_CODE = 'US.NVDA'
+
+def preopen_window(code, as_of):
+    """Decision window for predicting next HK session from `as_of` with overnight information.
+
+    earliest = when all information that may enter the features exists: the HK `as_of`
+    close confirmation and, if a US session dated `as_of` exists, that session's final_at.
+    deadline = the existing HK cutoff for the target session (09:00 HKT). Fails closed
+    outside HK or outside the verified calendar.
+    """
+    if market(code) != 'HK':
+        raise Unavailable('unavailable', 'pre-open window is defined for HK only')
+    as_of = str(as_of)[:10]
+    target = next_session(code, as_of)
+    earliest = session(code, as_of)['final_at']
+    if as_of in calendar('US'):
+        earliest = max(earliest, session(US_CALENDAR_CODE, as_of)['final_at'])
+    deadline = session(code, target)['deadline']
+    return {'as_of': as_of, 'target_session': target, 'earliest': earliest, 'deadline': deadline}
+
+def check_preopen_decision(code, as_of, now=None):
+    """Raise unless `now` lies inside the pre-open window; returns the window."""
+    now = utc(now or utc_now())
+    w = preopen_window(code, as_of)
+    if now < w['earliest']: raise Unavailable('awaiting_overnight')
+    if now >= w['deadline']: raise Unavailable('missed_deadline')
+    return w

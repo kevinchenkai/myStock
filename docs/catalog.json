@@ -551,6 +551,18 @@
       "provenance": "首轮矩阵负结果后，Claude Fable 5.1 于 2026-09-06 做误差归因与港股可行性预实验并撰写工单草案；用户认可方向、授权抓取外部日线；基线 36552ad。",
       "first_commit": null,
       "governed_at": "2026-09-06"
+    },
+    {
+      "path": "docs/records/ml-overnight-d1d3_claude_20260906.md",
+      "legacy_paths": [],
+      "title": "ML 隔夜信息 D1–D3 执行回执",
+      "category": "records",
+      "document_date": "2026-09-06",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "用户确认方案后由 Claude Fable 5.1 于 2026-09-06 实现 D1 数据表、D2 决策窗口、D3 特征版本并做泄漏检验；基线 34653ef。",
+      "first_commit": null,
+      "governed_at": "2026-09-06"
     }
   ]
 }

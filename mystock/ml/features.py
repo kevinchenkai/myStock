@@ -79,3 +79,51 @@ FEATURE_COLS = [
     "dist_hi_20", "dist_lo_20", "vol_ratio_5", "vol_ratio_20",
 ]
 LABEL_COLS = ["y_high_ret", "y_low_ret"]
+
+
+# ---- 特征版本（docs/plans/ml-overnight-plan_claude_20260906.md D3）----
+# V1 = 上面 16 个特征，冻结；V2 = V1 + 隔夜跨市场组。生产 predictor 仍只用 FEATURE_COLS（= V1）。
+FEATURE_COLS_V1 = list(FEATURE_COLS)
+OVERNIGHT_COLS = ["adr_ret"]
+FEATURE_COLS_V2 = FEATURE_COLS_V1 + OVERNIGHT_COLS
+
+
+def attach_overnight(df: pd.DataFrame, external: pd.DataFrame, code: str) -> pd.DataFrame:
+    """给每个 as_of 行拼接隔夜 ADR 收益（as-of join，纯函数）。
+
+    规则：adr_ret(as_of) = 外部行中 date ≥ as_of 且 available_at < 目标日决策截止（港股 09:00）
+    的所有行的收盘收益复利；即“自港股 as_of 收盘以来、开盘前已知的 ADR 累计变动”。
+    正常日就是日历日 as_of 的那根美股日线；港股休市而美股开市时会累计多根；
+    美股休市时无新信息记 0.0；外部历史尚未开始的 as_of 记 NaN。
+    available_at 严格按时间比较，晚于截止的行永远不进入特征。
+    """
+    from bisect import bisect_left, bisect_right
+    from . import sessions
+
+    out = df.copy()
+    if external is None or len(external) == 0:
+        out["adr_ret"] = np.nan
+        return out
+    ext = external.sort_values("date").reset_index(drop=True)
+    dates = ext["date"].astype(str).tolist()
+    avail = [sessions.utc(str(v)) for v in ext["available_at"]]
+    ret = ext["close"].astype(float).pct_change().to_numpy()
+    values = []
+    for as_of in out["date"].astype(str):
+        try:
+            cutoff = sessions.preopen_window(code, as_of)["deadline"]
+        except sessions.Unavailable:
+            values.append(np.nan)
+            continue
+        if as_of < dates[0]:
+            values.append(np.nan)
+            continue
+        start = bisect_left(dates, as_of)
+        end = bisect_left(avail, cutoff)   # strictly before the cutoff: at the deadline it is already too late
+        if end <= start:
+            values.append(0.0)
+            continue
+        seg = ret[start:end]
+        values.append(float(np.prod(1.0 + seg) - 1.0) if np.isfinite(seg).all() else np.nan)
+    out["adr_ret"] = values
+    return out

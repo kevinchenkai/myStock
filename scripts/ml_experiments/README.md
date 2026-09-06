@@ -20,7 +20,8 @@ python -m scripts.ml_experiments.strategy_validation --db "$MYSTOCK_EXPERIMENT_D
 - B 现在要求 `--db`、`--out`；只读连接。统计旧版留档触价后的 1/5 session 条件事件收益，重叠事件不是账户收益；成熟性截止固定为 2026-09-05T06:00Z，未成熟项保留 pending。已不执行旧版最多 20 日轮回逻辑。
 - `upgrade_matrix` 写实验文件但不改输入库；E0–E5 结果为负，不支持模型晋级。
 - `model_matrix`（2026-09-06）：预注册的学习器／尺度矩阵（冻结 LightGBM、naive_vol、EWMA／GK／GARCH 尺度、线性分位、LightGBM／CatBoost／XGBoost 小网格），`--db --out [--only --codes --seed]`；指定后端缺失时直接失败，不回退。首轮结果为负，见 [模型矩阵回执](../../docs/records/ml-model-matrix_claude_20260906.md)。
-- `overnight_feasibility`（2026-09-06）：港股隔夜跨市场特征可行性探针，`--db --external --out`；外部日线 CSV 由 yfinance 抓到忽略目录，美股假日填 0；结果与限制见 [新一轮方案](../../docs/plans/ml-overnight-plan_claude_20260906.md)。
+- `fetch_external`（2026-09-06）：D1 独立采集入口，`--db` 必填，只写 `ml_external_1d` 与 `ml_sync_log`；未接入 ml.sh。
+- `overnight_feasibility`（2026-09-06）：港股隔夜特征探针，`--db --out [--shift]`，读 `ml_external_1d` 并用 `features.attach_overnight` 拼接；`--shift` 为泄漏检验；结果见 [D1–D3 回执](../../docs/records/ml-overnight-d1d3_claude_20260906.md)。
 - `strategy_validation` 使用固定历史窗口和合成账户；HK lot=100 是 fixture 参数，不能当作所有港股的真实交易单位。
 
 ## 显式写入／补采工具

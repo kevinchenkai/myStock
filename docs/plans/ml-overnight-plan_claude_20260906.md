@@ -1,6 +1,6 @@
 # ML 新一轮方案：决策时点前移与隔夜跨市场信息_Claude_20260906
 
-> 作者：Claude（Fable 5.1）· 日期：2026-09-06 · 基线 `36552ad` / `main`。状态：用户已认可方向（先做港股），本文为工单草案与可行性证据；执行细节待 Codex Astra 审核后冻结。前序：[建模工具调研 v2.1](../research/ml-modeling-tools_claude_20260906.md)、[模型矩阵首轮回执](../records/ml-model-matrix_claude_20260906.md)。
+> 作者：Claude（Fable 5.1）· 日期：2026-09-06 · 基线 `36552ad` / `main`。状态：用户已认可方向（先做港股）；D1–D3 已完成，见 [执行回执](../records/ml-overnight-d1d3_claude_20260906.md)；D4 起待用户决定，整体待 Codex Astra 审核。前序：[建模工具调研 v2.1](../research/ml-modeling-tools_claude_20260906.md)、[模型矩阵首轮回执](../records/ml-model-matrix_claude_20260906.md)。
 > 边界：本轮只做了只读诊断与一次可行性预实验（冻结副本＋用户授权抓取的外部日线，均在忽略目录）；未改生产预测器、未改 ml.sh、未写运行库、未发布、未新增调度、未交易。可行性结果是对已查看过的开发窗口的又一次查看，不是 holdout。
 
 ## 0. 结论
