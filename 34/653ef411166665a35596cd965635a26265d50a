@@ -1,0 +1,29 @@
+scripts/ml_experiments/overnight_feasibility.py
+  s_e8a3869e1f94b1::t_98a2a4026ef02d 1-134
+docs/OPEN_ITEMS.md
+  s_e8a3869e1f94b1::t_5c7428673b5241 54
+docs/README.md
+  s_e8a3869e1f94b1::t_31c364cc988ebf 13,18
+docs/catalog.json
+  s_e8a3869e1f94b1::t_c647522f98d63f 542-553
+docs/plans/ml-overnight-plan_claude_20260906.md
+  s_e8a3869e1f94b1::t_ebbe068b7bdbcb 1-107
+scripts/ml_experiments/README.md
+  s_e8a3869e1f94b1::t_fb1dea1e010f45 23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "34653ef411166665a35596cd965635a26265d50a",
+  "prompts": {},
+  "sessions": {
+    "s_e8a3869e1f94b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "280953a0-bde7-47d8-a1f5-b9535307bb48",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
