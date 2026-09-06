@@ -539,6 +539,18 @@
       "provenance": "用户授权后由 Claude Fable 5.1 于 2026-09-06 在冻结副本上执行预注册矩阵并撰写；基线 d699de2。",
       "first_commit": null,
       "governed_at": "2026-09-06"
+    },
+    {
+      "path": "docs/plans/ml-overnight-plan_claude_20260906.md",
+      "legacy_paths": [],
+      "title": "ML 新一轮方案：决策时点前移与隔夜跨市场信息",
+      "category": "plans",
+      "document_date": "2026-09-06",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "首轮矩阵负结果后，Claude Fable 5.1 于 2026-09-06 做误差归因与港股可行性预实验并撰写工单草案；用户认可方向、授权抓取外部日线；基线 36552ad。",
+      "first_commit": null,
+      "governed_at": "2026-09-06"
     }
   ]
 }
