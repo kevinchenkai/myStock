@@ -1,0 +1,36 @@
+mystock/ml/external.py
+  s_e8a3869e1f94b1::t_85ddb8cb3ba3b7 23-26,72-73,76,83-85,89
+scripts/ml_experiments/fetch_external.py
+  s_e8a3869e1f94b1::t_85ddb8cb3ba3b7 19,21,26-28,30
+scripts/ml_experiments/overnight_d4.py
+  s_e8a3869e1f94b1::t_b36e546ab2885c 1-72,74-132
+  s_e8a3869e1f94b1::t_a83ab38214bc78 73
+docs/OPEN_ITEMS.md
+  s_e8a3869e1f94b1::t_6d40925cbd7d74 54
+docs/README.md
+  s_e8a3869e1f94b1::t_9fe3753b84cca5 13,19
+docs/catalog.json
+  s_e8a3869e1f94b1::t_03591f262b33d2 566-577
+docs/plans/ml-overnight-plan_claude_20260906.md
+  s_e8a3869e1f94b1::t_927a5ac913fc93 3
+docs/records/ml-overnight-d4_claude_20260906.md
+  s_e8a3869e1f94b1::t_ccf539affa6420 1-107
+scripts/ml_experiments/README.md
+  s_e8a3869e1f94b1::t_4c523d4ed26434 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "1f7c54601bd48f881acaa22aeeee88de0a7c2ed4",
+  "prompts": {},
+  "sessions": {
+    "s_e8a3869e1f94b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "280953a0-bde7-47d8-a1f5-b9535307bb48",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
