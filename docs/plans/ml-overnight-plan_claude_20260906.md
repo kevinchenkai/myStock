@@ -1,6 +1,6 @@
 # ML 新一轮方案：决策时点前移与隔夜跨市场信息_Claude_20260906
 
-> 作者：Claude（Fable 5.1）· 日期：2026-09-06 · 基线 `36552ad` / `main`。状态：用户已认可方向（先做港股）；D1–D3 已完成（[回执](../records/ml-overnight-d1d3_claude_20260906.md)），D4 已完成且主力两只过门槛（[回执](../records/ml-overnight-d4_claude_20260906.md)）；美股同机制 D4 亦通过（[回执](../records/ml-preopen-us-d4_claude_20260906.md)）；收敛后的方案见下文 §7；工程接入与 D5 待用户决定，整体待 Codex Astra 审核。用户 2026-09-06 明确主力标的为英伟达、特斯拉、阿里、腾讯，其余观察。前序：[建模工具调研 v2.1](../research/ml-modeling-tools_claude_20260906.md)、[模型矩阵首轮回执](../records/ml-model-matrix_claude_20260906.md)。
+> 作者：Claude（Fable 5.1）· 日期：2026-09-06 · 基线 `36552ad` / `main`。状态：用户已认可方向（先做港股）；D1–D3 已完成（[回执](../records/ml-overnight-d1d3_claude_20260906.md)），D4 已完成且主力两只过门槛（[回执](../records/ml-overnight-d4_claude_20260906.md)）；美股同机制 D4 亦通过（[回执](../records/ml-preopen-us-d4_claude_20260906.md)）；收敛后的方案见下文 §7；工程接入已完成、D5 shadow 已启动（[回执](../records/ml-preopen-shadow-start_claude_20260906.md)），整体待 Codex Astra 审核。用户 2026-09-06 明确主力标的为英伟达、特斯拉、阿里、腾讯，其余观察。前序：[建模工具调研 v2.1](../research/ml-modeling-tools_claude_20260906.md)、[模型矩阵首轮回执](../records/ml-model-matrix_claude_20260906.md)。
 > 边界：本轮只做了只读诊断与一次可行性预实验（冻结副本＋用户授权抓取的外部日线，均在忽略目录）；未改生产预测器、未改 ml.sh、未写运行库、未发布、未新增调度、未交易。可行性结果是对已查看过的开发窗口的又一次查看，不是 holdout。
 
 ## 0. 结论

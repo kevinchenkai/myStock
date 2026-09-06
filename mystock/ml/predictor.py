@@ -50,13 +50,15 @@ except Exception:  # noqa: BLE001
 from sklearn.ensemble import GradientBoostingRegressor
 
 
-def _fit_quantile(X, y, alpha: float, seed: int = 0):
+def _fit_quantile(X, y, alpha: float, seed: int = 0, params: dict | None = None):
     if _HAS_LGB:
-        m = lgb.LGBMRegressor(
+        kw = dict(
             objective="quantile", alpha=alpha, n_estimators=300,
             learning_rate=0.03, num_leaves=15, min_child_samples=30,
             subsample=0.8, subsample_freq=0, colsample_bytree=0.8, random_state=seed, verbose=-1, n_jobs=1,
         )
+        kw.update(params or {})   # V2 (pre-open) capacity override; V1 passes None
+        m = lgb.LGBMRegressor(**kw)
     else:
         m = GradientBoostingRegressor(
             loss="quantile", alpha=alpha, n_estimators=300,
@@ -90,6 +92,8 @@ class IntervalModel:
     cal_frac: float = 0.25
     label_horizon: int = 1   # 借鉴②：fit 段与校准段之间的隔离行数（标签前看=1）
     q: float = 0.0   # ret 空间的 conformal 半宽（fit 后置）
+    feature_cols: list = field(default_factory=lambda: list(FEATURE_COLS))   # V2 传 FEATURE_COLS_V2 / V2_US
+    params: dict | None = None   # 学习器容量覆盖（V2 预注册 7 叶／min_child 50）；None = 冻结 V1
 
     def fit(self, df: pd.DataFrame):
         fit_df = df
@@ -103,9 +107,9 @@ class IntervalModel:
             cal_df = df.iloc[-n_cal:]
         # 用纯 numpy（无列名）fit，预测端也用 numpy → 一致，消除 sklearn/lightgbm
         # "X does not have valid feature names" 警告。
-        X = fit_df[FEATURE_COLS].to_numpy()
-        self.m_high = _fit_quantile(X, fit_df["y_high_ret"].to_numpy(), self.high_alpha, self.seed)
-        self.m_low = _fit_quantile(X, fit_df["y_low_ret"].to_numpy(), self.low_alpha, self.seed)
+        X = fit_df[self.feature_cols].to_numpy()
+        self.m_high = _fit_quantile(X, fit_df["y_high_ret"].to_numpy(), self.high_alpha, self.seed, self.params)
+        self.m_low = _fit_quantile(X, fit_df["y_low_ret"].to_numpy(), self.low_alpha, self.seed, self.params)
         if self.conformal and self.cal_frac > 0 and len(df) >= 20:
             lo_cal, hi_cal = self._predict_ret_raw(cal_df)
             self.q = calib.calibrate(
@@ -120,7 +124,7 @@ class IntervalModel:
         return self
 
     def _predict_ret_raw(self, df: pd.DataFrame):
-        X = df[FEATURE_COLS].to_numpy()
+        X = df[self.feature_cols].to_numpy()
         return _predict_silent(self.m_low, X), _predict_silent(self.m_high, X)
 
     def predict_ret(self, df: pd.DataFrame):
@@ -241,19 +245,33 @@ def walk_forward_eval(
     return WalkForwardResult(code=code, n_folds=len(per_fold), metrics=metrics, per_fold=per_fold)
 
 
+V2_PARAMS = {"num_leaves": 7, "min_child_samples": 50}   # 预注册（D4）：V2 的容量
+V2_MIN_ROWS = 250                                         # 预注册：带新特征的可用训练行下限
+
+
 def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
                      high_alpha: float = 0.9, low_alpha: float = 0.1,
                      conformal: bool = False, target_coverage: float = 0.8,
                      cal_frac: float = 0.25, code: str | None = None, clock=None,
-                     historical: bool = False) -> dict:
+                     historical: bool = False, feature_version: str = 'v1',
+                     external: pd.DataFrame | None = None) -> dict:
     """用全历史 fit，对最新交易日预测次日 [L_hat, H_hat]。供推理/报告用。
 
     conformal=True 时启用 CQR（从训练末尾切 cal_frac 校准，ret 空间半宽 q 应用到次日）。
+
+    feature_version='v1'（默认，生产）：16 个冻结特征，收盘后决策，行为与此前完全一致。
+    feature_version='v2'（开盘前决策，D5 shadow）：港股拼接 ADR 隔夜收益、美股拼接盘前价收益，
+    容量用预注册的 V2_PARAMS；live 模式改用开盘前决策窗口守卫；最新行的新特征缺失或带
+    新特征的训练行不足 V2_MIN_ROWS 时失败关闭（不回退 V1，由调用方决定）。
     """
+    if feature_version not in ('v1', 'v2'):
+        raise ValueError('feature_version must be v1 or v2')
     if code is None:
         code = daily.attrs.get('code')
     if code is None and not historical:
         raise sessions.Unavailable('unavailable', 'code required for live session guard')
+    if feature_version == 'v2' and code is None:
+        raise ValueError('v2 requires code')
     clock = clock or sessions.utc_now
     expected_as_of = str(daily['date'].max()) if not daily.empty else None
     if code:
@@ -261,20 +279,50 @@ def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
         if not historical:
             expected_as_of = str(daily['date'].iloc[-1])
     df = build_features(daily)
+    cols = list(FEATURE_COLS)
+    params = None
+    extra = {}
+    if feature_version == 'v2':
+        from .features import FEATURE_COLS_V2, FEATURE_COLS_V2_US, attach_overnight
+        from . import preopen
+        if sessions.market(code) == 'HK':
+            df = attach_overnight(df, external, code)
+            cols = list(FEATURE_COLS_V2)
+        else:
+            df = preopen.attach_preopen(df, external, code)
+            cols = list(FEATURE_COLS_V2_US)
+        params = dict(V2_PARAMS)
     df = df.replace([float('inf'), float('-inf')], float('nan'))
-    train = df.dropna(subset=FEATURE_COLS + ["y_high_ret", "y_low_ret"])
-    valid = df.dropna(subset=FEATURE_COLS)
+    train = df.dropna(subset=cols + ["y_high_ret", "y_low_ret"])
+    valid = df.dropna(subset=cols)
+    if feature_version == 'v2':
+        if len(train) < V2_MIN_ROWS:
+            raise sessions.Unavailable('insufficient_v2_rows', f'{len(train)} rows with {cols[-1]}; need {V2_MIN_ROWS}')
+        base_last = df.dropna(subset=FEATURE_COLS).iloc[[-1]] if not df.dropna(subset=FEATURE_COLS).empty else None
+        if base_last is not None and str(base_last.iloc[0]['date']) == expected_as_of and not np.isfinite(base_last.iloc[0][cols[-1]]):
+            raise sessions.Unavailable('awaiting_preopen_data', f'{cols[-1]} missing for {expected_as_of}')
     if valid.empty or str(valid.iloc[-1]['date']) != expected_as_of:
         raise sessions.Unavailable('feature_gap', f'No complete features for {expected_as_of}; repair input gaps first')
     last = valid.iloc[[-1]]
     model = IntervalModel(
         seed=seed, high_alpha=high_alpha, low_alpha=low_alpha,
         conformal=conformal, target_coverage=target_coverage, cal_frac=cal_frac,
+        feature_cols=cols, params=params,
     ).fit(train)
     L, H = model.predict_prices(last)
+    raw_fn = getattr(model, '_predict_ret_raw', None)   # test doubles may omit it
+    lo_raw, hi_raw = raw_fn(last) if raw_fn else (np.array([np.nan]), np.array([np.nan]))
     close = float(last["close"].iloc[0])
     target = sessions.next_session(code, str(last['date'].iloc[0])) if code else None
-    if code and not historical: sessions.check_deadline(code, target, clock())
+    if code and not historical:
+        if feature_version == 'v2':
+            sessions.check_preopen_decision(code, str(last['date'].iloc[0]), clock())
+        else:
+            sessions.check_deadline(code, target, clock())
+    if feature_version == 'v2':
+        extra = {'feature_version': 'v2', 'preopen_feature': cols[-1],
+                 'preopen_value': round(float(last.iloc[0][cols[-1]]), 6), 'v2_params': dict(V2_PARAMS),
+                 'v2_train_rows': int(len(train))}
     return {
         'target_session': target,
         "as_of": str(last["date"].iloc[0]),
@@ -285,6 +333,9 @@ def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
         "conformal": bool(conformal),
         "q_ret": round(float(model.q), 5),
         "target_coverage": float(target_coverage) if conformal else None,
+        "lo_ret_raw": round(float(lo_raw[0]), 6),
+        "hi_ret_raw": round(float(hi_raw[0]), 6),
+        **extra,
     }
 
 

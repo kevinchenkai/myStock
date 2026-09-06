@@ -40,6 +40,11 @@ do_publish() {
 case "$CMD" in
  data) do_data ;;
  train) do_train ;;
+ shadow)
+   # D5 forward shadow (pre-open V2 next to V1, status=shadow, never published). Run inside the
+   # market's pre-open window: HK about 08:30 HKT, US about 09:00 ET. Production train/publish unchanged.
+   [ -n "${2:-}" ] || { echo 'Usage: ml.sh shadow HK|US' >&2; exit 2; }
+   "$PYTHON" -m mystock.ml.shadow --market "$2" ;;
  publish) do_publish ;;
  all)
    do_data
@@ -47,6 +52,6 @@ case "$CMD" in
    # All skipped: no artifact, no stale report publication.
    if "$PYTHON" -c 'import json,os,sys; r=json.load(open(os.environ["MYSTOCK_ML_RECEIPT"])); sys.exit(0 if r["artifact"] else 1)'; then do_publish; fi
    ;;
- help) echo 'Manual usage: ml.sh {data|train|all}; ml.sh publish <receipt.json>. Train prints the receipt; publish checks its artifact hash and target deadline. No automatic receipt selection.' ;;
+ help) echo 'Manual usage: ml.sh {data|train|all}; ml.sh publish <receipt.json>; ml.sh shadow HK|US (pre-open D5 shadow, not published). Train prints the receipt; publish checks its artifact hash and target deadline. No automatic receipt selection.' ;;
  *) exit 2 ;;
 esac

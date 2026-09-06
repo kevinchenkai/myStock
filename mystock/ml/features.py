@@ -96,7 +96,7 @@ def attach_overnight(df: pd.DataFrame, external: pd.DataFrame, code: str) -> pd.
     规则：adr_ret(as_of) = 外部行中 date ≥ as_of 且 available_at < 目标日决策截止（港股 09:00）
     的所有行的收盘收益复利；即“自港股 as_of 收盘以来、开盘前已知的 ADR 累计变动”。
     正常日就是日历日 as_of 的那根美股日线；港股休市而美股开市时会累计多根；
-    美股休市时无新信息记 0.0；外部历史尚未开始的 as_of 记 NaN。
+    美股休市时无新信息记 0.0；窗口内应有的美股交易日缺行（数据未到）记 NaN；外部历史尚未开始的 as_of 记 NaN。
     available_at 严格按时间比较，晚于截止的行永远不进入特征。
     """
     from bisect import bisect_left, bisect_right
@@ -110,6 +110,8 @@ def attach_overnight(df: pd.DataFrame, external: pd.DataFrame, code: str) -> pd.
     dates = ext["date"].astype(str).tolist()
     avail = [sessions.utc(str(v)) for v in ext["available_at"]]
     ret = ext["close"].astype(float).pct_change().to_numpy()
+    have = set(dates)
+    us_dates = sessions.calendar_dates("US")
     values = []
     for as_of in out["date"].astype(str):
         try:
@@ -122,6 +124,12 @@ def attach_overnight(df: pd.DataFrame, external: pd.DataFrame, code: str) -> pd.
             continue
         start = bisect_left(dates, as_of)
         end = bisect_left(avail, cutoff)   # strictly before the cutoff: at the deadline it is already too late
+        # Expected US sessions in the window: a missing bar on one of them means data not yet
+        # available (NaN, fail closed), not "no information"; only a genuine US holiday gives 0.
+        expected = [d for d in us_dates[bisect_left(us_dates, as_of):] if sessions.session(sessions.US_CALENDAR_CODE, d)["final_at"] < cutoff]
+        if any(d not in have for d in expected):
+            values.append(np.nan)
+            continue
         if end <= start:
             values.append(0.0)
             continue

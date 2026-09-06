@@ -289,6 +289,7 @@ bash scripts/ml.sh data       # ① 例行更新数据（增量优先）
 bash scripts/ml.sh train      # ② 冻结输入、回测与预测、生成报告；打印回执路径
 bash scripts/ml.sh publish "data/ml/receipts/<train-run-id>.json"  # ③ 使用 train 打印的真实路径
 bash scripts/ml.sh all        # 显式选择三步执行，包含公网发布；无参数仅帮助
+bash scripts/ml.sh shadow HK  # D5 开盘前 shadow（港股 08:30 HKT／美股 09:00 ET 各一次）；只追加 status=shadow 的留档，不发布、不影响生产
 ```
 
 > **增量缓存**：`data` 采集增量优先——库中最新日期距今 ≤5 天则只抓短窗（日线近 1 月 / 1h 近 5 天），UPSERT 与全量历史在库内合并，不重抓 5 年（例行从 ~30s 降到 ~11s）。日线 / 1h **各按自身缺口挑档**，避免 1h 连续失败时被日线新鲜度掩盖成永久空洞。首次或补全历史用 `python -m mystock.ml.fetch --full`。

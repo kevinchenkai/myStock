@@ -21,6 +21,7 @@ python -m scripts.ml_experiments.strategy_validation --db "$MYSTOCK_EXPERIMENT_D
 - `upgrade_matrix` 写实验文件但不改输入库；E0–E5 结果为负，不支持模型晋级。
 - `model_matrix`（2026-09-06）：预注册的学习器／尺度矩阵（冻结 LightGBM、naive_vol、EWMA／GK／GARCH 尺度、线性分位、LightGBM／CatBoost／XGBoost 小网格），`--db --out [--only --codes --seed]`；指定后端缺失时直接失败，不回退。首轮结果为负，见 [模型矩阵回执](../../docs/records/ml-model-matrix_claude_20260906.md)。
 - `fetch_external`（2026-09-06）：D1 独立采集入口，`--db` 必填，只写 `ml_external_1d` 与 `ml_sync_log`；未接入 ml.sh。
+- `shadow_report`（2026-09-06）：只读汇总 status=shadow 的留档与已成熟的次日高低价，V2 对 V1 的 raw pinball／覆盖／宽度；shadow 本身由 `bash scripts/ml.sh shadow HK|US` 运行。
 - `fetch_preopen`（2026-09-06）：美股盘前报价入 `ml_preopen_quotes`，`--db --history`（yfinance 盘前小时线 730 天）或 `--futu`（实盘快照，需 OpenD）；未接入 ml.sh。
 - `overnight_d4`（2026-09-06）：预注册正式实验，`--db --out [--seeds] [--market HK|US]`，O2 对 B0、五种子、两窗口，小米另跑 KWEB 代理；美股结果见 [美股 D4 回执](../../docs/records/ml-preopen-us-d4_claude_20260906.md)；结果见 [D4 回执](../../docs/records/ml-overnight-d4_claude_20260906.md)。`fetch_external --alt` 抓预注册的对照代理。
 - `overnight_feasibility`（2026-09-06）：港股隔夜特征探针，`--db --out [--shift]`，读 `ml_external_1d` 并用 `features.attach_overnight` 拼接；`--shift` 为泄漏检验；结果见 [D1–D3 回执](../../docs/records/ml-overnight-d1d3_claude_20260906.md)。

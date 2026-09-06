@@ -19,6 +19,8 @@ from . import sessions
 PREOPEN_MINUTES = 30
 SOURCE_HISTORY = 'yfinance_1h'
 SOURCE_LIVE = 'futu_snapshot'
+SOURCE_LIVE_BACKUP = 'yfinance_live'
+LIVE_PRIORITY = (SOURCE_LIVE, SOURCE_LIVE_BACKUP, SOURCE_HISTORY)
 US_TARGETS = ['US.NVDA', 'US.TSLA', 'US.PDD']
 
 
@@ -138,3 +140,35 @@ def attach_preopen(df: pd.DataFrame, quotes: pd.DataFrame, code: str) -> pd.Data
             values.append(hit[0] / float(close) - 1.0)
     out['pre_ret'] = values
     return out
+
+
+def fetch_live_yf(codes: list[str], now: str) -> list[dict]:
+    """Backup live source: yfinance `info['preMarketPrice']` at `now` (network)."""
+    from ..code_map import futu_to_yf
+    import yfinance as yf
+    import zoneinfo
+    current = sessions.utc(now)
+    day = current.astimezone(zoneinfo.ZoneInfo('America/New_York')).date().isoformat()
+    rows = []
+    for code in codes:
+        sessions.session(code, day)   # fail closed on non-sessions
+        info = yf.Ticker(futu_to_yf(code)).info or {}
+        price = _num(info.get('preMarketPrice'))
+        if price is None or not price > 0:
+            raise ValueError(f'{code}: preMarketPrice missing from yfinance')
+        rows.append(dict(code=code, date=day, price=price, prev_close=_num(info.get('previousClose')),
+                         available_at=current.isoformat(), source=SOURCE_LIVE_BACKUP,
+                         source_ref=str(info.get('preMarketTime', '')), synced_at=now))
+    return rows
+
+
+def load_preopen_any(code: str, db_path: Optional[str] = None, *, priority=LIVE_PRIORITY) -> pd.DataFrame:
+    """Merge sources by date with the given priority (first wins); adds a `source` column."""
+    frames = [load_preopen(code, db_path, source=src) for src in priority]
+    merged = {}
+    for df in frames:
+        for _, r in df.iterrows():
+            merged.setdefault(str(r['date']), r)
+    if not merged:
+        return pd.DataFrame(columns=['code', 'date', 'price', 'prev_close', 'available_at', 'source', 'source_ref', 'synced_at'])
+    return pd.DataFrame([merged[k] for k in sorted(merged)]).reset_index(drop=True)
