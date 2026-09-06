@@ -19,11 +19,11 @@ python -m scripts.ml_experiments.strategy_validation --db "$MYSTOCK_EXPERIMENT_D
 - A 必须设置 `MYSTOCK_EXPERIMENT_DB`，只读输入，结果打印到终端。purged walk-forward、CQR 关；`naive_vol` 是训练集的收益/波动率分位乘测试日波动率。原 `lgb_extra_x` 同时变更容量和特征，是探索性组合；独立消融用 `upgrade_matrix`。
 - B 现在要求 `--db`、`--out`；只读连接。统计旧版留档触价后的 1/5 session 条件事件收益，重叠事件不是账户收益；成熟性截止固定为 2026-09-05T06:00Z，未成熟项保留 pending。已不执行旧版最多 20 日轮回逻辑。
 - `upgrade_matrix` 写实验文件但不改输入库；E0–E5 结果为负，不支持模型晋级。
-- `model_matrix`（2026-09-06）：预注册的学习器／尺度矩阵（冻结 LightGBM、naive_vol、EWMA／GK／GARCH 尺度、线性分位、LightGBM／CatBoost／XGBoost 小网格），`--db --out [--only --codes --seed]`；指定后端缺失时直接失败，不回退。首轮结果为负，见 [模型矩阵回执](../../docs/records/ml-model-matrix_claude_20260906.md)。
+- `model_matrix`（2026-09-06；内层选参已改为每块只在该块训练段内选择，见 Codex 审核 P06）：预注册的学习器／尺度矩阵（冻结 LightGBM、naive_vol、EWMA／GK／GARCH 尺度、线性分位、LightGBM／CatBoost／XGBoost 小网格），`--db --out [--only --codes --seed]`；指定后端缺失时直接失败，不回退。首轮结果为负，见 [模型矩阵回执](../../docs/records/ml-model-matrix_claude_20260906.md)。
 - `fetch_external`（2026-09-06）：D1 独立采集入口，`--db` 必填，只写 `ml_external_1d` 与 `ml_sync_log`；未接入 ml.sh。
-- `shadow_report`（2026-09-06）：只读汇总 status=shadow 的留档与已成熟的次日高低价，V2 对 V1 的 raw pinball／覆盖／宽度；shadow 本身由 `bash scripts/ml.sh shadow HK|US` 运行。
+- `shadow_report`（2026-09-06）：只读汇总 status=shadow 的留档：`daily_final` 成熟判定、每目标日最早完整 V1／V2 配对、行内 alpha、B1 重建、计划日分母、尝试状态与逐来源计数；shadow 本身由 `bash scripts/ml.sh shadow HK|US` 运行。
 - `fetch_preopen`（2026-09-06）：美股盘前报价入 `ml_preopen_quotes`，`--db --history`（yfinance 盘前小时线 730 天）或 `--futu`（实盘快照，需 OpenD）；未接入 ml.sh。
-- `overnight_d4`（2026-09-06）：预注册正式实验，`--db --out [--seeds] [--market HK|US]`，O2 对 B0、五种子、两窗口，小米另跑 KWEB 代理；美股结果见 [美股 D4 回执](../../docs/records/ml-preopen-us-d4_claude_20260906.md)；结果见 [D4 回执](../../docs/records/ml-overnight-d4_claude_20260906.md)。`fetch_external --alt` 抓预注册的对照代理。
+- `overnight_d4`（2026-09-06）：预注册正式实验，`--db --out [--seeds] [--market HK|US]`，O2 对 B0、五种子、两窗口，另含同容量对照 O3、O2 对 O3，KWEB 在自身掩码上重建 B0／B1 比较，区间逐股按真实日期配对并保存逐行预测；美股结果见 [美股 D4 回执](../../docs/records/ml-preopen-us-d4_claude_20260906.md)；结果见 [D4 回执](../../docs/records/ml-overnight-d4_claude_20260906.md)。`fetch_external --alt` 抓预注册的对照代理。
 - `overnight_feasibility`（2026-09-06）：港股隔夜特征探针，`--db --out [--shift]`，读 `ml_external_1d` 并用 `features.attach_overnight` 拼接；`--shift` 为泄漏检验；结果见 [D1–D3 回执](../../docs/records/ml-overnight-d1d3_claude_20260906.md)。
 - `strategy_validation` 使用固定历史窗口和合成账户；HK lot=100 是 fixture 参数，不能当作所有港股的真实交易单位。
 

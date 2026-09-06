@@ -254,7 +254,7 @@ def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
                      conformal: bool = False, target_coverage: float = 0.8,
                      cal_frac: float = 0.25, code: str | None = None, clock=None,
                      historical: bool = False, feature_version: str = 'v1',
-                     external: pd.DataFrame | None = None) -> dict:
+                     external: pd.DataFrame | None = None, decision_at=None) -> dict:
     """用全历史 fit，对最新交易日预测次日 [L_hat, H_hat]。供推理/报告用。
 
     conformal=True 时启用 CQR（从训练末尾切 cal_frac 校准，ret 空间半宽 q 应用到次日）。
@@ -285,22 +285,29 @@ def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
     if feature_version == 'v2':
         from .features import FEATURE_COLS_V2, FEATURE_COLS_V2_US, attach_overnight
         from . import preopen
+        if not _HAS_LGB:
+            raise sessions.Unavailable('backend_unavailable', 'v2 requires lightgbm; no sklearn fallback')
+        if not historical:
+            # Guard before any join or fit: outside the pre-open window nothing is computed.
+            sessions.check_preopen_decision(code, expected_as_of, clock())
+        if decision_at is None and not historical:
+            decision_at = clock()   # actual decision upper bound for the as-of join
         if sessions.market(code) == 'HK':
-            df = attach_overnight(df, external, code)
+            df = attach_overnight(df, external, code, decision_at=decision_at)
             cols = list(FEATURE_COLS_V2)
         else:
-            df = preopen.attach_preopen(df, external, code)
+            df = preopen.attach_preopen(df, external, code, decision_at=decision_at)
             cols = list(FEATURE_COLS_V2_US)
         params = dict(V2_PARAMS)
     df = df.replace([float('inf'), float('-inf')], float('nan'))
     train = df.dropna(subset=cols + ["y_high_ret", "y_low_ret"])
     valid = df.dropna(subset=cols)
     if feature_version == 'v2':
-        if len(train) < V2_MIN_ROWS:
-            raise sessions.Unavailable('insufficient_v2_rows', f'{len(train)} rows with {cols[-1]}; need {V2_MIN_ROWS}')
         base_last = df.dropna(subset=FEATURE_COLS).iloc[[-1]] if not df.dropna(subset=FEATURE_COLS).empty else None
         if base_last is not None and str(base_last.iloc[0]['date']) == expected_as_of and not np.isfinite(base_last.iloc[0][cols[-1]]):
             raise sessions.Unavailable('awaiting_preopen_data', f'{cols[-1]} missing for {expected_as_of}')
+        if len(train) < V2_MIN_ROWS:
+            raise sessions.Unavailable('insufficient_v2_rows', f'{len(train)} rows with {cols[-1]}; need {V2_MIN_ROWS}')
     if valid.empty or str(valid.iloc[-1]['date']) != expected_as_of:
         raise sessions.Unavailable('feature_gap', f'No complete features for {expected_as_of}; repair input gaps first')
     last = valid.iloc[[-1]]
@@ -335,6 +342,7 @@ def predict_next_day(daily: pd.DataFrame, *, seed: int = 0,
         "target_coverage": float(target_coverage) if conformal else None,
         "lo_ret_raw": round(float(lo_raw[0]), 6),
         "hi_ret_raw": round(float(hi_raw[0]), 6),
+        "backend": "lightgbm" if _HAS_LGB else "sklearn",
         **extra,
     }
 

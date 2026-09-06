@@ -35,11 +35,10 @@ def main():
                     raise SystemExit(1)
         else:
             from mystock.collectors.futu_client import fetch_snapshots
-            df = fetch_snapshots(codes)
-            rows = preopen.rows_from_futu_snapshot(df, now)
+            rows, rejected = preopen.rows_from_futu_snapshot(fetch_snapshots(codes), now)
             n = mldb.upsert(conn, 'ml_preopen_quotes', rows)
-            mldb.log_sync(conn, 'preopen_live', symbol=','.join(codes), row_count=n, status='ok')
-            print('futu snapshot rows', n, now)
+            mldb.log_sync(conn, 'preopen_live', symbol=','.join(codes), row_count=n, status='ok' if rows else 'empty', message=f'futu rejected={rejected}')
+            print('futu snapshot rows', n, 'rejected', rejected, now)
 
 
 if __name__ == '__main__':

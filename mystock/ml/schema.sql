@@ -174,5 +174,5 @@ CREATE TABLE IF NOT EXISTS ml_preopen_quotes (
     source          TEXT NOT NULL,        -- yfinance_1h / futu_snapshot
     source_ref      TEXT,                 -- 来源原始时间戳或记录标识
     synced_at       TEXT NOT NULL,
-    PRIMARY KEY (code, date, source)
+    PRIMARY KEY (code, date, source, available_at)
 );

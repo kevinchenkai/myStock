@@ -52,6 +52,17 @@ def init_ml_db(db_path: Optional[str] = None) -> None:
             conn.execute("ALTER TABLE ml_quotes_1h ADD COLUMN data_source TEXT NOT NULL DEFAULT 'yfinance'")
         if 'source_ref' not in columns:
             conn.execute('ALTER TABLE ml_quotes_1h ADD COLUMN source_ref TEXT')
+        # 2026-09-06: ml_preopen_quotes primary key gained available_at so same-day recaptures
+        # append versions instead of overwriting. Rebuild the (new, small) table if it predates that.
+        pk = [r[1] for r in conn.execute('PRAGMA table_info(ml_preopen_quotes)') if r[5]]
+        if pk and 'available_at' not in pk:
+            conn.executescript(
+                'ALTER TABLE ml_preopen_quotes RENAME TO ml_preopen_quotes_old;'
+                'CREATE TABLE ml_preopen_quotes (code TEXT NOT NULL, date TEXT NOT NULL, price REAL NOT NULL, prev_close REAL,'
+                ' available_at TEXT NOT NULL, source TEXT NOT NULL, source_ref TEXT, synced_at TEXT NOT NULL,'
+                ' PRIMARY KEY (code, date, source, available_at));'
+                'INSERT INTO ml_preopen_quotes SELECT code,date,price,prev_close,available_at,source,source_ref,synced_at FROM ml_preopen_quotes_old;'
+                'DROP TABLE ml_preopen_quotes_old;')
         conn.commit()
     finally:
         conn.close()

@@ -17,6 +17,7 @@
 | [Codex 开盘前建模与 shadow 审核](research/ml-preopen-review_codex_20260906.md) | `a8fa729..6da6d6c`：8 项必须修订、4 项建议修订，七个无训练合成反例，R1–R8／K1–K14 核对与生产切换前门槛；原回执正文保留 |
 | [Claude 建模工具调研](research/ml-modeling-tools_claude_20260906.md) | 归纳偏置视角的候选分组（尺度模型／线性分位／CatBoost／TabPFN）、与 Codex 审查的逐条对照、合并实验矩阵与协议；v2 已按 Codex 追加审核（§9）修订，回应见 §10 |
 | [新一轮方案：时点前移与隔夜信息](plans/ml-overnight-plan_claude_20260906.md) | 隔夜信息的诊断、可行性预实验与 §7 两市收敛方案；上限推断及“模型不变”表述需结合 Codex 新审核 P08 阅读 |
+| [Codex 审核修订回执](records/ml-preopen-review-fixes_claude_20260906.md) | P01–P08、S01–S04 逐项处置：真实时钟与决策上界、延迟数据失败关闭、快照事件时间校验、配对入档与评价闭环、同容量对照与逐股区间、矩阵每块选参重跑；首条港股 shadow 归为工程记录 |
 | [工程接入与 D5 shadow 启动回执](records/ml-preopen-shadow-start_claude_20260906.md) | V2 预测入口、决策时刻留档、`ml.sh shadow HK|US`、Futu 盘前快照与备用源；港股首条 shadow 已留档，生产默认仍为 V1 |
 | [美股盘前信息 D4 回执](records/ml-preopen-us-d4_claude_20260906.md) | 报告英伟达、特斯拉两侧、两窗口改善 10%–30%；历史跨度与 bar 时点待 P04 核对，双源对照待 P05 完善；Futu 映射已实现未实盘 |
 | [隔夜信息 D4 正式实验回执](records/ml-overnight-d4_claude_20260906.md) | 报告腾讯、阿里两侧改善 8%–32%；KWEB 基线／门槛表及区间解读见 P07，覆盖与收益尚非生产验收 |

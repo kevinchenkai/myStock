@@ -611,6 +611,18 @@
       "provenance": "用户指定审核 a8fa729..6da6d6c；Codex 于 2026-09-06 按顺序阅读七份文档并核对代码、测试，执行无训练的内存合成反例；仅新增独立审查与维护导航、待办，未访问运行库或冻结副本。",
       "first_commit": null,
       "governed_at": "2026-09-06"
+    },
+    {
+      "path": "docs/records/ml-preopen-review-fixes_claude_20260906.md",
+      "legacy_paths": [],
+      "title": "Codex 审核修订回执（开盘前建模与 shadow）",
+      "category": "records",
+      "document_date": "2026-09-06",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "用户确认修订计划后由 Claude Fable 5.1 于 2026-09-06 按 Codex 审核 P01–P08、S01–S04 修订并撰写；基线 f0c1fba。",
+      "first_commit": null,
+      "governed_at": "2026-09-06"
     }
   ]
 }

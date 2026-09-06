@@ -1,0 +1,24 @@
+{
+ "HK.00700": {
+  "target_session": "2026-09-07",
+  "as_of": "2026-09-04",
+  "close": 73.9351,
+  "L_hat": 70.2862,
+  "H_hat": 77.2611,
+  "width_pct": 9.43,
+  "conformal": true,
+  "q_ret": 0.00846,
+  "target_coverage": 0.7
+ },
+ "US.NVDA": {
+  "target_session": "2026-09-08",
+  "as_of": "2026-09-04",
+  "close": 76.1709,
+  "L_hat": 72.4649,
+  "H_hat": 79.7798,
+  "width_pct": 9.6,
+  "conformal": true,
+  "q_ret": 0.00871,
+  "target_coverage": 0.7
+ }
+}

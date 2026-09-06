@@ -90,50 +90,65 @@ FEATURE_COLS_V2 = FEATURE_COLS_V1 + OVERNIGHT_COLS
 FEATURE_COLS_V2_US = FEATURE_COLS_V1 + PREOPEN_COLS
 
 
-def attach_overnight(df: pd.DataFrame, external: pd.DataFrame, code: str) -> pd.DataFrame:
-    """给每个 as_of 行拼接隔夜 ADR 收益（as-of join，纯函数）。
+def attach_overnight(df: pd.DataFrame, external: pd.DataFrame, code: str, decision_at=None) -> pd.DataFrame:
+    """给每个 as_of 行拼接隔夜 ADR 收益（as-of join，纯函数，按美股日历驱动）。
 
-    规则：adr_ret(as_of) = 外部行中 date ≥ as_of 且 available_at < 目标日决策截止（港股 09:00）
-    的所有行的收盘收益复利；即“自港股 as_of 收盘以来、开盘前已知的 ADR 累计变动”。
-    正常日就是日历日 as_of 的那根美股日线；港股休市而美股开市时会累计多根；
-    美股休市时无新信息记 0.0；窗口内应有的美股交易日缺行（数据未到）记 NaN；外部历史尚未开始的 as_of 记 NaN。
-    available_at 严格按时间比较，晚于截止的行永远不进入特征。
+    对 as_of（港股交易日）：目标日 = 下一港股交易日，截止 = 目标日决策截止（09:00 HKT）。
+    预期美股交易日 = 日期 ≥ as_of 且 final_at < 截止 的美股交易日。
+      - 没有预期交易日（真正的美股假日）→ 0.0；
+      - 每个预期交易日以及它们之前的最后一个美股交易日都必须有行、价格有限且 > 0、
+        available_at < 截止、且（若给出 decision_at）available_at ≤ decision_at，否则 → NaN（数据未到／延迟／缺失，失败关闭）；
+      - 满足时 adr_ret = close(最后预期日) / close(起始前一美股日) − 1（用各行自身 close，不跨缺失日）。
+    外部历史尚未开始的 as_of 记 NaN。decision_at 是实际决策时刻的上界，历史模拟须显式传入。
     """
-    from bisect import bisect_left, bisect_right
     from . import sessions
 
     out = df.copy()
     if external is None or len(external) == 0:
         out["adr_ret"] = np.nan
         return out
-    ext = external.sort_values("date").reset_index(drop=True)
-    dates = ext["date"].astype(str).tolist()
-    avail = [sessions.utc(str(v)) for v in ext["available_at"]]
-    ret = ext["close"].astype(float).pct_change().to_numpy()
-    have = set(dates)
+    bound = sessions.utc(decision_at) if decision_at is not None else None
+    rows = {}
+    for d, c, a in zip(external["date"].astype(str), external["close"], external["available_at"]):
+        try:
+            rows[d] = (float(c), sessions.utc(str(a)))
+        except (TypeError, ValueError, sessions.Unavailable):
+            continue
     us_dates = sessions.calendar_dates("US")
+    from bisect import bisect_left
+    first_ext = min(rows) if rows else None
+
+    def usable(d, cutoff):
+        r = rows.get(d)
+        return (r is not None and np.isfinite(r[0]) and r[0] > 0 and r[1] < cutoff
+                and (bound is None or r[1] <= bound))
+
     values = []
     for as_of in out["date"].astype(str):
         try:
-            cutoff = sessions.preopen_window(code, as_of)["deadline"]
+            w = sessions.preopen_window(code, as_of)
         except sessions.Unavailable:
             values.append(np.nan)
             continue
-        if as_of < dates[0]:
+        cutoff = w["deadline"]
+        if first_ext is None or as_of < first_ext:
             values.append(np.nan)
             continue
-        start = bisect_left(dates, as_of)
-        end = bisect_left(avail, cutoff)   # strictly before the cutoff: at the deadline it is already too late
-        # Expected US sessions in the window: a missing bar on one of them means data not yet
-        # available (NaN, fail closed), not "no information"; only a genuine US holiday gives 0.
-        expected = [d for d in us_dates[bisect_left(us_dates, as_of):] if sessions.session(sessions.US_CALENDAR_CODE, d)["final_at"] < cutoff]
-        if any(d not in have for d in expected):
-            values.append(np.nan)
-            continue
-        if end <= start:
+        k = bisect_left(us_dates, as_of)
+        expected = []
+        while k < len(us_dates) and sessions.session(sessions.US_CALENDAR_CODE, us_dates[k])["final_at"] < cutoff:
+            expected.append(us_dates[k]); k += 1
+        if not expected:
             values.append(0.0)
             continue
-        seg = ret[start:end]
-        values.append(float(np.prod(1.0 + seg) - 1.0) if np.isfinite(seg).all() else np.nan)
+        base_idx = bisect_left(us_dates, expected[0]) - 1
+        if base_idx < 0:
+            values.append(np.nan)
+            continue
+        base = us_dates[base_idx]
+        if not all(usable(d, cutoff) for d in expected) or not usable(base, cutoff):
+            values.append(np.nan)
+            continue
+        values.append(rows[expected[-1]][0] / rows[base][0] - 1.0)
     out["adr_ret"] = values
     return out

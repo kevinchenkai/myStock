@@ -67,7 +67,8 @@ def garch_scale(ret_fit, ret_all, *, dist: str = 'normal'):
     res = arch_model(fit * 100.0, mean='Zero', vol='GARCH', p=1, q=1, dist=dist, rescale=False).fit(disp='off')
     params = res.params
     omega, a1, b1 = float(params['omega']), float(params['alpha[1]']), float(params['beta[1]'])
-    ok = np.isfinite([omega, a1, b1]).all() and omega > 0 and a1 >= 0 and b1 >= 0 and a1 + b1 < 1
+    ok = (np.isfinite([omega, a1, b1]).all() and omega > 0 and a1 >= 0 and b1 >= 0 and a1 + b1 < 1
+          and int(res.convergence_flag) == 0)   # non-converged fits are rejected, never used silently
     info = dict(omega=omega, alpha=a1, beta=b1, convergence_flag=int(res.convergence_flag),
                 stationary=bool(ok), n_fit=int(len(fit)))
     if not ok:

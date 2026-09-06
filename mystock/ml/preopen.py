@@ -1,14 +1,19 @@
-"""US pre-open quotes (pre-market price 30 minutes before the open) for the pre-open decision.
+"""US pre-open quotes (pre-market price before the open) for the pre-open decision.
 
-Historical rows come from yfinance hourly bars with prepost=True: the 08:00–09:00 ET bar's close
-is the price at 09:00 ET. Live rows come from a Futu market snapshot taken at run time. Both
-carry `available_at` = the snapshot moment, so the as-of join can be audited. Written only by
-`scripts/ml_experiments/fetch_preopen.py`; the production predictor does not read it.
+Historical rows: yfinance hourly bars with prepost=True; only the bar that starts exactly at
+08:00 America/New_York is accepted and its close is the price at 09:00 ET (= the pre-registered
+snapshot moment, open − 30 min). Live rows: Futu market snapshot (primary) and yfinance
+`preMarketPrice` (backup), both captured at the same planned moment and both stored; each row
+keeps the provider event time in `source_ref` and is validated against the target session's
+pre-market window before it can be used. Selection among valid rows follows LIVE_PRIORITY.
+Written only by `scripts/ml_experiments/fetch_preopen.py` / `mystock.ml.shadow`; the production
+predictor does not read it.
 """
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
+import zoneinfo
 
 import numpy as np
 import pandas as pd
@@ -22,6 +27,8 @@ SOURCE_LIVE = 'futu_snapshot'
 SOURCE_LIVE_BACKUP = 'yfinance_live'
 LIVE_PRIORITY = (SOURCE_LIVE, SOURCE_LIVE_BACKUP, SOURCE_HISTORY)
 US_TARGETS = ['US.NVDA', 'US.TSLA', 'US.PDD']
+NY = zoneinfo.ZoneInfo('America/New_York')
+PREMARKET_START_HOUR = 4          # US pre-market opens 04:00 ET
 
 
 def snapshot_time(code: str, date: str):
@@ -29,11 +36,30 @@ def snapshot_time(code: str, date: str):
     return sessions.session(code, date)['open'] - timedelta(minutes=PREOPEN_MINUTES)
 
 
+def _num(v):
+    try:
+        f = float(v)
+        return f if np.isfinite(f) else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _valid_price(p) -> bool:
+    return p is not None and np.isfinite(p) and p > 0
+
+
+def premarket_window(code: str, date: str):
+    """(start, end) UTC of the pre-market period for that session: 04:00 ET .. open."""
+    s = sessions.session(code, date)
+    start = datetime.combine(datetime.fromisoformat(date).date(), datetime.min.time(), tzinfo=NY).replace(hour=PREMARKET_START_HOUR)
+    return start.astimezone(timezone.utc), s['open']
+
+
 def rows_from_yf_hourly(df: pd.DataFrame, code: str, now: str) -> list[dict]:
     """Historical pre-open rows from a yfinance prepost hourly frame (tz-aware index).
 
-    Uses only the bar starting 08:00 local (New York); its close is the price at 09:00 ET,
-    which equals the snapshot moment. Rows whose snapshot moment is after `now` are dropped.
+    Accepts only bars starting exactly 08:00:00 New York time on a US session; duplicates are
+    rejected; rows whose snapshot moment is after `now` are dropped.
     """
     current = sessions.utc(now)
     if df is None or df.empty:
@@ -42,20 +68,21 @@ def rows_from_yf_hourly(df: pd.DataFrame, code: str, now: str) -> list[dict]:
     if getattr(idx, 'tz', None) is None:
         raise ValueError('hourly frame must be timezone-aware')
     local = idx.tz_convert('America/New_York')
-    rows = []
+    rows, seen = [], set()
     for ts_local, (_, r) in zip(local, df.iterrows()):
-        if ts_local.hour != 8:
+        if (ts_local.hour, ts_local.minute, ts_local.second) != (8, 0, 0):
             continue
         day = ts_local.strftime('%Y-%m-%d')
         try:
             avail = snapshot_time(code, day)
         except sessions.Unavailable:
             continue
-        if avail > current:
+        if avail > current or day in seen:
             continue
-        price = float(r['Close'])
-        if not (np.isfinite(price) and price > 0):
+        price = _num(r['Close'])
+        if not _valid_price(price):
             continue
+        seen.add(day)
         rows.append(dict(code=code, date=day, price=price, prev_close=None, available_at=avail.isoformat(),
                          source=SOURCE_HISTORY, source_ref=ts_local.isoformat(), synced_at=now))
     return rows
@@ -64,67 +91,137 @@ def rows_from_yf_hourly(df: pd.DataFrame, code: str, now: str) -> list[dict]:
 def fetch_history(code: str, now: str, *, period: str = '730d') -> list[dict]:
     """Download prepost hourly bars for `code` (network) and convert to pre-open rows."""
     from ..code_map import futu_to_yf
-    try:
-        import yfinance as yf
-    except ImportError as e:  # pragma: no cover
-        raise RuntimeError('yfinance unavailable') from e
+    import yfinance as yf
     df = yf.Ticker(futu_to_yf(code)).history(period=period, interval='1h', prepost=True, auto_adjust=False)
     return rows_from_yf_hourly(df, code, now)
 
 
-def rows_from_futu_snapshot(df: pd.DataFrame, now: str) -> list[dict]:
-    """Live pre-open rows from a Futu get_market_snapshot frame taken at `now`.
+def _parse_event(value, *, zone=NY):
+    """Parse a provider timestamp (ISO / 'YYYY-MM-DD HH:MM:SS' local / epoch seconds) to UTC."""
+    if value is None or (isinstance(value, float) and not np.isfinite(value)) or str(value).strip() == '':
+        return None
+    if isinstance(value, (int, float)) or str(value).isdigit():
+        return datetime.fromtimestamp(float(value), tz=timezone.utc)
+    text = str(value).replace('Z', '+00:00')
+    try:
+        dt = datetime.fromisoformat(text)
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=zone)
+    return dt.astimezone(timezone.utc)
 
-    Requires a pre-market price column; refuses to fall back to last_price silently.
+
+def _live_row(code, price, prev_close, event, now_dt, now_iso, source):
+    """Validate one live quote against the session dated by `now` (New York) and return (row, reason)."""
+    day = now_dt.astimezone(NY).date().isoformat()
+    try:
+        start, end = premarket_window(code, day)
+    except sessions.Unavailable:
+        return None, f'{day} is not a US session'
+    if not _valid_price(price):
+        return None, 'price missing or invalid'
+    if event is None:
+        return None, 'event time missing'
+    if not (start <= event < end):
+        return None, f'event time {event.isoformat()} outside pre-market window of {day}'
+    if event > now_dt:
+        return None, 'event time after capture time'
+    return dict(code=code, date=day, price=float(price), prev_close=prev_close, available_at=now_iso,
+                source=source, source_ref=event.isoformat(), synced_at=now_iso), None
+
+
+def rows_from_futu_snapshot(df: pd.DataFrame, now: str) -> tuple[list[dict], dict]:
+    """Live rows from a Futu get_market_snapshot frame captured at `now`.
+
+    Uses `pre_market_price` and `update_time` (Futu: last update, US quotes in New York time).
+    Returns (valid rows, {code: rejection reason}). No fallback to last_price.
     """
-    current = sessions.utc(now)
-    rows = []
+    now_dt = sessions.utc(now); now_iso = now_dt.isoformat()
+    rows, rejected = [], {}
     for _, r in df.iterrows():
         code = str(r['code'])
-        price = None
-        for col in ('pre_market_price', 'pre_price'):
-            if col in df.columns and pd.notna(r[col]):
-                price = float(r[col])
-                break
-        if price is None or not price > 0:
-            raise ValueError(f'{code}: pre-market price missing in snapshot')
-        zone = 'America/New_York'
-        day = current.astimezone(__import__('zoneinfo').ZoneInfo(zone)).date().isoformat()
+        price = _num(r['pre_market_price']) if 'pre_market_price' in df.columns else None
+        row, why = _live_row(code, price, _num(r.get('prev_close_price')), _parse_event(r.get('update_time')), now_dt, now_iso, SOURCE_LIVE)
+        if row: rows.append(row)
+        else: rejected[code] = why
+    return rows, rejected
+
+
+def fetch_live_yf(codes: list[str], now: str) -> tuple[list[dict], dict]:
+    """Backup live source: yfinance `info['preMarketPrice']` with `preMarketTime` (network)."""
+    from ..code_map import futu_to_yf
+    import yfinance as yf
+    now_dt = sessions.utc(now); now_iso = now_dt.isoformat()
+    rows, rejected = [], {}
+    for code in codes:
         try:
-            sessions.session(code, day)
-        except sessions.Unavailable as e:
-            raise ValueError(f'{code}: {day} is not a US session') from e
-        rows.append(dict(code=code, date=day, price=price, prev_close=_num(r.get('prev_close_price')),
-                         available_at=current.isoformat(), source=SOURCE_LIVE,
-                         source_ref=str(r.get('update_time', '')), synced_at=now))
-    return rows
+            info = yf.Ticker(futu_to_yf(code)).info or {}
+        except Exception as e:  # noqa: BLE001
+            rejected[code] = f'yfinance error: {type(e).__name__}'
+            continue
+        row, why = _live_row(code, _num(info.get('preMarketPrice')), _num(info.get('previousClose')), _parse_event(info.get('preMarketTime')), now_dt, now_iso, SOURCE_LIVE_BACKUP)
+        if row: rows.append(row)
+        else: rejected[code] = why
+    return rows, rejected
 
 
-def _num(v):
-    try:
-        f = float(v)
-        return f if f == f else None
-    except (TypeError, ValueError):
-        return None
-
-
-def load_preopen(code: str, db_path: Optional[str] = None, *, source: str = SOURCE_HISTORY) -> pd.DataFrame:
+def load_preopen(code: str, db_path: Optional[str] = None, *, source: str | None = None) -> pd.DataFrame:
     with mldb.get_ml_connection_readonly(db_path) as c:
+        if source:
+            return pd.read_sql_query('SELECT code, date, price, prev_close, available_at, source, source_ref, synced_at '
+                                     'FROM ml_preopen_quotes WHERE code=? AND source=? ORDER BY date, available_at', c, params=(code, source))
         return pd.read_sql_query('SELECT code, date, price, prev_close, available_at, source, source_ref, synced_at '
-                                 'FROM ml_preopen_quotes WHERE code=? AND source=? ORDER BY date', c, params=(code, source))
+                                 'FROM ml_preopen_quotes WHERE code=? ORDER BY date, available_at', c, params=(code,))
 
 
-def attach_preopen(df: pd.DataFrame, quotes: pd.DataFrame, code: str) -> pd.DataFrame:
+def select_quote(quotes: pd.DataFrame, code: str, target: str, decision_at, priority=LIVE_PRIORITY):
+    """Among rows dated `target`, keep those valid for a decision at `decision_at` (available_at strictly
+    before the session deadline and not after decision_at, finite positive price) and pick by priority,
+    latest available_at within a source. Returns a one-row DataFrame or None."""
+    deadline = sessions.session(code, target)['deadline']
+    bound = sessions.utc(decision_at)
+    cands = []
+    for _, r in quotes[quotes['date'].astype(str) == target].iterrows():
+        try:
+            a = sessions.utc(str(r['available_at']))
+        except (ValueError, sessions.Unavailable):
+            continue
+        if _valid_price(_num(r['price'])) and a < deadline and a <= bound:
+            cands.append((priority.index(r['source']) if r['source'] in priority else len(priority), -a.timestamp(), r))
+    if not cands:
+        return None
+    cands.sort(key=lambda t: (t[0], t[1]))
+    return pd.DataFrame([cands[0][2]])
+
+
+def quotes_for_prediction(code: str, db_path, target: str, decision_at) -> tuple[pd.DataFrame, Optional[dict]]:
+    """History rows before `target` plus the selected live/history row for `target` (if any)."""
+    allq = load_preopen(code, db_path)
+    hist = allq[(allq['source'] == SOURCE_HISTORY) & (allq['date'].astype(str) < target)]
+    chosen = select_quote(allq, code, target, decision_at)
+    frame = pd.concat([hist, chosen], ignore_index=True) if chosen is not None else hist.reset_index(drop=True)
+    return frame, (chosen.iloc[0].to_dict() if chosen is not None else None)
+
+
+def attach_preopen(df: pd.DataFrame, quotes: pd.DataFrame, code: str, decision_at=None) -> pd.DataFrame:
     """pre_ret(as_of) = pre-open price on the target session / close(as_of) − 1 (pure as-of join).
 
-    Only the quote dated exactly the target session and with available_at strictly before that
-    session's decision deadline is used; anything else gives NaN (no information, fail closed).
+    Only a quote dated exactly the target session, with a finite positive price, available_at
+    strictly before that session's deadline and (if given) not after decision_at is used; when
+    several qualify the LIVE_PRIORITY source wins. Anything else gives NaN (fail closed).
     """
     out = df.copy()
     if quotes is None or len(quotes) == 0:
         out['pre_ret'] = np.nan
         return out
-    q = {str(d): (float(p), sessions.utc(str(a))) for d, p, a in zip(quotes['date'], quotes['price'], quotes['available_at'])}
+    bound = sessions.utc(decision_at) if decision_at is not None else None
+    by_date: dict[str, list] = {}
+    for _, r in quotes.iterrows():
+        try:
+            by_date.setdefault(str(r['date']), []).append((r['source'], _num(r['price']), sessions.utc(str(r['available_at']))))
+        except (ValueError, sessions.Unavailable):
+            continue
     values = []
     for as_of, close in zip(out['date'].astype(str), out['close']):
         try:
@@ -133,42 +230,12 @@ def attach_preopen(df: pd.DataFrame, quotes: pd.DataFrame, code: str) -> pd.Data
         except sessions.Unavailable:
             values.append(np.nan)
             continue
-        hit = q.get(target)
-        if hit is None or hit[1] >= deadline or not (isinstance(close, (int, float)) and np.isfinite(close) and close > 0):
+        ok = [(LIVE_PRIORITY.index(src) if src in LIVE_PRIORITY else len(LIVE_PRIORITY), -a.timestamp(), p)
+              for src, p, a in by_date.get(target, []) if _valid_price(p) and a < deadline and (bound is None or a <= bound)]
+        if not ok or not (isinstance(close, (int, float)) and np.isfinite(close) and close > 0):
             values.append(np.nan)
         else:
-            values.append(hit[0] / float(close) - 1.0)
+            ok.sort()
+            values.append(ok[0][2] / float(close) - 1.0)
     out['pre_ret'] = values
     return out
-
-
-def fetch_live_yf(codes: list[str], now: str) -> list[dict]:
-    """Backup live source: yfinance `info['preMarketPrice']` at `now` (network)."""
-    from ..code_map import futu_to_yf
-    import yfinance as yf
-    import zoneinfo
-    current = sessions.utc(now)
-    day = current.astimezone(zoneinfo.ZoneInfo('America/New_York')).date().isoformat()
-    rows = []
-    for code in codes:
-        sessions.session(code, day)   # fail closed on non-sessions
-        info = yf.Ticker(futu_to_yf(code)).info or {}
-        price = _num(info.get('preMarketPrice'))
-        if price is None or not price > 0:
-            raise ValueError(f'{code}: preMarketPrice missing from yfinance')
-        rows.append(dict(code=code, date=day, price=price, prev_close=_num(info.get('previousClose')),
-                         available_at=current.isoformat(), source=SOURCE_LIVE_BACKUP,
-                         source_ref=str(info.get('preMarketTime', '')), synced_at=now))
-    return rows
-
-
-def load_preopen_any(code: str, db_path: Optional[str] = None, *, priority=LIVE_PRIORITY) -> pd.DataFrame:
-    """Merge sources by date with the given priority (first wins); adds a `source` column."""
-    frames = [load_preopen(code, db_path, source=src) for src in priority]
-    merged = {}
-    for df in frames:
-        for _, r in df.iterrows():
-            merged.setdefault(str(r['date']), r)
-    if not merged:
-        return pd.DataFrame(columns=['code', 'date', 'price', 'prev_close', 'available_at', 'source', 'source_ref', 'synced_at'])
-    return pd.DataFrame([merged[k] for k in sorted(merged)]).reset_index(drop=True)
