@@ -16,6 +16,17 @@
 
 按预注册停止规则：本轮不再扩展搜索，负结果登记；树模型与尺度模型两组假设都已检验，学习器和尺度估计器都不是当前误差的主要来源。
 
+## 0.1 本日进展时间线（供审核者定位）
+
+| 提交 | 内容 |
+| --- | --- |
+| `a8fa729` | Claude 只读调研 v1.0；Codex 原审查按治理规范入库 |
+| `e02e2bf` | Codex 追加审核（研究文档 §9）后修订为 v2 |
+| `d699de2` | v2.1：同步 §3／§8，联网核实 TabPFN-3／TabPFN 分位接口／CatBoost MultiQuantile |
+| `eece068` | 用户授权后执行首轮矩阵：新增 `mystock/ml/models.py`、`mystock/ml/scales.py`、`scripts/ml_experiments/model_matrix.py` 与单测；本回执 |
+
+用户决定：实验可在 main 与本机进行但不得影响 Web／ML 正常工作；mk 直接安装所需库；由 Claude 执行、Codex Astra 审核。
+
 ## 1. 预注册与执行事实
 
 | 项 | 值 |
@@ -176,3 +187,37 @@
 2. 后续若还要提升准确性，更合理的方向是**误差归因**而不是继续换模型：把误差分成普通日、跳空日、财报日、市场大幅波动日，看剩余误差落在哪里，再决定是否需要新的信息源。这属于新一轮范围。
 3. TabPFN 探针、HAR-RV、CARR、MultiQuantile、池化、组合仍处后置；在没有新的信息增量假设前，不建议为它们再消耗一次开发窗口查看。
 4. 代码层交付（`mystock/ml/models.py`、`mystock/ml/scales.py`、`scripts/ml_experiments/model_matrix.py` 及单测）保留在仓库，供后续复现；不接入生产。
+
+## 8. 复现命令
+
+在仓库根目录、mk 环境执行；输入应为冻结副本，输出目录任意（忽略目录内）：
+
+```bash
+conda activate mk
+python -m scripts.ml_experiments.model_matrix --db data/model-matrix-20260906/input.db --out data/model-matrix-20260906/run1
+```
+
+`--only` 可限定候选，`--codes` 可限定股票，`--seed` 默认 0。输出 `metrics.json`（逐股指标、折信息、失败与回退）、`predictions.json`（逐 session 的 raw／校准边界与逐行 pinball）、`protocol.json`（预注册候选、内层分数、选中配置、拟合次数、耗时、版本、输入哈希、门槛表）。单测：`pytest tests/test_ml_models.py tests/test_ml_scales.py`。
+
+## 9. 关键实现决策（审核要点）
+
+以下每条都是本轮做出的具体选择，请审核者重点核对是否符合 §6 协议或是否引入偏差。函数名可在 [model_matrix.py](../../scripts/ml_experiments/model_matrix.py)、[scales.py](../../mystock/ml/scales.py)、[models.py](../../mystock/ml/models.py) 中定位。
+
+| 编号 | 决策 | 位置 | 说明与可能的争议点 |
+| --- | --- | --- | --- |
+| K1 | 复用 `upgrade_matrix.features` 的特征、公司行动掩码与 `2026-09-05T06:00Z` 的准备时钟 | `prepare` | 保证与 E0–E5 同一共同掩码；输入库已更新到 09-04，故 120 个 session 相对旧记录平移约两个 session |
+| K2 | 训练／校准／测试切分与 E0–E5 相同：`tr = usable[(date<first)&(target_session<=first)]`，尾部 25% 校准，1 行 gap | `prepare` | 标签成熟性以首个测试决策日为界 |
+| K3 | 内层选参：每块训练段 `a` 的末尾 20%（至少 20 行、1 行 gap）作验证；分数为各股相对网格首配置的 pinball 等权均值，取最小；每侧一套、六股共享 | `inner_select` | 校准段与测试段不参与选择；六股共享是预先固定的选择，未尝试按市场共享 |
+| K4 | 外层：选中配置在整个 `a` 上重拟合，预测 `c+te`，CQR 的 q 只由 `c` 估计 | `evaluate` | 内层验证段在外层被重新纳入训练，属常规做法，但意味着内层分数与外层分数不可直接比较 |
+| K5 | 尺度候选：`q = quantile(y/s over a)`，预测 `q × s_row`，每个尺度各自重估 q；尺度经过与 B1 相同的正下限 `1e-4` | `scales.scaled_quantile`、`evaluation.scale` | B1 走同一函数，与 `evaluation.naive_vol` 数值一致（有单测） |
+| K6 | EWMA 用前 20 个收益的样本方差初始化，λ=0.94，NaN 收益沿用前状态 | `scales.ewma_scale` | 全序列一次计算，只依赖过去，无块内重估 |
+| K7 | Garman-Klass 用复权 OHLC，20 日滚动均值开方，t 的滚动值直接作 t+1 尺度；负值截 0 | `scales.garman_klass_scale` | 只含日内信息，不含隔夜跳空；未做普通日／跳空日分报 |
+| K8 | GARCH(1,1)：零均值、正态，用 `a` 的 `ret_1d`（收益 ×100）估计参数；再以固定参数在截至测试块末日的全序列上前向过滤，取 h=1 方差开方 ÷100 | `scales.garch_scale`、`scale_for` | 过滤经过校准段与测试段时使用了这些日期**已实现**的收益，这是 t 时刻可得信息，不是标签；参数每块重估一次，块内不更新。要求 ω>0、α+β<1，否则该块回退 B1 并计数（本轮 0 次） |
+| K9 | 树模型固定 300 树、lr 0.03、colsample 0.8、seed 0；LightGBM 关 bagging（与 B0 一致）；CatBoost 显式 `boosting_type=Ordered`；XGBoost `hist` | `models.py` | 三库容量参数不同名不同义，网格是“各自合理范围”，不是同名同值 |
+| K10 | 线性分位：`StandardScaler` 只在训练段拟合，`QuantileRegressor(alpha=1e-3, solver='highs')` | `models._fit_linear` | 单配置，未做 L_scaled |
+| K11 | 后端缺失直接失败（`BackendUnavailable`），runner 启动前检查所有所需后端 | `models._require`、`main` | 不存在静默回退到 sklearn 的路径 |
+| K12 | 失败处理：任一块异常则该块用 B1 尺度并标记 `fallback`，指标同时给全体与仅模型行（`model_only`） | `evaluate` | 本轮无触发，因此无分母差异 |
+| K13 | 门槛表的配对区间：逐 session 的 pinball 差除以该股 B0 均值，按各股 session 序号对齐后等股平均，10-session 块 bootstrap | `summarize`、`evaluation.block_interval` | 与 E0–E5 汇总脚本同口径；跨市场日期不完全相同 |
+| K14 | 未做：五种子、更早历史窗口、前向 shadow、费用后回放、跳空日分报、L_scaled、C2／P1／A1／T1 | — | 无候选接近门槛，按预注册未启动 |
+
+请审核者特别关注 K3（内层分数的相对化是否引入对网格首配置的偏置）、K8（前向过滤的时点是否被接受）以及 K1（复用旧时钟是否影响 09-03／09-04 两个 session 的成熟性判断）。
