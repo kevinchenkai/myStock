@@ -1,0 +1,19 @@
+docs/records/ml-model-matrix_claude_20260906.md
+  s_e8a3869e1f94b1::t_7a6362c8e34d60 19-29,190-223
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "36552ad0abfef3824be3022f7d1cb61ddf86664c",
+  "prompts": {},
+  "sessions": {
+    "s_e8a3869e1f94b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "280953a0-bde7-47d8-a1f5-b9535307bb48",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
