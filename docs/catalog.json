@@ -501,6 +501,32 @@
       "provenance": "Codex 执行 fc32045 工单；用户后续要求在本地 main 实施。实际依赖升级与隔离 Web 验收记录。",
       "first_commit": null,
       "governed_at": "2026-09-05"
+    },
+    {
+      "path": "docs/research/ml-review_codex_20260906.md",
+      "legacy_paths": [
+        "docs/research/myStock_ML_Review_Codex_20260906.md"
+      ],
+      "title": "Codex ML 模块审查与 LightGBM 替代方案研究",
+      "category": "research",
+      "document_date": "2026-09-06",
+      "producer": "codex",
+      "status": "current",
+      "provenance": "用户提供的 Codex（GPT Astra）审查，原文署名 Codex、日期 2026-09-06、基线 b988ea2；由 Claude 按治理规范改名入库，正文未改。",
+      "first_commit": null,
+      "governed_at": "2026-09-06"
+    },
+    {
+      "path": "docs/research/ml-modeling-tools_claude_20260906.md",
+      "legacy_paths": [],
+      "title": "Claude ML 建模工具调研",
+      "category": "research",
+      "document_date": "2026-09-06",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "用户请求只读调研“是否有优于 LightGBM 的建模工具”；Claude Fable 5.1 于 2026-09-06 撰写并回应 Codex 同日审查；基线 b988ea2。",
+      "first_commit": null,
+      "governed_at": "2026-09-06"
     }
   ]
 }

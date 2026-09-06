@@ -4,7 +4,7 @@
 > 约定见 [`COLLABORATION.md`](COLLABORATION.md) §4。
 >
 > 关闭一项时**标记完成并写明关闭它的提交／文档，不要删行**——删掉就看不出它曾被判断过。
-> 最后更新：2026-09-05（导入升级遗留项；文档同步基线 a460d38/main，补正早期概览的模型结论与来源，未实施模型改动）。
+> 最后更新：2026-09-06（登记 ML 建模工具调研待决策项与 Codex 审查发现；未实施模型改动）。
 
 ## 状态说明
 
@@ -50,6 +50,18 @@
 | --- | --- | --- |
 | E0–E5 无候选晋级 | 等股票权重 raw pinball ≥5%、skill ≥3%、4/6 股票方向改善的门槛均未达成 | 已如实记录为负结果，见[实验汇总](records/ml-upgrade-experiment-results_codex_20260904.md)。**不调低门槛**；后续若做 E6–E8 属新一轮范围 |
 | 前向 shadow 未开始 | 历史重建**不是** live、也不是前向 shadow | 待办（需真实等待未来交易日，无法压缩） |
+| 建模工具调研待决策 | [Claude 调研](research/ml-modeling-tools_claude_20260906.md)与 [Codex 审查](research/ml-review_codex_20260906.md)给出三批候选（尺度模型／线性分位／组合 → CatBoost／XGBoost／池化 → TabPFN 探针）与统一协议 | 待用户决定是否执行第一批；门槛不变，不为使用新工具更换生产模型 |
+
+### 来自 Codex 审查 ML-REVIEW-20260906
+
+来源：[Codex ML 审查](research/ml-review_codex_20260906.md) §5。与建模工具比较相互独立，不阻塞零依赖实验；均为待确认口径问题，尚未独立复核。
+
+| 编号 | 问题 | 状态 |
+| --- | --- | --- |
+| **R-01** | 公网报告仍走 `report.build_report → backtest.run_backtest`（旧 `simulator.Account`，无费用／lot／公司行动），与新 `execution.replay` 协议不同；公网收益与命中率不能当验收 | 待办：报告标注协议，或迁移到新引擎 |
+| **R-02** | Bandit reward 用 T+1 盯市差值减 buy_hold 增量，不等于完整账户日收益；需先选定目标口径再验证 | 待办：与换模型分开归因 |
+| **R-03** | 特征用复权比例、标签用原始 high/low 相对原始 close；开发 runner 排除公司行动目标日而逐日重建包含 | 待办：预先规定普通日／事件日口径 |
+| **R-04** | `predictor._fit_quantile` 缺 LightGBM 时静默回退 sklearn；实验须在指定后端缺失时明确失败 | 待办：随模型适配层处理 |
 
 ---
 
