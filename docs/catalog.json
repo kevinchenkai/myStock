@@ -527,6 +527,18 @@
       "provenance": "用户请求只读调研“是否有优于 LightGBM 的建模工具”；Claude Fable 5.1 于 2026-09-06 撰写并回应 Codex 同日审查；基线 b988ea2。同日 Codex 追加审核（§9），Claude 按其修订为 v2 并回应（§10）。",
       "first_commit": null,
       "governed_at": "2026-09-06"
+    },
+    {
+      "path": "docs/records/ml-model-matrix_claude_20260906.md",
+      "legacy_paths": [],
+      "title": "ML 模型矩阵首轮实验回执",
+      "category": "records",
+      "document_date": "2026-09-06",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "用户授权后由 Claude Fable 5.1 于 2026-09-06 在冻结副本上执行预注册矩阵并撰写；基线 d699de2。",
+      "first_commit": null,
+      "governed_at": "2026-09-06"
     }
   ]
 }

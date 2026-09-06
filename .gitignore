@@ -242,3 +242,6 @@ data/
 # macOS
 .DS_Store
 **/.DS_Store
+
+# CatBoost 训练日志目录（实验副产物）
+catboost_info/

@@ -19,6 +19,7 @@ python -m scripts.ml_experiments.strategy_validation --db "$MYSTOCK_EXPERIMENT_D
 - A 必须设置 `MYSTOCK_EXPERIMENT_DB`，只读输入，结果打印到终端。purged walk-forward、CQR 关；`naive_vol` 是训练集的收益/波动率分位乘测试日波动率。原 `lgb_extra_x` 同时变更容量和特征，是探索性组合；独立消融用 `upgrade_matrix`。
 - B 现在要求 `--db`、`--out`；只读连接。统计旧版留档触价后的 1/5 session 条件事件收益，重叠事件不是账户收益；成熟性截止固定为 2026-09-05T06:00Z，未成熟项保留 pending。已不执行旧版最多 20 日轮回逻辑。
 - `upgrade_matrix` 写实验文件但不改输入库；E0–E5 结果为负，不支持模型晋级。
+- `model_matrix`（2026-09-06）：预注册的学习器／尺度矩阵（冻结 LightGBM、naive_vol、EWMA／GK／GARCH 尺度、线性分位、LightGBM／CatBoost／XGBoost 小网格），`--db --out [--only --codes --seed]`；指定后端缺失时直接失败，不回退。首轮结果为负，见 [模型矩阵回执](../../docs/records/ml-model-matrix_claude_20260906.md)。
 - `strategy_validation` 使用固定历史窗口和合成账户；HK lot=100 是 fixture 参数，不能当作所有港股的真实交易单位。
 
 ## 显式写入／补采工具

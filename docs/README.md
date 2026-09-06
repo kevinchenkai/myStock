@@ -10,11 +10,12 @@
 
 ## 当前讨论：ML 建模工具（是否有优于 LightGBM 的工具）
 
-2026-09-06 只读调研，未执行任何训练或依赖安装；是否进入实验由用户决定。两份文档结论一致：现有证据不能指定“已经更好”的替代品，需在统一样本外协议下比较。
+2026-09-06 只读调研后，用户授权在 mk 安装 catboost／xgboost／arch 并在冻结副本上执行首轮预注册矩阵；结果为负，无候选过门槛，生产模型不变。
 
 | 文档 | 用途 |
 | --- | --- |
 | [Claude 建模工具调研](research/ml-modeling-tools_claude_20260906.md) | 归纳偏置视角的候选分组（尺度模型／线性分位／CatBoost／TabPFN）、与 Codex 审查的逐条对照、合并实验矩阵与协议；v2 已按 Codex 追加审核（§9）修订，回应见 §10 |
+| [模型矩阵首轮实验回执](records/ml-model-matrix_claude_20260906.md) | 九候选（冻结 LightGBM、naive_vol、EWMA／GK／GARCH 尺度、线性分位、LightGBM／CatBoost／XGBoost 小网格）同协议比较，全部不晋级；含预注册、成本与逐股表 |
 | [Codex ML 审查](research/ml-review_codex_20260906.md) | 代码与文档审查、报告协议与 reward 口径问题、CatBoost／XGBoost／TabPFN／NGBoost 适配分析、有界实验设计 |
 
 ## 当前工单：Web 两项 P0 与依赖升级
