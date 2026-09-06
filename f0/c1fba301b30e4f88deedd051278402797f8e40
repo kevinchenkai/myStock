@@ -1,0 +1,27 @@
+docs/research/ml-preopen-review_codex_20260906.md
+  s_612cad8e12fb53::t_c81bed7fb78312 1-228,230-231
+  s_612cad8e12fb53::t_b89375f7bf7fce 229
+docs/OPEN_ITEMS.md
+  s_612cad8e12fb53::t_a76c7505c5408d 7,52,54,69-86
+  s_612cad8e12fb53::t_396f1279fea766 87
+docs/catalog.json
+  s_612cad8e12fb53::t_22b73c34851b4a 602-613
+docs/README.md
+  s_612cad8e12fb53::t_a76c7505c5408d 3,13,17,19,21-23
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "f0c1fba301b30e4f88deedd051278402797f8e40",
+  "prompts": {},
+  "sessions": {
+    "s_612cad8e12fb53": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "01a06fa0-7445-7b73-84c4-5ea66f7dc7a6",
+        "model": "gpt-6-astra"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
