@@ -1,0 +1,48 @@
+scripts/ml.sh
+  s_e8a3869e1f94b1::t_36398d27eb5760 43-47,55
+mystock/ml/preopen.py
+  s_e8a3869e1f94b1::t_36398d27eb5760 22-23,143-174
+mystock/ml/shadow.py
+  s_e8a3869e1f94b1::t_2856089b8fc692 86-89
+  s_e8a3869e1f94b1::t_36398d27eb5760 1-85,90-110
+mystock/ml/predictor.py
+  s_e8a3869e1f94b1::t_62ed381ff9e69a 313-314
+  s_e8a3869e1f94b1::t_36398d27eb5760 53,55,60-61,95-96,110-112,127,248-251,256-257,261-265,267-268,273-274,282-294,296-303,310,317-325,336-338
+scripts/ml_experiments/shadow_report.py
+  s_e8a3869e1f94b1::t_36398d27eb5760 1-48
+tests/test_ml_shadow.py
+  s_e8a3869e1f94b1::t_62ed381ff9e69a 1-39,41,44,46,48,50-74
+  s_e8a3869e1f94b1::t_6c7f1f89683cc7 40,42-43,45,47,49
+mystock/ml/features.py
+  s_e8a3869e1f94b1::t_2856089b8fc692 99,113-114,127-132
+README.md
+  s_e8a3869e1f94b1::t_56f78fd6d55d6f 292
+docs/OPEN_ITEMS.md
+  s_e8a3869e1f94b1::t_7006aecfda24fc 54
+docs/README.md
+  s_e8a3869e1f94b1::t_5ea7677d16c899 13,19
+docs/catalog.json
+  s_e8a3869e1f94b1::t_2978b04aecf662 590-601
+docs/plans/ml-overnight-plan_claude_20260906.md
+  s_e8a3869e1f94b1::t_c1b3b3d1418fe8 3
+docs/records/ml-preopen-shadow-start_claude_20260906.md
+  s_e8a3869e1f94b1::t_130fecde47a833 1-54
+scripts/ml_experiments/README.md
+  s_e8a3869e1f94b1::t_f7a81a1dec1184 24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.8",
+  "base_commit_sha": "6da6d6c4e578262736ca1cd26fd3b7bb7b89c8e8",
+  "prompts": {},
+  "sessions": {
+    "s_e8a3869e1f94b1": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "280953a0-bde7-47d8-a1f5-b9535307bb48",
+        "model": "claude-fable-5-1"
+      },
+      "human_author": "Kevin <kevinchenkai@126.com>"
+    }
+  }
+}
