@@ -575,6 +575,18 @@
       "provenance": "用户确认预注册后由 Claude Fable 5.1 于 2026-09-06 执行 D4（五种子、两窗口）并撰写；基线 b8ee07a。",
       "first_commit": null,
       "governed_at": "2026-09-06"
+    },
+    {
+      "path": "docs/records/ml-preopen-us-d4_claude_20260906.md",
+      "legacy_paths": [],
+      "title": "ML 美股盘前信息可行性与 D4 回执",
+      "category": "records",
+      "document_date": "2026-09-06",
+      "producer": "claude",
+      "status": "current",
+      "provenance": "用户确认“Futu 为主、开始美股可行性与 D4”后由 Claude Fable 5.1 于 2026-09-06 执行并撰写；基线 1f7c546。",
+      "first_commit": null,
+      "governed_at": "2026-09-06"
     }
   ]
 }

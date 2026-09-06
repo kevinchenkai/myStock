@@ -167,19 +167,21 @@ US_CALENDAR_CODE = 'US.NVDA'
 def preopen_window(code, as_of):
     """Decision window for predicting next HK session from `as_of` with overnight information.
 
-    earliest = when all information that may enter the features exists: the HK `as_of`
-    close confirmation and, if a US session dated `as_of` exists, that session's final_at.
-    deadline = the existing HK cutoff for the target session (09:00 HKT). Fails closed
-    outside HK or outside the verified calendar.
+    HK: earliest = the later of the `as_of` close confirmation and the same-date US session's
+    final_at; deadline = the existing 09:00 HKT cutoff of the target session.
+    US: earliest = target open − 30 min (pre-market snapshot moment); deadline = target open.
+    Fails closed outside the verified calendar.
     """
-    if market(code) != 'HK':
-        raise Unavailable('unavailable', 'pre-open window is defined for HK only')
     as_of = str(as_of)[:10]
     target = next_session(code, as_of)
-    earliest = session(code, as_of)['final_at']
-    if as_of in calendar('US'):
-        earliest = max(earliest, session(US_CALENDAR_CODE, as_of)['final_at'])
     deadline = session(code, target)['deadline']
+    if market(code) == 'HK':
+        earliest = session(code, as_of)['final_at']
+        if as_of in calendar('US'):
+            earliest = max(earliest, session(US_CALENDAR_CODE, as_of)['final_at'])
+    else:
+        # US: the pre-registered pre-market snapshot is taken 30 minutes before the target open.
+        earliest = session(code, target)['open'] - timedelta(minutes=30)
     return {'as_of': as_of, 'target_session': target, 'earliest': earliest, 'deadline': deadline}
 
 def check_preopen_decision(code, as_of, now=None):

@@ -162,3 +162,17 @@ CREATE TABLE IF NOT EXISTS ml_external_1d (
     PRIMARY KEY (symbol, date)
 );
 CREATE INDEX IF NOT EXISTS idx_ml_external_code ON ml_external_1d(for_code, date);
+
+-- 美股开盘前报价快照（盘前价）。历史用 yfinance 盘前小时线（08:00–09:00 ET bar 收盘），实盘用 Futu 快照；
+-- available_at 为快照时刻（开盘前 30 分钟）。docs/plans/ml-overnight-plan_claude_20260906.md 美股段。
+CREATE TABLE IF NOT EXISTS ml_preopen_quotes (
+    code            TEXT NOT NULL,        -- 富途代码，如 US.NVDA
+    date            TEXT NOT NULL,        -- 目标交易日（美东日期）
+    price           REAL NOT NULL,        -- 快照时刻的盘前价
+    prev_close      REAL,                 -- 来源给出的前收（可空，仅核对用）
+    available_at    TEXT NOT NULL,        -- 快照时刻（UTC）
+    source          TEXT NOT NULL,        -- yfinance_1h / futu_snapshot
+    source_ref      TEXT,                 -- 来源原始时间戳或记录标识
+    synced_at       TEXT NOT NULL,
+    PRIMARY KEY (code, date, source)
+);

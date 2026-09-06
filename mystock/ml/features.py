@@ -84,8 +84,10 @@ LABEL_COLS = ["y_high_ret", "y_low_ret"]
 # ---- 特征版本（docs/plans/ml-overnight-plan_claude_20260906.md D3）----
 # V1 = 上面 16 个特征，冻结；V2 = V1 + 隔夜跨市场组。生产 predictor 仍只用 FEATURE_COLS（= V1）。
 FEATURE_COLS_V1 = list(FEATURE_COLS)
-OVERNIGHT_COLS = ["adr_ret"]
+OVERNIGHT_COLS = ["adr_ret"]           # 港股：ADR 隔夜收益（attach_overnight）
+PREOPEN_COLS = ["pre_ret"]             # 美股：盘前价相对昨收（preopen.attach_preopen）
 FEATURE_COLS_V2 = FEATURE_COLS_V1 + OVERNIGHT_COLS
+FEATURE_COLS_V2_US = FEATURE_COLS_V1 + PREOPEN_COLS
 
 
 def attach_overnight(df: pd.DataFrame, external: pd.DataFrame, code: str) -> pd.DataFrame:

@@ -21,7 +21,7 @@ def test_preopen_window_normal_us_holiday_and_non_hk():
     w2 = s.preopen_window('HK.00700', '2026-09-07')         # US Labor Day: no US session dated as_of
     assert w2['earliest'] == s.session('HK.00700', '2026-09-07')['final_at']
     with pytest.raises(s.Unavailable):
-        s.preopen_window('US.NVDA', '2026-09-04')
+        s.preopen_window('XX.0001', '2026-09-04')       # unknown market fails closed
 
 
 def test_check_preopen_decision_statuses():
