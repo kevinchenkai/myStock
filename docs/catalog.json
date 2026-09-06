@@ -599,6 +599,18 @@
       "provenance": "用户确认“开始工程接入和 D5 shadow”后由 Claude Fable 5.1 于 2026-09-06 实现并首次运行港股 shadow；基线 d38bdbd。",
       "first_commit": null,
       "governed_at": "2026-09-06"
+    },
+    {
+      "path": "docs/research/ml-preopen-review_codex_20260906.md",
+      "legacy_paths": [],
+      "title": "ML 开盘前建模与 shadow 审核",
+      "category": "research",
+      "document_date": "2026-09-06",
+      "producer": "codex",
+      "status": "current",
+      "provenance": "用户指定审核 a8fa729..6da6d6c；Codex 于 2026-09-06 按顺序阅读七份文档并核对代码、测试，执行无训练的内存合成反例；仅新增独立审查与维护导航、待办，未访问运行库或冻结副本。",
+      "first_commit": null,
+      "governed_at": "2026-09-06"
     }
   ]
 }
